@@ -1,13 +1,14 @@
 # Smart Nutrition Recommendation System
+  
   AI Nutrition Recommendation System is a full-stack web application that delivers personalized nutrition recommendations and weekly meal planning powered by AI. 
   The platform is tailored for Vietnamese users, leveraging Vietnamese food data, local ingredients, and culturally relevant dietary and exercise patterns.
----
 
+---
 ## Overview
 
 This system allows users to:
 
-- Create and manage weekly meal plans
+- Create and manage weekly meal plans 
 - Track daily calories and macronutrients
 - Analyze nutrition data with charts
 - Receive AI-powered food recommendations
@@ -78,11 +79,11 @@ npm run dev
 
 Backend will run at:
 
-http://localhost:5000  
+http://localhost:3000  
 
 Swagger API documentation:
 
-http://localhost:5000/api-docs  
+http://localhost:3000/api-docs  
 
 ---
 
