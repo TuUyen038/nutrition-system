@@ -46,16 +46,6 @@ The application is built with a React frontend and a Node.js + Express backend u
 
 ---
 
-## Project Structure
-
-root/
-│
-├── frontend/        # React application
-├── backend/         # Express API server
-└── README.md
-
----
-
 ## Installation
 
 ## Backend Setup
@@ -95,6 +85,7 @@ npm start
 
 Frontend will run at:
 http://localhost:3000 (default port)
+
 If a custom PORT is configured:
 http://localhost:3001
 
