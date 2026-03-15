@@ -13,9 +13,12 @@ const uploadImageRoutes = require("./uploadImage.routes");
 const auditLogRoutes = require("./auditLog.routes");
 const favoriteRoutes = require("./favorite.routes");
 const dashboardRoutes = require("./dashboard.routes");
+const exerciseRoutes = require("./exercise.routes");
 
 // Public routes (không cần authentication)
 router.use("/auth", authRoutes);
+router.use("/exercises", exerciseRoutes);
+router.use("/exercise", exerciseRoutes);
 
 // Protected routes (cần authentication)
 router.use("/users", userRoutes);
