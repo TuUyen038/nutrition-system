@@ -57,6 +57,25 @@ const ExerciseSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    activityType: {
+      type: String,
+      enum: [
+        "strength_training",
+        "calisthenics",
+        "cardio_machine",
+        "hiit",
+        "aerobic_dance",
+        "yoga_stretching",
+        "functional_training"
+      ],
+      default: "strength_training",
+      index: true,
+    },
+    defaultIntensity: {
+      type: String,
+      enum: ["light", "moderate", "vigorous"],
+      default: "moderate",
+    },
     videos: {
       type: [String],
       default: [],
