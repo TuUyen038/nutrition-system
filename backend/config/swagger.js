@@ -440,6 +440,26 @@ const options = {
               type: "array",
               items: { type: "string", format: "uri" },
             },
+            activityType: {
+              type: "string",
+              enum: [
+                "strength_training",
+                "calisthenics",
+                "cardio_machine",
+                "hiit",
+                "aerobic_dance",
+                "yoga_stretching",
+                "functional_training"
+              ],
+              example: "strength_training",
+              description: "Loại hoạt động",
+            },
+            defaultIntensity: {
+              type: "string",
+              enum: ["light", "moderate", "vigorous"],
+              example: "moderate",
+              description: "Cường độ mặc định",
+            },
           },
         },
 
