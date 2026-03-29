@@ -10,12 +10,12 @@ function calculateBMR({ gender, age, height, weight }) {
   if (!gender || !age || !height || !weight) return 0;
 
   return gender === "male"
-    ? 10 * weight + 6.25 * height - 5 * age + 5
-    : 10 * weight + 6.25 * height - 5 * age - 161;
+    ? 9.99 * weight + 6.25 * height - 4.92 * age + 5
+    : 9.99 * weight + 6.25 * height - 4.92 * age - 161;
 }
 
 // ========================
-// TDEE = BMR × Activity
+// TDEE = BMR ×  (fitness level)
 // ========================
 function calculateTDEE(user) {
   const bmr = calculateBMR(user);
@@ -31,9 +31,9 @@ function calculateTDEE(user) {
 function adjustByGoal(calories, goal) {
   switch (goal) {
     case "lose_weight":
-      return calories - 500;
+      return calories - 300;
     case "gain_weight":
-      return calories + 500;
+      return calories + 300;
     default:
       return calories;
   }

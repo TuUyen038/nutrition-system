@@ -11,10 +11,11 @@ const recipeSchema = new mongoose.Schema(
     totalWeight: Number,
     source: {
       type: String,
-      // enum: ["savoury", "usda", "fatsecret", "manual"],
-      required: true,
-      default: "savoury",
       index: true,
+    },
+    sourceMetadata: {
+      code: { type: String, sparse: true, index: true },
+      id: { type: String, sparse: true, index: true },
     },
 
     version: {
@@ -28,29 +29,17 @@ const recipeSchema = new mongoose.Schema(
     category: {
       type: String,
       enum: [
-        "main", // món chính
-        "side", // món phụ
-        "soup", // canh, súp
-
-        "breakfast", // món ăn sáng
-        "lunch", // món ăn trưa
-        "dinner", // món ăn tối
-
-        "snack", // ăn vặt
-        "dessert", // món tráng miệng
-        "drink", // đồ uống
-
-        "salad", // salad
-        "sauce", // nước sốt
-
-        "baked", // món nướng, bánh
-        "fried", // món chiên
-        "steamed", // hấp
-        "boiled", // luộc
-
-        "vegetarian", // chay
+        "main",             // Món chính
+        "side",             // Món phụ
+        "dessert",          // Món tráng miệng
+        "drink",            // Đồ uống
+        "base_starch",      // Tinh bột cơ bản (bún, cơm lứt...)
+        "light_supplement", // Bổ sung nhẹ (phô mai, hạt...)
+        "one_dish_meal",    // Món ăn một món (phở, hủ tiếu...)
+        "soup_veg",         // Canh rau
       ],
     },
+    allergy_tags: [String],
 
     instructions: [String],
     ingredients: [
@@ -60,7 +49,7 @@ const recipeSchema = new mongoose.Schema(
           ref: "Ingredient",
         },
         quantity: {
-          amount: { type: Number},
+          amount: { type: Number },
           unit: {
             type: String,
             enum: ["g"],
@@ -74,7 +63,7 @@ const recipeSchema = new mongoose.Schema(
       },
     ],
 
-    servings: { type: Number},
+    servings: { type: Number },
 
     totalNutrition: {
       calories: Number,
@@ -116,6 +105,7 @@ const recipeSchema = new mongoose.Schema(
     verified: { type: Boolean, default: true },
     // isPublic: { type: Boolean, default: false },
     deleted: { type: Boolean, default: false }, // Soft delete
+    nutritionVector: [Number],
   },
   { timestamps: true },
 );
