@@ -56,6 +56,7 @@ function Profile() {
     height: "",
     weight: "",
     goal: "maintain_weight",
+    fitnessLevel: "intermediate",
     allergies: [],
   });
   const [originalProfile, setOriginalProfile] = useState({ ...profile });
@@ -124,6 +125,7 @@ function Profile() {
           height: user.height?.toString() || "",
           weight: user.weight?.toString() || "",
           goal: user.goal || "maintain_weight",
+          fitnessLevel: user.fitnessLevel || "intermediate",
           allergies: Array.isArray(user.allergies) ? user.allergies : [],
         };
 
@@ -200,6 +202,7 @@ function Profile() {
         height: profile.height ? parseFloat(profile.height) : undefined,
         weight: profile.weight ? parseFloat(profile.weight) : undefined,
         goal: profile.goal,
+        fitnessLevel: profile.fitnessLevel,
         allergies: profile.allergies,
       };
 
@@ -395,6 +398,18 @@ function Profile() {
                         {goalLabels[profile.goal] || profile.goal}
                       </MDTypography>
                     </MDBox>
+                    <MDBox display="flex" justifyContent="space-between">
+                      <MDTypography variant="button" color="text" fontWeight="medium">
+                        Mức độ fitness:
+                      </MDTypography>
+                      <MDTypography variant="button" color="text">
+                        {profile.fitnessLevel === "sedentary" && "Ít hoạt động"}
+                        {profile.fitnessLevel === "beginner" && "Mới bắt đầu"}
+                        {profile.fitnessLevel === "intermediate" && "Trung cấp"}
+                        {profile.fitnessLevel === "advanced" && "Nâng cao"}
+                        {profile.fitnessLevel === "athlete" && "Vận động viên"}
+                      </MDTypography>
+                    </MDBox>
                     <MDBox display="flex" flexDirection="column">
                       <MDTypography variant="button" color="text" fontWeight="medium" mb={0.5}>
                         Dị ứng:
@@ -538,6 +553,46 @@ function Profile() {
                       <MenuItem value="lose_weight">Giảm cân</MenuItem>
                       <MenuItem value="maintain_weight">Duy trì cân nặng</MenuItem>
                       <MenuItem value="gain_weight">Tăng cân</MenuItem>
+                    </Select>
+                  </FormControl>
+
+                  <FormControl fullWidth variant="outlined" sx={{ mb: 2 }}>
+                    <InputLabel id="fitness-level-label" sx={{ lineHeight: "1.5" }}>
+                      Mức độ fitness
+                    </InputLabel>
+                    <Select
+                      labelId="fitness-level-label"
+                      label="Mức độ fitness"
+                      value={profile.fitnessLevel}
+                      onChange={handleChange("fitnessLevel")}
+                      sx={{
+                        minHeight: "48px",
+                        "& .MuiSelect-select": {
+                          display: "flex",
+                          alignItems: "center",
+                          padding: "14px 14px !important",
+                          lineHeight: "1.5",
+                          minHeight: "20px",
+                        },
+                        "& .MuiOutlinedInput-notchedOutline": {
+                          borderColor: "rgba(0, 0, 0, 0.23)",
+                          borderWidth: "1px",
+                        },
+                        "&:hover .MuiOutlinedInput-notchedOutline": {
+                          borderColor: "rgba(0, 0, 0, 0.87)",
+                          borderWidth: "1px",
+                        },
+                        "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                          borderColor: "#1976d2",
+                          borderWidth: "1px",
+                        },
+                      }}
+                    >
+                      <MenuItem value="sedentary">Ít hoạt động (ít vận động, chủ yếu ngồi văn phòng)</MenuItem>
+                      <MenuItem value="beginner">Mới bắt đầu (tập nhẹ 1-3 ngày/tuần)</MenuItem>
+                      <MenuItem value="intermediate">Trung cấp (tập vừa 4-5 ngày/tuần)</MenuItem>
+                      <MenuItem value="advanced">Nâng cao (tập cường độ cao 6-7 ngày/tuần)</MenuItem>
+                      <MenuItem value="athlete">Vận động viên (tập 2 lần/ngày)</MenuItem>
                     </Select>
                   </FormControl>
 

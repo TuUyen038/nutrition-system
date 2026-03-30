@@ -38,6 +38,7 @@ function Cover() {
     height: "",
     weight: "",
     goal: "",
+    fitnessLevel: "intermediate",
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -381,6 +382,49 @@ function Cover() {
                     <MenuItem value="lose_weight">Giảm cân</MenuItem>
                     <MenuItem value="maintain_weight">Duy trì cân nặng</MenuItem>
                     <MenuItem value="gain_weight">Tăng cân</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+
+              {/* Mức độ fitness */}
+              <Grid item xs={12}>
+                <FormControl fullWidth variant="outlined">
+                  <InputLabel id="fitness-level-label" sx={{ lineHeight: "1.5" }}>
+                    Mức độ fitness
+                  </InputLabel>
+                  <Select
+                    labelId="fitness-level-label"
+                    label="Mức độ fitness"
+                    value={formData.fitnessLevel}
+                    onChange={handleChange("fitnessLevel")}
+                    sx={{
+                      minHeight: "48px",
+                      "& .MuiSelect-select": {
+                        display: "flex",
+                        alignItems: "center",
+                        padding: "14px 14px !important",
+                        lineHeight: "1.5",
+                        minHeight: "20px",
+                      },
+                      "& .MuiOutlinedInput-notchedOutline": {
+                        borderColor: "rgba(0, 0, 0, 0.23)",
+                        borderWidth: "1px",
+                      },
+                      "&:hover .MuiOutlinedInput-notchedOutline": {
+                        borderColor: "rgba(0, 0, 0, 0.87)",
+                        borderWidth: "1px",
+                      },
+                      "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                        borderColor: "#1976d2",
+                        borderWidth: "1px",
+                      },
+                    }}
+                  >
+                    <MenuItem value="sedentary">Ít hoạt động (ít vận động, chủ yếu ngồi văn phòng)</MenuItem>
+                    <MenuItem value="beginner">Mới bắt đầu (tập nhẹ 1-3 ngày/tuần)</MenuItem>
+                    <MenuItem value="intermediate">Trung cấp (tập vừa 4-5 ngày/tuần)</MenuItem>
+                    <MenuItem value="advanced">Nâng cao (tập cường độ cao 6-7 ngày/tuần)</MenuItem>
+                    <MenuItem value="athlete">Vận động viên (tập 2 lần/ngày)</MenuItem>
                   </Select>
                 </FormControl>
               </Grid>

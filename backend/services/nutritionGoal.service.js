@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const NutritionGoal = require("../models/NutritionGoal");
+const { fitnessToActivityFactor } = require("../utils/fitnessMapping");
 
 const DEFAULT_ACTIVITY_FACTOR = 1.55; // moderate
 
@@ -15,13 +16,19 @@ function calculateBMR({ gender, age, height, weight }) {
 }
 
 // ========================
-// TDEE = BMR ×  (fitness level)
+// TDEE = BMR ×  activityFactor (ưu tiên fitness level nếu có)
 // ========================
 function calculateTDEE(user) {
   const bmr = calculateBMR(user);
   if (!bmr) return 0;
 
-  const activityFactor = user.activityFactor || DEFAULT_ACTIVITY_FACTOR;
+  let activityFactor = DEFAULT_ACTIVITY_FACTOR;
+
+  // Ưu tiên fitnessLevel
+  if (user.fitnessLevel && fitnessToActivityFactor[user.fitnessLevel]) {
+    activityFactor = fitnessToActivityFactor[user.fitnessLevel];
+  }
+
   return bmr * activityFactor;
 }
 
@@ -78,6 +85,13 @@ async function createNutritionGoal(user) {
       { session }
     );
 
+    // derive activityFactor từ fitnessLevel (giống TDEE)
+    let activityFactor = DEFAULT_ACTIVITY_FACTOR;
+
+    if (user.fitnessLevel && fitnessToActivityFactor[user.fitnessLevel]) {
+      activityFactor = fitnessToActivityFactor[user.fitnessLevel];
+    }
+
     // Create goal mới
     const [newGoal] = await NutritionGoal.create(
       [
@@ -89,7 +103,8 @@ async function createNutritionGoal(user) {
             height: user.height,
             weight: user.weight,
             goal: user.goal,
-            activityFactor: user.activityFactor || DEFAULT_ACTIVITY_FACTOR,
+            activityFactor,
+            fitnessLevel: user.fitnessLevel || "sedentary", // ít hoạt động nếu không có thông tin fitnessLevel, để dễ theo dõi lịch sử thay đổi
           },
           targetNutrition,
           status: "active",

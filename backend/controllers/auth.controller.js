@@ -29,6 +29,7 @@ exports.signup = async (req, res) => {
       height,
       weight,
       goal,
+      fitnessLevel,
       allergies,
     } = req.body;
 
@@ -67,6 +68,7 @@ exports.signup = async (req, res) => {
       height,
       weight,
       goal,
+      fitnessLevel,
       allergies: allergies || [],
     });
 

@@ -73,6 +73,12 @@ const options = {
               example: "lose_weight",
               description: "Mục tiêu sức khỏe",
             },
+            fitnessLevel: {
+              type: "string",
+              enum: ["sedentary", "beginner", "intermediate", "advanced", "athlete"],
+              example: "intermediate",
+              description: "Mức độ fitness (ít hoạt động, mới bắt đầu, trung cấp, nâng cao, vận động viên)",
+            },
             allergies: {
               type: "array",
               items: { type: "string" },
@@ -248,6 +254,12 @@ const options = {
               type: "string",
               enum: ["lose_weight", "maintain_weight", "gain_weight"],
             },
+            fitnessLevel: {
+              type: "string",
+              enum: ["sedentary", "beginner", "intermediate", "advanced", "athlete"],
+              example: "intermediate",
+              description: "Mức độ fitness",
+            },
             allergies: {
               type: "array",
               items: { type: "string" },
@@ -274,6 +286,7 @@ const options = {
             height: { type: "number" },
             weight: { type: "number" },
             goal: { type: "string", enum: ["lose_weight", "maintain_weight", "gain_weight"] },
+            fitnessLevel: { type: "string", enum: ["sedentary", "beginner", "intermediate", "advanced", "athlete"] },
             allergies: { type: "array", items: { type: "string" } },
           },
         },
