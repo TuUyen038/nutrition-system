@@ -463,6 +463,98 @@ const options = {
           },
         },
 
+        // ==================== WORKOUT SESSION SCHEMAS ====================
+        WorkoutSession: {
+          type: "object",
+          properties: {
+            _id: {
+              type: "string",
+              format: "ObjectId",
+              description: "ID của phiên tập",
+            },
+            userId: {
+              type: "string",
+              format: "ObjectId",
+              description: "ID của người dùng",
+            },
+            exerciseId: {
+              type: "number",
+              example: 1,
+              description: "ID của bài tập",
+            },
+            intensity: {
+              type: "string",
+              enum: ["light", "moderate", "vigorous"],
+              example: "moderate",
+              description: "Cường độ tập luyện",
+            },
+            startTime: {
+              type: "string",
+              format: "date-time",
+              description: "Thời gian bắt đầu phiên tập",
+            },
+            endTime: {
+              type: "string",
+              format: "date-time",
+              nullable: true,
+              description: "Thời gian kết thúc phiên tập",
+            },
+            durationMinutes: {
+              type: "number",
+              nullable: true,
+              description: "Thời lượng tập luyện (phút)",
+            },
+            kcalBurned: {
+              type: "number",
+              nullable: true,
+              description: "Lượng calo tiêu thụ",
+            },
+          },
+        },
+        StartWorkoutRequest: {
+          type: "object",
+          required: ["userId", "exerciseId", "intensity"],
+          properties: {
+            userId: {
+              type: "string",
+              format: "ObjectId",
+              description: "ID của người dùng",
+            },
+            exerciseId: {
+              type: "number",
+              example: 1,
+              description: "ID của bài tập",
+            },
+            intensity: {
+              type: "string",
+              enum: ["light", "moderate", "vigorous"],
+              example: "moderate",
+              description: "Cường độ tập luyện",
+            },
+          },
+        },
+        StopWorkoutRequest: {
+          type: "object",
+          required: ["sessionId"],
+          properties: {
+            sessionId: {
+              type: "string",
+              format: "ObjectId",
+              description: "ID của phiên tập cần kết thúc",
+            },
+          },
+        },
+        TodayKcalResponse: {
+          type: "object",
+          properties: {
+            totalKcal: {
+              type: "number",
+              example: 245.5,
+              description: "Tổng calo tiêu thụ trong ngày",
+            },
+          },
+        },
+
         // ==================== RECIPE SCHEMAS ====================
         Recipe: {
           type: "object",
@@ -2716,6 +2808,145 @@ const options = {
             },
             401: {
               description: "Chưa xác thực",
+            },
+          },
+        },
+      },
+
+      // ==================== WORKOUT SESSION ENDPOINTS ====================
+      "/workout-session/start": {
+        post: {
+          tags: ["Workout Session"],
+          summary: "Bắt đầu phiên tập luyện",
+          description: "Tạo một phiên tập luyện mới cho người dùng",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/StartWorkoutRequest" },
+              },
+            },
+          },
+          responses: {
+            200: {
+              description: "Phiên tập đã được tạo thành công",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean", example: true },
+                      data: { $ref: "#/components/schemas/WorkoutSession" },
+                    },
+                  },
+                },
+              },
+            },
+            400: {
+              description: "Dữ liệu không hợp lệ hoặc người dùng đã có phiên tập đang hoạt động",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean", example: false },
+                      message: { type: "string" },
+                    },
+                  },
+                },
+              },
+            },
+            401: {
+              description: "Chưa xác thực",
+            },
+          },
+        },
+      },
+      "/workout-session/stop": {
+        post: {
+          tags: ["Workout Session"],
+          summary: "Kết thúc phiên tập luyện",
+          description: "Kết thúc phiên tập luyện và tính toán calo tiêu thụ",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/StopWorkoutRequest" },
+              },
+            },
+          },
+          responses: {
+            200: {
+              description: "Phiên tập đã được kết thúc thành công",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean", example: true },
+                      data: { $ref: "#/components/schemas/WorkoutSession" },
+                    },
+                  },
+                },
+              },
+            },
+            400: {
+              description: "Phiên tập không tồn tại hoặc đã kết thúc",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean", example: false },
+                      message: { type: "string" },
+                    },
+                  },
+                },
+              },
+            },
+            401: {
+              description: "Chưa xác thực",
+            },
+          },
+        },
+      },
+      "/workout-session/today-kcal": {
+        get: {
+          tags: ["Workout Session"],
+          summary: "Lấy tổng calo tiêu thụ hôm nay",
+          description: "Lấy tổng lượng calo đã tiêu thụ trong ngày của người dùng",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              in: "query",
+              name: "userId",
+              required: true,
+              schema: { type: "string", format: "ObjectId" },
+              description: "ID của người dùng",
+            },
+          ],
+          responses: {
+            200: {
+              description: "Tổng calo tiêu thụ hôm nay",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean", example: true },
+                      data: { $ref: "#/components/schemas/TodayKcalResponse" },
+                    },
+                  },
+                },
+              },
+            },
+            401: {
+              description: "Chưa xác thực",
+            },
+            500: {
+              description: "Lỗi server",
             },
           },
         },
