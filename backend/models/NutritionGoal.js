@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { act } = require("react");
 
 const nutritionGoalSchema = new mongoose.Schema(
   {
@@ -27,6 +28,12 @@ const nutritionGoalSchema = new mongoose.Schema(
       fiber: Number,
       sugar: Number,
       sodium: Number,
+    },
+
+    tdee: {
+      calories: Number,
+      brm: Number,
+      activityFactor: Number,
     },
 
     // Trạng thái version

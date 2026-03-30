@@ -59,6 +59,7 @@ function calculateNutritionGoal(user) {
   };
 }
 
+
 async function createNutritionGoal(user) {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -119,7 +120,10 @@ async function getActiveGoal(req, res) {
 
   res.json(goal);
 };
+
 module.exports = {
   createNutritionGoal,
   getActiveGoal,
+  calculateBMR,
+  calculateTDEE
 };

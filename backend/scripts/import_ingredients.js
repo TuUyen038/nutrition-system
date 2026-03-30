@@ -158,3 +158,66 @@ async function importIngredients() {
 }
 
 importIngredients();
+
+
+// const path = require("path");
+// const mongoose = require("mongoose");
+// require("dotenv").config({ path: path.join(__dirname, "../.env") });
+
+// const NutritionGoal = require("../models/NutritionGoal");
+
+// // Import lại các hàm logic tính toán của bạn
+// // Giả sử các hàm này nằm trong file nutritionService.js
+// const { calculateBMR, calculateTDEE } = require("../services/nutritionGoal.service");
+
+// const MONGO_URI = process.env.MONGO_URI;
+
+// async function runMigration() {
+//   try {
+//     await mongoose.connect(MONGO_URI);
+//     console.log("✅ Connected to MongoDB");
+
+//     // 1. Tìm các bản ghi chưa có trường tdee
+//     const goals = await NutritionGoal.find({ tdee: { $exists: false } });
+//     console.log(`🔍 Tìm thấy ${goals.length} bản ghi cần cập nhật.`);
+
+//     for (const goal of goals) {
+//       // 2. Tạo mock user từ bodySnapshot cũ để đưa vào hàm tính toán
+//       const userMock = {
+//         age: goal.bodySnapshot.age,
+//         gender: goal.bodySnapshot.gender,
+//         height: goal.bodySnapshot.height,
+//         weight: goal.bodySnapshot.weight,
+//         goal: goal.bodySnapshot.goal,
+//         activityFactor: goal.bodySnapshot.activityFactor
+//       };
+
+//       // 3. Tính toán lại con số
+//       const bmrValue = calculateBMR(userMock);
+//       const tdeeValue = calculateTDEE(userMock);
+
+//       // 4. Cập nhật trực tiếp vào bản ghi đó
+//       await NutritionGoal.updateOne(
+//         { _id: goal._id },
+//         {
+//           $set: {
+//             tdee: {
+//               calories: Math.round(tdeeValue),
+//               brm: Math.round(bmrValue), // Khớp với 'brm' trong Schema của bạn
+//               activityFactor: 1.55
+//             }
+//           }
+//         }
+//       );
+//       console.log(`✔️ Đã cập nhật TDEE cho Goal: ${goal._id}`);
+//     }
+
+//     console.log("🚀 Hoàn thành Migration!");
+//     process.exit(0);
+//   } catch (err) {
+//     console.error("❌ Lỗi Migration:", err);
+//     process.exit(1);
+//   }
+// }
+
+// runMigration();
