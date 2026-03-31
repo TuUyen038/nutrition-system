@@ -5,7 +5,9 @@ const ROLE_ABSORPTION = {
   saute: 0.6,
   seasoning: 1,
   soup: 1,
-  boiling_discarded: 0,
+  boiling: 0.7,
+  brining: 0.1, // ngâm nước muối làm giảm sodium hấp thu
+  sauce: 0.3,
 };
 
 function convertToGrams(amount, unit) {
