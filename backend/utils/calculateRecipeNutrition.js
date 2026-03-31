@@ -1,5 +1,13 @@
 const Ingredient = require("../models/Ingredient");
 
+const ROLE_ABSORPTION = {
+  frying: 0.3,
+  saute: 0.6,
+  seasoning: 1,
+  soup: 1,
+  boiling_discarded: 0,
+};
+
 function convertToGrams(amount, unit) {
   if (!amount || amount <= 0) return 0;
 
@@ -54,9 +62,7 @@ async function calculateRecipeNutrition(ingredients, servings) {
   // Process each ingredient
   for (const ing of ingredients) {
     if (!ing.ingredientId) continue;
-console.log("truoc amount")
     if (!ing.quantity?.amount || ing.quantity.amount <= 0) continue;
-console.log("sau amount")
 
     try {
       const ingredientDoc = await Ingredient.findById(ing.ingredientId);
@@ -70,11 +76,31 @@ console.log("sau amount")
 
       if (amountInGrams <= 0) continue;
 
-      totalWeight += amountInGrams;
+      // --- determine absorptionRate ---
+      let absorptionRate = 1;
 
-      const factor = amountInGrams / 100;
+      // priority 1: user override
+      if (ing.absorptionRate != null) {
+        absorptionRate = ing.absorptionRate;
+      }
+      // priority 2: role mapping
+      else if (ing.role) {
+        if (!ROLE_ABSORPTION.hasOwnProperty(ing.role)) {
+          console.warn(`Unknown role: ${ing.role}`);
+        }
+        absorptionRate = ROLE_ABSORPTION[ing.role] ?? 1;
+      }
+
+      // --- apply ---
+      const effectiveAmount = amountInGrams * absorptionRate;
+
+      // --- update weight ---
+      totalWeight += effectiveAmount;
+
+      // --- nutrition ---
+      const factor = effectiveAmount / 100;
       const nutrition = ingredientDoc.nutrition;
-      console.log("nutrition of each ing: ", ing, nutrition);
+
       totalNutrition.calories += (nutrition.calories || 0) * factor;
       totalNutrition.protein += (nutrition.protein || 0) * factor;
       totalNutrition.fat += (nutrition.fat || 0) * factor;
@@ -82,6 +108,7 @@ console.log("sau amount")
       totalNutrition.fiber += (nutrition.fiber || 0) * factor;
       totalNutrition.sugar += (nutrition.sugar || 0) * factor;
       totalNutrition.sodium += (nutrition.sodium || 0) * factor;
+
     } catch (error) {
       console.error(
         `Error calculating nutrition for ingredient ${ing.ingredientId}:`,
@@ -131,3 +158,6 @@ module.exports = {
   calculateRecipeNutrition,
   convertToGrams,
 };
+
+//TODO: Ui nhập liệu nên có cho chọn role, thêm logic validation cho role trong be
+//TODO: xem xét việc áp dụng tỉ lệ lên nước chấm để làm giảm sodium. thêm vào đó là xem xét việt bay hơi nưuosc khi chiên, rán,...

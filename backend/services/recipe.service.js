@@ -128,6 +128,7 @@ exports.saveRecipeToDB = async (recipeData) => {
     const normalized = {
       ...recipeData,
       verified: recipeData.verified ?? false,
+      
     };
 
     if (Array.isArray(normalized.ingredients)) {
