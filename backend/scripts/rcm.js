@@ -1,273 +1,325 @@
 const mongoose = require("mongoose");
 const path = require("path");
 
-// Load cấu hình từ file .env (nằm ở thư mục cha của thư mục chứa script này)
 require("dotenv").config({ path: path.join(__dirname, "../.env") });
-
 const Recipe = require("../models/Recipe");
 
-// ─────────────────────────────────────────────────────────────
-// 1. CẤU HÌNH & HẰNG SỐ (CONFIG)
-// ─────────────────────────────────────────────────────────────
-
+// --- CONFIG & CONSTANTS (Giữ nguyên từ code của bạn) ---
 const GOAL_PROFILES = {
-    lose_weight: { label: "Giảm cân", cal_f: 0.85, p: 0.30, f: 0.25, c: 0.45 },
-    gain_muscle: { label: "Tăng cơ", cal_f: 1.10, p: 0.25, f: 0.25, c: 0.50 },
-    balanced:    { label: "Cân bằng", cal_f: 1.00, p: 0.20, f: 0.30, c: 0.50 },
+  lose_weight: { label: "Giảm cân", cal_f: 0.85, p: 0.3, f: 0.25, c: 0.45 },
+  gain_muscle: { label: "Tăng cơ", cal_f: 1.1, p: 0.25, f: 0.25, c: 0.5 },
+  balanced: { label: "Cân bằng", cal_f: 1.0, p: 0.2, f: 0.3, c: 0.5 },
 };
+// Thêm danh sách các từ khóa gây "nặng bụng" buổi tối
+const NIGHT_BLACKLIST = ["xôi", "nếp", "chiên", "rán", "quay"];
 
-const MEAL_SPLIT = { breakfast: 0.25, lunch: 0.40, dinner: 0.35 };
+// Điều chỉnh lại MEAL_SPLIT để bữa tối nhẹ hơn một chút nếu muốn
+const MEAL_SPLIT = { breakfast: 0.25, lunch: 0.45, dinner: 0.3 };
 const MEAL_LABEL = { breakfast: "Sáng", lunch: "Trưa", dinner: "Tối" };
-
-// Trọng số ưu tiên khi tính điểm (Calories và Protein quan trọng nhất)
 const NUTRITION_WEIGHTS = { calories: 2.5, protein: 2.0, fat: 1.0, carbs: 1.0 };
 const TOTAL_W = Object.values(NUTRITION_WEIGHTS).reduce((a, b) => a + b, 0);
-
-// Ngưỡng Calo tối đa cho từng loại món ăn để thực hiện Auto-scaling (Ví dụ: tránh ăn 1 đĩa Ngô chiên 800kcal)
 const MAX_CALO_PER_CAT = {
-    main: 1000,
-    side_dish: 200,
-    dessert: 150,
-    light_supplement: 200,
-    soup_veg: 150,
-    base_starch: 800, // Cơm/Bún trắng
-    one_dish_meal: 900
+  main: 600,
+  side_dish: 200,
+  dessert: 150,
+  light_supplement: 200,
+  soup_veg: 150,
+  base_starch: 300,
+  one_dish_meal: 700,
 };
 
-// ─────────────────────────────────────────────────────────────
-// 2. CÁC HÀM TÍNH TOÁN DINH DƯỠNG (CORE LOGIC)
-// ─────────────────────────────────────────────────────────────
+// --- CORE UTILS (Các hàm bổ trợ tính toán) ---
 
 /**
- * Tính toán tỷ lệ scale dựa trên ngưỡng calo của Category
+ * Hàm kiểm tra món ăn có phù hợp cho buổi tối không
  */
-function getNormalizedScale(recipe) {
-    const cat = recipe.category || "unknown";
-    const rawCalories = recipe.totalNutritionPerServing?.calories || 0;
-    const threshold = MAX_CALO_PER_CAT[cat] || 9999;
-    return rawCalories > threshold ? threshold / rawCalories : 1.0;
+function isHeavyForDinner(recipe) {
+  const searchStr = (
+    recipe.name +
+    " " +
+    (recipe.description || "")
+  ).toLowerCase();
+  return NIGHT_BLACKLIST.some((word) => searchStr.includes(word));
+}
+
+function getScaledNutri(recipe) {
+  const cat = recipe.category || "unknown";
+  const rawNutri = recipe.totalNutritionPerServing || {};
+  const rawCalo = rawNutri.calories || 0;
+
+  // Lấy ngưỡng tối đa cho phép của loại món này
+  const threshold = MAX_CALO_PER_CAT[cat] || 500;
+
+  // Tính toán scale để món ăn không vượt quá ngưỡng
+  // Ví dụ: Khoai 707kcal, threshold 300kcal => scale = 300/707 = 0.42
+  let scale = rawCalo > threshold ? threshold / rawCalo : 1.0;
+
+  // GIỚI HẠN CỨNG:
+  // Một món ăn dù hệ thống có "vã" calo đến mấy cũng không được ăn quá 1.5 lần
+  // hoặc nếu món gốc quá to thì không được ăn quá tỉ lệ threshold.
+  // Điều này ngăn việc hệ thống bắt bạn ăn x2.0 đĩa khoai 707kcal.
+  scale = Math.min(scale, 1.2);
+
+  return {
+    nutri: {
+      calories: (rawNutri.calories || 0) * scale,
+      protein: (rawNutri.protein || 0) * scale,
+      fat: (rawNutri.fat || 0) * scale,
+      carbs: (rawNutri.carbs || 0) * scale,
+    },
+    scale: parseFloat(scale.toFixed(2)), // Làm tròn cho đẹp log
+  };
+}
+
+function gaussianScore(itemNutri, targetVec) {
+  let sse = 0.0;
+  for (const [key, w] of Object.entries(NUTRITION_WEIGHTS)) {
+    const t = targetVec[key] || 1;
+    const a = itemNutri[key] || 0;
+    sse += w * Math.pow((a - t) / t, 2);
+  }
+  return Math.exp((-0.5 * sse) / TOTAL_W);
 }
 
 /**
- * Lấy dinh dưỡng sau khi đã scale (ví dụ: chỉ ăn 0.5 suất nếu món quá béo)
+ * Hàm chọn món core: có thêm logic kiểm tra trùng lặp thông minh
  */
-function getScaledNutri(recipe, scaleOverride = null) {
-    const nutri = recipe.totalNutritionPerServing || {};
-    const scale = scaleOverride !== null ? scaleOverride : getNormalizedScale(recipe);
+function pickOne(
+  pool,
+  categoryInput,
+  targetVec,
+  usedIds = new Set(),
+  mealType,
+) {
+  const allowedCats = Array.isArray(categoryInput)
+    ? categoryInput
+    : [categoryInput];
+  let subPool = pool.filter((r) => allowedCats.includes(r.category));
+
+  // Lọc Blacklist ngay từ đầu cho bữa tối
+  if (mealType === "dinner") {
+    subPool = subPool.filter((r) => !isHeavyForDinner(r));
+  }
+
+  if (subPool.length === 0) return null;
+
+  const scored = subPool.map((recipe) => {
+    const { nutri } = getScaledNutri(recipe);
+    const fitScore = gaussianScore(nutri, targetVec);
+    const isUsed = usedIds.has(recipe._id.toString());
+    const isSide = recipe.category === "side_dish";
+
+    // Phạt trùng món
+    let varietyScore = isUsed ? 0.0 : 1.0;
+    if (recipe.category === "base_starch" && isUsed) varietyScore = 0.3; // Tinh bột lặp lại bị phạt nặng hơn tí
+
+    // PHẠT CỰC NẶNG SIDE DISH:
+    // Trừ hẳn 0.8 điểm để nó luôn thua các món Main (thường có điểm từ 0.5 - 1.0)
+    let sidePenalty = isSide ? 0.8 : 0.0;
 
     return {
-        nutri: {
-            calories: (nutri.calories || 0) * scale,
-            protein:  (nutri.protein || 0) * scale,
-            fat:      (nutri.fat || 0) * scale,
-            carbs:    (nutri.carbs || 0) * scale,
-        },
-        scale
+      finalScore: 0.4 * fitScore + 0.6 * varietyScore - sidePenalty,
+      recipe,
     };
-}
+  });
 
-/**
- * Gaussian Score: So sánh độ lệch giữa món ăn và mục tiêu bữa ăn
- */
-function gaussianScore(itemNutri, targetVec) {
-    let sse = 0.0;
-    for (const [key, w] of Object.entries(NUTRITION_WEIGHTS)) {
-        const t = targetVec[key] || 1;
-        const a = itemNutri[key] || 0;
-        sse += w * Math.pow((a - t) / t, 2);
-    }
-    return Math.exp(-0.5 * sse / TOTAL_W);
+  scored.sort((a, b) => b.finalScore - a.finalScore);
+  const topN = Math.min(scored.length, 3);
+  return scored[Math.floor(Math.random() * topN)].recipe;
 }
 
 // ─────────────────────────────────────────────────────────────
-// 3. BỘ MÁY GỢI Ý (RECOMMENDATION ENGINE)
+// TÍNH NĂNG 1: GỢI Ý CHO 1 NGÀY (DAILY PLAN)
 // ─────────────────────────────────────────────────────────────
+function generateDailyPlan(recipes, adjDt, usedIdsInWeek = new Set()) {
+  let dayActual = { calories: 0, protein: 0, fat: 0, carbs: 0 };
+  let plan = {};
+  let currentDayMain = null;
 
-function pickOne(pool, categoryInput, targetVec, usedNames, mealType) {
-    const allowedCats = Array.isArray(categoryInput) ? categoryInput : [categoryInput];
-    const subPool = pool.filter(r => allowedCats.includes(r.category));
-
-    if (subPool.length === 0) return null;
-
-    const scored = subPool.map(recipe => {
-        const { nutri } = getScaledNutri(recipe);
-        const fitScore = gaussianScore(nutri, targetVec);
-        
-        // Phạt nhẹ các món có dầu mỡ/chiên rán vào buổi tối (dựa trên tên hoặc mô tả)
-        let penalty = 0.0;
-        const searchStr = (recipe.name + (recipe.description || "")).toLowerCase();
-        if (mealType === "dinner" && (searchStr.includes("chiên") || searchStr.includes("rán"))) {
-            penalty = 0.2;
-        }
-
-        const isUsed = usedNames.has(recipe.name.toLowerCase().trim());
-        const varietyScore = isUsed ? 0.0 : 1.0;
-        
-        return { 
-            finalScore: (0.7 * fitScore) + (0.3 * varietyScore) - penalty, 
-            recipe 
-        };
-    });
-
-    scored.sort((a, b) => b.finalScore - a.finalScore);
-    const topN = Math.min(scored.length, 3);
-    return scored[Math.floor(Math.random() * topN)].recipe;
-}
-
-function buildCompleteMeal(recipes, mealType, target, usedNames, forceCombo = false) {
+  for (const mKey of ["breakfast", "lunch", "dinner"]) {
+    const mTarget = Object.fromEntries(
+      Object.entries(adjDt).map(([k, v]) => [k, v * MEAL_SPLIT[mKey]]),
+    );
     let chosen = [];
 
-    if (mealType === "breakfast") {
-        // Sáng: Ưu tiên One-dish (Phở, Bún, Mỳ)
-        const res = pickOne(recipes, ["one_dish_meal"], target, usedNames, mealType);
-        if (res) chosen.push(res);
+    if (mKey === "breakfast") {
+      const res = pickOne(
+        recipes,
+        ["one_dish_meal"],
+        mTarget,
+        usedIdsInWeek,
+        mKey,
+      );
+      if (res) chosen.push(res);
     } else {
-        // Tạo khung Combo (Cơm + Mặn + Canh)
-        const s = pickOne(recipes, ["base_starch"], { ...target, calories: target.calories * 0.4 }, usedNames, mealType);
-        const m = pickOne(recipes, ["main"], { ...target, calories: target.calories * 0.4 }, usedNames, mealType);
-        const v = pickOne(recipes, ["soup_veg"], { ...target, calories: target.calories * 0.2 }, usedNames, mealType);
-        const combo = [s, m, v].filter(Boolean);
+      // 1. Chọn tinh bột
+      const s = pickOne(
+        recipes,
+        ["base_starch"],
+        { ...mTarget, calories: mTarget.calories * 0.4 },
+        usedIdsInWeek,
+        mKey,
+      );
 
-        // Tạo khung One-dish (Bún đậu, Phở...)
-        const oneDish = pickOne(recipes, ["one_dish_meal"], target, usedNames, mealType);
-        const oneDishArr = oneDish ? [oneDish] : [];
+      // 2. Chọn món mặn (Main)
+      let m;
+      // KIỂM TRA LEFTOVER: Phải thỏa mãn: (Linh hoạt 30%) + (Không được nằm trong Blacklist buổi tối)
+      if (
+        mKey === "dinner" &&
+        currentDayMain &&
+        Math.random() < 0.3 &&
+        !isHeavyForDinner(currentDayMain)
+      ) {
+        m = currentDayMain;
+      } else {
+        m = pickOne(
+          recipes,
+          ["main"],
+          { ...mTarget, calories: mTarget.calories * 0.4 },
+          usedIdsInWeek,
+          mKey,
+        );
+      }
 
-        // Logic So găng (Duel) giữa Cơm và One-dish
-        if (forceCombo) {
-            chosen = combo;
-        } else {
-            // Thưởng điểm cho Combo (cơm) để ưu tiên bữa ăn gia đình truyền thống
-            const scoreCombo = combo.length >= 2 ? 1.2 : 0; 
-            const scoreOne = oneDishArr.length > 0 ? 1.0 : 0;
-            chosen = scoreCombo >= scoreOne ? combo : oneDishArr;
-        }
+      // 3. Chọn canh/rau
+      const v = pickOne(
+        recipes,
+        ["soup_veg"],
+        { ...mTarget, calories: mTarget.calories * 0.2 },
+        usedIdsInWeek,
+        mKey,
+      );
+
+      if (mKey === "lunch") currentDayMain = m;
+      chosen = [s, m, v].filter(Boolean);
     }
 
-    chosen.forEach(r => usedNames.add(r.name.toLowerCase().trim()));
-    return chosen;
-}
-
-// ─────────────────────────────────────────────────────────────
-// 4. LOGIC ĐIỀU CHỈNH THÔNG MINH (ADAPTIVE / DEBT)
-// ─────────────────────────────────────────────────────────────
-
-function getDailyTarget(tdee, goal) {
-    const p = GOAL_PROFILES[goal] || GOAL_PROFILES.balanced;
-    const cal = tdee * p.cal_f;
-    return {
-        calories: cal,
-        protein:  (cal * p.p) / 4,
-        fat:      (cal * p.f) / 9,
-        carbs:    (cal * p.c) / 4
-    };
-}
-
-/**
- * Rolling Debt: Điều chỉnh target hôm nay dựa trên những gì đã ăn hôm qua/hôm kia
- */
-function adjustTarget(dt, history, smoothing = 2) {
-    const recent = history.slice(-3); // Xét 3 ngày gần nhất
-    const adjusted = { ...dt };
-    
-    ["calories", "protein", "fat", "carbs"].forEach(k => {
-        const consumed = recent.reduce((sum, day) => sum + (day[k] || 0), 0);
-        const debt = (dt[k] * recent.length) - consumed;
-        
-        const maxAdj = dt[k] * 0.2; // Không điều chỉnh quá 20% tránh sốc calo
-        const adjVal = Math.max(-maxAdj, Math.min(maxAdj, debt / smoothing));
-        adjusted[k] += adjVal;
+    // Cập nhật dinh dưỡng thực tế
+    chosen.forEach((r) => {
+      usedIdsInWeek.add(r._id.toString());
+      const { nutri } = getScaledNutri(r);
+      dayActual.calories += nutri.calories;
+      dayActual.protein += nutri.protein;
+      dayActual.fat += nutri.fat;
+      dayActual.carbs += nutri.carbs;
     });
-    return adjusted;
+    plan[mKey] = chosen;
+  }
+  return { plan, dayActual };
 }
 
 // ─────────────────────────────────────────────────────────────
-// 5. THỰC THI (MAIN EXECUTION)
+// TÍNH NĂNG 2: GỢI Ý CHO 1 TUẦN (WEEKLY PLAN)
 // ─────────────────────────────────────────────────────────────
+function generateWeeklyPlan(recipes, baseDt, history = []) {
+  let weeklyHistory = [...history];
+  let usedIdsInWeek = new Set(); // ĐẢM BẢO DÒNG NÀY CÓ TỒN TẠI
+  let weeklyPlan = [];
 
+  for (let d = 1; d <= 7; d++) {
+    const adjDt = adjustTarget(baseDt, weeklyHistory);
+
+    // Truyền Set đã khởi tạo vào đây
+    const dayResult = generateDailyPlan(recipes, adjDt, usedIdsInWeek);
+
+    weeklyPlan.push({ day: d, ...dayResult });
+    weeklyHistory.push(dayResult.dayActual);
+  }
+  return weeklyPlan;
+}
+
+function adjustTarget(dt, history, smoothing = 3) {
+  // Tăng smoothing để bù nợ chậm hơn, êm hơn
+  if (history.length === 0) return dt;
+  const recent = history.slice(-3);
+  const adjusted = { ...dt };
+
+  ["calories", "protein", "fat", "carbs"].forEach((k) => {
+    const consumed = recent.reduce((sum, day) => sum + (day[k] || 0), 0);
+    const debt = dt[k] * recent.length - consumed;
+
+    // Giới hạn chỉ điều chỉnh tối đa 10% để tránh ăn quá nhiều starch bù calo
+    const maxAdj = dt[k] * 0.1;
+    adjusted[k] += Math.max(-maxAdj, Math.min(maxAdj, debt / smoothing));
+  });
+  return adjusted;
+}
+
+// ─────────────────────────────────────────────────────────────
+// EXECUTION
+// ─────────────────────────────────────────────────────────────
 async function main() {
-    try {
-        console.log("🚀 Đang kết nối tới Database...");
-        await mongoose.connect(process.env.MONGO_URI);
-        console.log("✅ Kết nối MongoDB thành công.");
+  try {
+    await mongoose.connect(process.env.MONGO_URI);
+    const recipes = await Recipe.find({
+      deleted: { $ne: true },
+      "totalNutritionPerServing.calories": { $gt: 0 },
+    }).lean();
+    if (recipes.length === 0) return;
 
-        // 1. Tải toàn bộ Recipe hợp lệ vào bộ nhớ
-        const recipes = await Recipe.find({
-            deleted: { $ne: true },
-            "totalNutritionPerServing.calories": { $gt: 0 }
-        }).lean();
+    const TDEE = 2200;
+    const GOAL = "balanced";
+    const baseDt = {
+      calories: TDEE * GOAL_PROFILES[GOAL].cal_f,
+      protein: (TDEE * 0.2) / 4,
+      fat: (TDEE * 0.3) / 9,
+      carbs: (TDEE * 0.5) / 4,
+    };
 
-        if (recipes.length === 0) {
-            console.log("❌ Không có dữ liệu món ăn hợp lệ trong DB.");
-            return;
+    // --- DEMO 1: GỢI Ý 1 NGÀY ---
+    console.log("--- TEST: GỢI Ý 1 NGÀY ---");
+    const singleDay = generateDailyPlan(recipes, baseDt);
+    Object.entries(singleDay.plan).forEach(([m, items]) => {
+      console.log(`${MEAL_LABEL[m]}: ${items.map((i) => i.name).join(" + ")}`);
+    });
+    console.log(
+      `Tổng Calo thực tế: ${singleDay.dayActual.calories.toFixed(0)}\n`,
+    );
+
+    // --- DEMO 2: GỢI Ý 1 TUẦN ---
+    // --- THỰC THI GỢI Ý 1 TUẦN ---
+    console.log("\n" + "=".repeat(70));
+    console.log("📅 KẾ HOẠCH DINH DƯỠNG CHI TIẾT TRONG 1 TUẦN");
+    console.log("=".repeat(70));
+
+    const weekly = generateWeeklyPlan(recipes, baseDt);
+
+    weekly.forEach((d) => {
+      console.log(
+        `\n[ NGÀY ${d.day} ] - Tổng năng lượng: ${d.dayActual.calories.toFixed(0)} kcal`,
+      );
+      console.log("-".repeat(45));
+
+      // Lặp qua từng bữa ăn trong ngày
+      for (const [mealKey, items] of Object.entries(d.plan)) {
+        const mealName = MEAL_LABEL[mealKey] || mealKey;
+
+        if (items.length > 0) {
+          // Gom tên món và calo của từng món trong bữa
+          const details = items
+            .map((it) => {
+              const { nutri, scale } = getScaledNutri(it);
+              return `${it.name} (x${scale.toFixed(1)} - ${nutri.calories.toFixed(0)} kcal)`;
+            })
+            .join(" + ");
+
+          console.log(`  + Bữa ${mealName.padEnd(5)}: ${details}`);
+        } else {
+          console.log(
+            `  + Bữa ${mealName.padEnd(5)}: (Không tìm thấy món phù hợp)`,
+          );
         }
+      }
+      console.log("- ".repeat(23));
+    });
 
-        const TDEE = 2500;
-        const GOAL = "gain_muscle"; // Thử nghiệm mục tiêu tăng cơ
-        const baseDt = getDailyTarget(TDEE, GOAL);
-
-        // 2. Giả lập lịch sử: Người dùng ăn thiếu hụt Calo và Protein trong 3 ngày qua
-        const history = [
-            { calories: baseDt.calories * 0.8, protein: baseDt.protein * 0.5, fat: baseDt.fat, carbs: baseDt.carbs },
-            { calories: baseDt.calories * 0.9, protein: baseDt.protein * 0.6, fat: baseDt.fat, carbs: baseDt.carbs },
-            { calories: baseDt.calories * 0.85, protein: baseDt.protein * 0.7, fat: baseDt.fat, carbs: baseDt.carbs }
-        ];
-
-        // 3. Tính target sau khi đã bù nợ (Adaptive)
-        const adjDt = adjustTarget(baseDt, history);
-
-        console.log(`\n${"=".repeat(60)}`);
-        console.log(`KẾ HOẠCH DINH DƯỠNG: ${GOAL_PROFILES[GOAL].label.toUpperCase()}`);
-        console.log(`TDEE: ${TDEE} kcal | Target Gốc: ${baseDt.calories.toFixed(0)} kcal`);
-        console.log(`Target Điều Chỉnh (Bù nợ): ${adjDt.calories.toFixed(0)} kcal | Protein: ${adjDt.protein.toFixed(1)}g`);
-        console.log(`${"=".repeat(60)}\n`);
-
-        const usedNames = new Set();
-        let dayActual = { calories: 0, protein: 0, fat: 0, carbs: 0 };
-
-        // 4. Gợi ý cho 3 bữa ăn
-        for (const mKey of ["breakfast", "lunch", "dinner"]) {
-            // Tính target riêng cho bữa này
-            const mTarget = Object.fromEntries(
-                Object.entries(adjDt).map(([k, v]) => [k, v * MEAL_SPLIT[mKey]])
-            );
-            
-            // Logic: Nếu trưa ăn One-dish (Bún/Phở) thì tối ép ăn Combo (Cơm) cho cân bằng
-            const isLunchOneDish = mKey === "dinner" && Array.from(usedNames).some(n => n.includes("phở") || n.includes("bún"));
-            
-            const mealItems = buildCompleteMeal(recipes, mKey, mTarget, usedNames, isLunchOneDish);
-            
-            console.log(`▶ Bữa ${MEAL_LABEL[mKey]} (Target: ${mTarget.calories.toFixed(0)} kcal):`);
-            
-            if (mealItems.length === 0) {
-                console.log("   (Không tìm thấy món phù hợp)");
-                continue;
-            }
-
-            mealItems.forEach(it => {
-                const { nutri, scale } = getScaledNutri(it);
-                console.log(`   - [${it.category.padEnd(12)}] ${it.name.padEnd(30)} (x${scale.toFixed(2)}) | Calo: ${nutri.calories.toFixed(1)}`);
-                
-                dayActual.calories += nutri.calories;
-                dayActual.protein += nutri.protein;
-                dayActual.fat += nutri.fat;
-                dayActual.carbs += nutri.carbs;
-            });
-            console.log("");
-        }
-
-        // 5. Tổng kết
-        console.log("-".repeat(60));
-        console.log(`TỔNG CỘNG THỰC TẾ: Calo=${dayActual.calories.toFixed(0)}, Protein=${dayActual.protein.toFixed(1)}g`);
-        console.log(`MỤC TIÊU CẦN ĐẠT : Calo=${adjDt.calories.toFixed(0)}, Protein=${adjDt.protein.toFixed(1)}g`);
-        console.log("-".repeat(60));
-
-    } catch (err) {
-        console.error("❌ Lỗi hệ thống:", err);
-    } finally {
-        await mongoose.disconnect();
-        console.log("\n🔌 Đã ngắt kết nối Database.");
-    }
+    console.log("\n" + "=".repeat(70));
+    console.log("✅ Hoàn tất gợi ý thực đơn tuần.");
+  } catch (err) {
+    console.error(err);
+  } finally {
+    await mongoose.disconnect();
+  }
 }
 
-// Chạy script
 main();
