@@ -15,6 +15,7 @@ const favoriteRoutes = require("./favorite.routes");
 const dashboardRoutes = require("./dashboard.routes");
 const exerciseRoutes = require("./exercise.routes");
 const workoutSessionRoutes = require("./workoutSession.routes");
+const workoutRoutes = require("./workout.routes");
 
 // Public routes (không cần authentication)
 router.use("/auth", authRoutes);
@@ -31,6 +32,7 @@ router.use("/recipes", recipeRoutes);
 router.use("/upload-image", uploadImageRoutes);
 router.use("/favorites", favoriteRoutes);
 router.use("/workout-session", workoutSessionRoutes);
+router.use("/workout", workoutRoutes);
 
 // Admin only routes
 router.use("/audit-logs", auditLogRoutes);

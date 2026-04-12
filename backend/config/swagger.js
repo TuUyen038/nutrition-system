@@ -568,6 +568,81 @@ const options = {
           },
         },
 
+        // ==================== WORKOUT SCHEMAS ====================
+        WorkoutPlanResponse: {
+          type: "object",
+          properties: {
+            userId: {
+              type: "string",
+              format: "ObjectId",
+              description: "ID người dùng",
+            },
+            workoutLevel: {
+              type: "string",
+              enum: ["beginner", "intermediate", "advanced"],
+              description: "Mức độ workout",
+            },
+            targetCalories: {
+              type: "number",
+              description: "Mục tiêu calo đốt mỗi ngày tập",
+            },
+            plan: {
+              type: "array",
+              items: {
+                oneOf: [
+                  {
+                    type: "object",
+                    properties: {
+                      day: { type: "number" },
+                      type: { type: "string", enum: ["workout"] },
+                      muscleGroup: { type: "string" },
+                      targetCalories: { type: "number" },
+                      exercises: {
+                        type: "array",
+                        items: {
+                          type: "object",
+                          properties: {
+                            exerciseId: { type: "number" },
+                            name: { type: "string" },
+                            sets: { type: "number" },
+                            reps: { type: "string" },
+                            duration: { type: "number" },
+                            calories: { type: "number" },
+                          },
+                        },
+                      },
+                    },
+                  },
+                  {
+                    type: "object",
+                    properties: {
+                      day: { type: "number" },
+                      type: { type: "string", enum: ["rest"] },
+                    },
+                  },
+                ],
+              },
+            },
+            generatedAt: {
+              type: "string",
+              format: "date-time",
+            },
+          },
+        },
+        WorkoutLevelResponse: {
+          type: "object",
+          properties: {
+            fitnessLevel: {
+              type: "string",
+              enum: ["sedentary", "beginner", "intermediate", "advanced", "athlete"],
+            },
+            workoutLevel: {
+              type: "string",
+              enum: ["beginner", "intermediate", "advanced"],
+            },
+          },
+        },
+
         // ==================== RECIPE SCHEMAS ====================
         Recipe: {
           type: "object",
@@ -2960,6 +3035,65 @@ const options = {
             },
             500: {
               description: "Lỗi server",
+            },
+          },
+        },
+      },
+
+      // ==================== WORKOUT ENDPOINTS ====================
+      "/workout/plan": {
+        get: {
+          tags: ["Workout"],
+          summary: "Tạo kế hoạch tập luyện 7 ngày",
+          description: "Tạo kế hoạch tập luyện cá nhân hóa dựa trên fitness level và mục tiêu của người dùng",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            200: {
+              description: "Kế hoạch tập luyện đã được tạo thành công",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean", example: true },
+                      data: { $ref: "#/components/schemas/WorkoutPlanResponse" },
+                    },
+                  },
+                },
+              },
+            },
+            401: {
+              description: "Chưa xác thực",
+            },
+            500: {
+              description: "Lỗi server",
+            },
+          },
+        },
+      },
+      "/workout/level": {
+        get: {
+          tags: ["Workout"],
+          summary: "Lấy mức độ workout của người dùng",
+          description: "Lấy mapping từ fitness level sang workout level",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            200: {
+              description: "Mức độ workout",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean", example: true },
+                      data: { $ref: "#/components/schemas/WorkoutLevelResponse" },
+                    },
+                  },
+                },
+              },
+            },
+            401: {
+              description: "Chưa xác thực",
             },
           },
         },
