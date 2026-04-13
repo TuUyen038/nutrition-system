@@ -1,7 +1,116 @@
 const dailyMenuService = require("../services/dailyMenu.service");
-const Recipe = require("../models/Recipe");
 const DailyMenu = require("../models/DailyMenu");
+const mealRecommendationService = require("../services/mealRecommendation.service");
 
+exports.suggestDailyMenuV2 = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { date } = req.body;
+
+    if (!date) {
+      return res.status(400).json({ message: "date là bắt buộc" });
+    }
+
+    // Lấy user info + daily target
+    const user = await User.findById(userId).lean();
+    const goal = await NutritionGoal.findOne({ userId, status: "active" })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    if (!goal) {
+      return res.status(400).json({ message: "Chưa set nutrition goal" });
+    }
+
+    const dailyTarget = goal.targetNutrition;
+
+    // Generate daily menu
+    const { recipesPlanned, nutritionSum } =
+      await mealRecommendationService.generateDailyMenuDataV2({
+        userId,
+        dateStr: date,
+        user,
+        dailyTarget,
+      });
+
+    // Tạo hoặc update DailyMenu
+    const DailyMenu = require("../models/DailyMenu");
+    const dailyMenu = await DailyMenu.findOneAndUpdate(
+      { userId, date },
+      {
+        recipes: recipesPlanned,
+        totalNutrition: nutritionSum,
+        status: "suggested",
+      },
+      { upsert: true, new: true }
+    ).populate("recipes.recipeId");
+
+    return res.status(200).json(dailyMenu);
+  } catch (err) {
+    console.error("Error suggestDailyMenuV2:", err);
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+// Thêm vào dailyMenu.controller.js
+exports.suggestRecipesForMeal = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const {
+      date,
+      mealType, // "breakfast", "lunch", "dinner"
+      allowedCategories = [], // optional: ["main", "side"]
+      topN = 3,
+    } = req.body;
+
+    const user = await User.findById(userId).lean();
+    const goal = await NutritionGoal.findOne({ userId, status: "active" })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    if (!goal) {
+      return res.status(400).json({ message: "Chưa set nutrition goal" });
+    }
+
+    // Lấy nutrition đã gọi trong ngày (nếu có)
+    const DailyMenu = require("../models/DailyMenu");
+    const existing = await DailyMenu.findOne({ userId, date }).lean();
+
+    const currentDayNutrition = existing?.totalNutrition || {
+      calories: 0,
+      protein: 0,
+      fat: 0,
+      carbs: 0,
+      fiber: 0,
+    };
+
+    // Gợi ý top N recipes
+    const recipes = await mealRecommendationService.pickTopRecipesForMeal({
+      userId,
+      dateStr: date,
+      mealType,
+      currentDayNutrition,
+      dailyTarget: goal.targetNutrition,
+      user,
+      allowedCategories,
+      topN,
+    });
+
+    return res.status(200).json({
+      mealType,
+      suggestions: recipes.map((r) => ({
+        _id: r._id,
+        name: r.name,
+        category: r.category,
+        imageUrl: r.imageUrl,
+        totalNutrition: r.totalNutrition,
+        _score: r._score, // similarity score
+      })),
+    });
+  } catch (err) {
+    console.error("Error suggestRecipesForMeal:", err);
+    return res.status(500).json({ message: err.message });
+  }
+};
 exports.suggestDailyMenu = async (req, res) => {
   try {
     const userId = req.user._id; // Lấy từ authenticated user
