@@ -9,7 +9,57 @@ const Recipe = require("../models/Recipe");
 const dayjs = require("dayjs");
 const User = require("../models/User");
 const NutritionGoal = require("../models/NutritionGoal");
+
+// mealPlan.service.js
+const mealRecommendationService = require("./mealRecommendation.service");
+
+
 class MealPlanService {
+
+  async suggestWeekPlanV2({ userId, startDateStr, days = 7 }) {
+  const user = await User.findById(userId).lean();
+  const goal = await NutritionGoal.findOne({ userId, status: "active" })
+    .sort({ createdAt: -1 })
+    .lean();
+
+  if (!goal) throw new Error("No active nutrition goal");
+
+  const dailyMenuIds = [];
+  const start = dayjs(startDateStr);
+
+  for (let i = 0; i < days; i++) {
+    const d = start.add(i, "day").format("YYYY-MM-DD");
+    
+    const { recipesPlanned, nutritionSum } =
+      await mealRecommendationService.generateDailyMenuDataV2({
+        userId,
+        dateStr: d,
+        user,
+        dailyTarget: goal.targetNutrition,
+      });
+
+    const dailyMenu = await DailyMenu.create({
+      userId,
+      date: d,
+      recipes: recipesPlanned,
+      totalNutrition: nutritionSum,
+      status: "suggested",
+    });
+
+    dailyMenuIds.push(dailyMenu._id);
+  }
+
+  return await MealPlan.create({
+    userId,
+    startDate: startDateStr,
+    endDate: start.add(days - 1, "day").format("YYYY-MM-DD"),
+    dailyMenuIds,
+    source: "ai",
+    generatedBy: "nutrition_ai_v2",
+    status: "suggested",
+  });
+}
+
   async getRecipeUsageStats(userId, dateStr, windowDays = 7) {
     const base = dayjs(dateStr);
 
