@@ -10,7 +10,7 @@ const mealItemSchema = new mongoose.Schema(
         name:         { type: String, required: true },
         category:     { type: String },
         scale:        { type: Number, default: 1.0 },
-        proteinSource:{
+        mealSource:{
             type: String,
             enum: ["chicken", "pork", "beef", "seafood", "egg", "tofu", "other", "none"],
             default: "none",
@@ -62,7 +62,14 @@ const mealLogSchema = new mongoose.Schema(
             protein:  { type: Number, default: 0 },
             fat:      { type: Number, default: 0 },
             carbs:    { type: Number, default: 0 },
-            
+        },
+
+        // Target dinh dưỡng cho ngày (sau khi điều chỉnh adaptive)
+        dailyTargetNutrition: {
+            calories: { type: Number, default: 0 },
+            protein:  { type: Number, default: 0 },
+            fat:      { type: Number, default: 0 },
+            carbs:    { type: Number, default: 0 },
         },
 
         source: {

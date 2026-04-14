@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const mealPlanController = require('../controllers/mealPlan.controller');
 const { authenticate } = require('../middlewares/auth');
-
+const rcmController = require("../controllers/mealRcm.controller");
 // Tất cả route đều cần xác thực
 router.use(authenticate);
 
@@ -28,6 +28,8 @@ router.delete('/:planId', mealPlanController.deleteMealPlan);
 
 // gợi ý tuần
 router.post("/suggest", mealPlanController.suggestWeekPlan);
+
+router.post("/recommendations/week", rcmController.recommendWeek);
 
 
 module.exports = router;
