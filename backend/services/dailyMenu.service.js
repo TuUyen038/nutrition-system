@@ -7,7 +7,6 @@ const User = require("../models/User");
 const NutritionGoal = require("../models/NutritionGoal");
 const Recipe = require("../models/Recipe");
 
-
 async function getUserDailyTarget(userId) {
   const [user, goal] = await Promise.all([
     User.findById(userId).lean(),
@@ -212,7 +211,9 @@ exports.createDailyMenu = async (data) => {
     // Normalize date TRƯỚC KHI tìm existing để đảm bảo match đúng
     date = normalizeDate(date);
     // Tìm existing menu - nếu có nhiều, lấy cái mới nhất (tránh trùng rác cũ)
-    let existing = await DailyMenu.findOne({ userId, date }).sort({ createdAt: -1 });
+    let existing = await DailyMenu.findOne({ userId, date }).sort({
+      createdAt: -1,
+    });
 
     const normalizedRecipes = await Promise.all(
       (recipes || []).map(async (r) => {
@@ -233,7 +234,7 @@ exports.createDailyMenu = async (data) => {
         // }
 
         return recipeItem;
-      })
+      }),
     );
 
     const totalNutrition = await calculateTotalNutrition(normalizedRecipes);
@@ -256,7 +257,7 @@ exports.createDailyMenu = async (data) => {
         select: "name description imageUrl totalNutrition",
       });
       // Filter out recipes that failed to populate (i.e., deleted)
-      created.recipes = created.recipes.filter(r => r.recipeId);
+      created.recipes = created.recipes.filter((r) => r.recipeId);
 
       return { type: "created", data: created };
     }
@@ -274,7 +275,7 @@ exports.createDailyMenu = async (data) => {
       select: "name description imageUrl totalNutrition",
     });
     // Filter out recipes that failed to populate (i.e., deleted)
-    existing.recipes = existing.recipes.filter(r => r.recipeId);
+    existing.recipes = existing.recipes.filter((r) => r.recipeId);
 
     return { type: "updated", data: existing };
   } catch (error) {
@@ -427,6 +428,29 @@ exports.addRecipeToMeal = async (userId, mealData) => {
   return meal;
 };
 
+// hàm markMealAsEaten dùng update/create meallog khi gọi hàm updateMealStatus
+async function markMealAsEaten({ userId, recipeItem, date }) {
+  // check đã có log chưa (idempotent)
+  const existed = await MealLog.findOne({
+    userId,
+    recipeItemId: recipeItem._id,
+  });
+
+  if (existed) return;
+
+  await MealLog.create({
+    userId,
+    recipeId: recipeItem.recipeId,
+    recipeItemId: recipeItem._id,
+    calories: recipeItem.recipeId.totalNutrition?.calories,
+    protein: recipeItem.recipeId.totalNutrition?.protein,
+    fat: recipeItem.recipeId.totalNutrition?.fat,
+    carbs: recipeItem.recipeId.totalNutrition?.carbs,
+    date,
+    source: "planned",
+  });
+}
+
 exports.updateMealStatus = async (mealId, newStatus) => {
   // mealId là _id của một recipe item trong array recipes của DailyMenu
   // Cần tìm DailyMenu chứa recipe item này và cập nhật status
@@ -478,6 +502,17 @@ exports.updateMealStatus = async (mealId, newStatus) => {
 
   // Lưu DailyMenu để cập nhật recipe item
   await dailyMenu.save();
+
+  // Nếu chuyển sang "eaten", tạo log trong Meallog
+  if (newStatus === "eaten") {
+    await markMealAsEaten({
+      userId: dailyMenu.userId,
+      recipeItem,
+      date: dailyMenu.date,
+    });
+  } else {
+    await MealLog.deleteOne({ recipeItemId: mealId });
+  }
 
   // Populate recipeId để trả về đầy đủ thông tin
   await dailyMenu.populate({
