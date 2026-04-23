@@ -103,10 +103,10 @@ const NUTRITION_WEIGHTS = { calories: 2.0, protein: 2.0, fat: 1.8, carbs: 1.5 };
 const MAX_CALO_PER_CAT = {
   main: 550,
   base_starch: 350,
-  side_dish: 250,      // tăng từ 200
+  side_dish: 250, // tăng từ 200
   soup_veg: 200,
   one_dish_meal: 600,
-  dessert: 200,        // tăng từ 120
+  dessert: 200, // tăng từ 120
   light_supplement: 350, // tăng từ 250
 };
 
@@ -403,18 +403,19 @@ function pickOne(poolCache, categories, targetVec, context) {
 
       // 7. Enhanced: Overage penalty cho TẤT CẢ macros — nếu accumulated vượt quá → giảm score
       let overageMultiplier = 1.0;
-      if (accumulatedRatio.calories > 0.95) overageMultiplier *= 0.7;   // giảm 30% nếu calo >95%
-      if (accumulatedRatio.protein > 1.1) overageMultiplier *= 0.5;     // giảm 50% nếu protein >110%
-      if (accumulatedRatio.fat > 1.05) overageMultiplier *= 0.6;        // giảm 40% nếu fat >105%
+      if (accumulatedRatio.calories > 0.95) overageMultiplier *= 0.7; // giảm 30% nếu calo >95%
+      if (accumulatedRatio.protein > 1.1) overageMultiplier *= 0.5; // giảm 50% nếu protein >110%
+      if (accumulatedRatio.fat > 1.05) overageMultiplier *= 0.6; // giảm 40% nếu fat >105%
       if (accumulatedRatio.carbs > 0.85 && item.category === "base_starch")
-        overageMultiplier *= 0.3;  // giảm 70% nếu carbs >85% và item là starch
+        overageMultiplier *= 0.3; // giảm 70% nếu carbs >85% và item là starch
 
       const finalScore =
         (0.6 * nutritionFit +
-        0.2 * favouriteBoost +
-        0.1 * noveltyScore +
-        0.1 * diversityScore -
-        friedPenalty) * overageMultiplier;
+          0.2 * favouriteBoost +
+          0.1 * noveltyScore +
+          0.1 * diversityScore -
+          friedPenalty) *
+        overageMultiplier;
 
       return { score: Math.max(0, finalScore), item };
     });
@@ -614,7 +615,6 @@ async function getAllAdaptiveTargets(userId, originalTarget, dates) {
 // BUILD MEAL
 // ─────────────────────────────────────────────────────────────
 
-
 /**
  * Xây dựng 1 bữa ăn hoàn chỉnh.
  *
@@ -633,19 +633,21 @@ function buildMeal(poolCache, mealType, adjTarget, context) {
   function scaledTarget(ratio) {
     return {
       calories: adjTarget.calories * ratio,
-      protein:  adjTarget.protein  * ratio,
-      fat:      adjTarget.fat      * ratio,
-      carbs:    adjTarget.carbs    * ratio,
+      protein: adjTarget.protein * ratio,
+      fat: adjTarget.fat * ratio,
+      carbs: adjTarget.carbs * ratio,
     };
   }
 
   function pick(categories, target) {
     const accumulated = sumNutrition(chosen);
     const accumulatedRatio = {
-      calories: adjTarget.calories > 0 ? accumulated.calories / adjTarget.calories : 0,
-      protein:  adjTarget.protein  > 0 ? accumulated.protein  / adjTarget.protein  : 0,
-      fat:      adjTarget.fat      > 0 ? accumulated.fat      / adjTarget.fat      : 0,
-      carbs:    adjTarget.carbs    > 0 ? accumulated.carbs    / adjTarget.carbs    : 0,
+      calories:
+        adjTarget.calories > 0 ? accumulated.calories / adjTarget.calories : 0,
+      protein:
+        adjTarget.protein > 0 ? accumulated.protein / adjTarget.protein : 0,
+      fat: adjTarget.fat > 0 ? accumulated.fat / adjTarget.fat : 0,
+      carbs: adjTarget.carbs > 0 ? accumulated.carbs / adjTarget.carbs : 0,
     };
     return pickOne(poolCache, categories, target, {
       ...context,
@@ -668,7 +670,7 @@ function buildMeal(poolCache, mealType, adjTarget, context) {
   // ─── BREAKFAST ───────────────────────────────────────────────
   if (mealType === "breakfast") {
     // FIX 2: nhắm 70% thay vì 100% để tránh overshoot
-    const oneDish = pick(["one_dish_meal"], scaledTarget(0.70));
+    const oneDish = pick(["one_dish_meal"], scaledTarget(0.7));
     push(oneDish);
 
     if (remainRatio() > 0.15)
@@ -679,44 +681,58 @@ function buildMeal(poolCache, mealType, adjTarget, context) {
 
     // Fallback nếu không có one_dish_meal
     if (!oneDish) {
-      push(pick(["main"],      scaledTarget(0.45)));
+      push(pick(["main"], scaledTarget(0.45)));
       push(pick(["base_starch"], scaledTarget(0.35)));
-      push(pick(["soup_veg"],  scaledTarget(0.20)));
+      push(pick(["soup_veg"], scaledTarget(0.2)));
 
       if (remainRatio() > 0.15)
         push(pick(["light_supplement"], scaledTarget(remainRatio() * 0.5)));
-      if (remainRatio() > 0.10)
+      if (remainRatio() > 0.1)
         push(pick(["dessert", "drink", "fruit"], scaledTarget(remainRatio())));
     }
 
-  // ─── LUNCH / DINNER ──────────────────────────────────────────
+    // ─── LUNCH / DINNER ──────────────────────────────────────────
   } else if (mealType === "lunch" || mealType === "dinner") {
     if (Math.random() < 0.6) {
       // Combo: main + starch + soup/veg → tổng = 100%, macro đồng bộ — FIX 1
-      push(pick(["main"],             scaledTarget(0.45)));
-      push(pick(["base_starch"],      scaledTarget(0.35)));
-      push(pick(["soup_veg", "side"], scaledTarget(0.20)));
+      push(pick(["main"], scaledTarget(0.45)));
+      push(pick(["base_starch"], scaledTarget(0.35)));
+      push(pick(["soup_veg"], scaledTarget(0.2)));
 
       if (remainRatio() > 0.15)
-        push(pick(["side"],                    scaledTarget(remainRatio() * 0.6)));
-      if (remainRatio() > 0.10)
-        push(pick(["dessert", "light_supplement"], scaledTarget(remainRatio())));
+        push(pick(["side"], scaledTarget(remainRatio() * 0.6)));
+      if (remainRatio() > 0.1)
+        push(
+          pick(["dessert", "light_supplement"], scaledTarget(remainRatio())),
+        );
     } else {
       // One-dish: nhắm 75%, phần còn lại dành cho side/fruit
       push(pick(["one_dish_meal"], scaledTarget(0.75)));
 
       if (remainRatio() > 0.15)
-        push(pick(["side"],                      scaledTarget(remainRatio() * 0.6)));
-      if (remainRatio() > 0.10)
+        push(pick(["side"], scaledTarget(remainRatio() * 0.6)));
+      if (remainRatio() > 0.1)
         push(pick(["fruit", "light_supplement"], scaledTarget(remainRatio())));
     }
 
-  // ─── SNACK ───────────────────────────────────────────────────
+    // ─── SNACK ───────────────────────────────────────────────────
   } else if (mealType === "snack") {
-    push(pick(
-      ["dessert", "fruit", "light_supplement"],
-      scaledTarget(0.5),
-    ));
+    // Ưu tiên fruit/light_supplement trước (nhẹ hơn dessert)
+    // Nhắm 60% để còn chỗ cho món thứ 2 nếu vẫn còn thiếu
+    const snackMain = pick(
+      ["fruit", "light_supplement", "dessert"],
+      scaledTarget(0.7),
+    );
+    push(snackMain);
+
+    // Fallback: nếu category trên không có món nào → thử rộng hơn
+    if (!snackMain) {
+      push(pick(["dessert", "drink"], scaledTarget(0.7)));
+    }
+
+    // Nếu vẫn còn dư >20% thì thêm 1 món nhỏ nữa
+    if (remainRatio() > 0.2)
+      push(pick(["dessert", "drink", "fruit"], scaledTarget(remainRatio())));
   }
 
   // ─── CLEANUP: nếu vẫn vượt >15% thì pop từ cuối ─────────────
@@ -731,8 +747,14 @@ function buildMeal(poolCache, mealType, adjTarget, context) {
   chosen.forEach((r) => {
     context.usedNames.add(r.name);
     const src = detectMealSource(r);
-    context.usedMealSources.set(src, (context.usedMealSources.get(src) || 0) + 1);
-    context.usedCategories.set(r.category, (context.usedCategories.get(r.category) || 0) + 1);
+    context.usedMealSources.set(
+      src,
+      (context.usedMealSources.get(src) || 0) + 1,
+    );
+    context.usedCategories.set(
+      r.category,
+      (context.usedCategories.get(r.category) || 0) + 1,
+    );
   });
 
   // ─── Build output ─────────────────────────────────────────────
@@ -744,9 +766,9 @@ function buildMeal(poolCache, mealType, adjTarget, context) {
   const totalNutrition = itemsWithScaled.reduce(
     (acc, { scaled }) => {
       acc.calories += scaled.calories;
-      acc.protein  += scaled.protein;
-      acc.fat      += scaled.fat;
-      acc.carbs    += scaled.carbs;
+      acc.protein += scaled.protein;
+      acc.fat += scaled.fat;
+      acc.carbs += scaled.carbs;
       return acc;
     },
     { calories: 0, protein: 0, fat: 0, carbs: 0 },
@@ -757,20 +779,20 @@ function buildMeal(poolCache, mealType, adjTarget, context) {
   return {
     mealType,
     items: itemsWithScaled.map(({ r, scaled, scale }) => ({
-      recipeId:    r._id,
-      name:        r.name,
-      imageUrl:    r.imageUrl,
+      recipeId: r._id,
+      name: r.name,
+      imageUrl: r.imageUrl,
       description: r.description,
-      scale:       parseFloat(scale.toFixed(3)),
-      mealSource:  detectMealSource(r),
+      scale: parseFloat(scale.toFixed(3)),
+      mealSource: detectMealSource(r),
       nutrition: {
         calories: parseFloat(r.totalNutritionPerServing.calories.toFixed(1)),
-        protein:  parseFloat(r.totalNutritionPerServing.protein.toFixed(1)),
-        fat:      parseFloat(r.totalNutritionPerServing.fat.toFixed(1)),
-        carbs:    parseFloat(r.totalNutritionPerServing.carbs.toFixed(1)),
+        protein: parseFloat(r.totalNutritionPerServing.protein.toFixed(1)),
+        fat: parseFloat(r.totalNutritionPerServing.fat.toFixed(1)),
+        carbs: parseFloat(r.totalNutritionPerServing.carbs.toFixed(1)),
       },
       servingTime: mealType,
-      isChecked:   false,
+      isChecked: false,
     })),
     totalNutrition,
   };
@@ -842,14 +864,19 @@ function buildDayPlan(poolCache, dailyTarget, goal, sharedContext) {
   };
 
   if (debts.calories || debts.protein) {
+    const rawCalDeficit = Math.max(
+      0,
+      dailyTarget.calories - dailyTotal.calories,
+    );
+    // capRatio: nếu deficit > 300 thì scale xuống, macro theo tỷ lệ đó
+    const capRatio =
+      rawCalDeficit > 0 ? Math.min(300, rawCalDeficit) / rawCalDeficit : 1;
+
     const snackTarget = {
-      calories: Math.min(
-        Math.max(0, dailyTarget.calories - dailyTotal.calories),
-        300  // max 300 kcal cho snack
-      ),
-      protein: Math.max(0, dailyTarget.protein - dailyTotal.protein),
-      fat: Math.max(0, dailyTarget.fat - dailyTotal.fat) * 0.5,  // relax hơn
-      carbs: Math.max(0, dailyTarget.carbs - dailyTotal.carbs) * 0.3,  // relax hơn
+      calories: Math.min(rawCalDeficit, 300),
+      protein: Math.max(0, dailyTarget.protein - dailyTotal.protein) * capRatio,
+      fat: Math.max(0, dailyTarget.fat - dailyTotal.fat) * capRatio,
+      carbs: Math.max(0, dailyTarget.carbs - dailyTotal.carbs) * capRatio,
     };
 
     const snack = buildMeal(poolCache, "snack", snackTarget, {
