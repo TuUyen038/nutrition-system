@@ -11,12 +11,6 @@ const mealLogSchema = new mongoose.Schema({
   dailyMenuId: { type: mongoose.Schema.Types.ObjectId },
 
   recipe: recipeItemSchema,
-  
-  source: {
-    type: String,
-    enum: ["planned", "manual"],
-    default: "planned"
-  },
 
 }, { timestamps: true });
 

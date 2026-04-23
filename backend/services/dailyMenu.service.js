@@ -6,6 +6,7 @@ const { normalizeDate } = require("../utils/date");
 const User = require("../models/User");
 const NutritionGoal = require("../models/NutritionGoal");
 const Recipe = require("../models/Recipe");
+const { createMealLog, deleteMealLog } = require("./mealLog.service");
 
 async function getUserDailyTarget(userId) {
   const [user, goal] = await Promise.all([
@@ -283,17 +284,6 @@ exports.createDailyMenu = async (data) => {
     throw new Error("Không thể lưu thực đơn: " + error.message);
   }
 };
-
-// exports.getMealHistory = async (userId) => {
-//   return DailyMenu.find({ userId, status: "completed" })
-//     .sort({ date: -1 })
-//     .populate({
-//       path: "recipes._id",
-//       model: "Recipe",
-//       select: "date name imageUrl totalNutrition",
-//     });
-// };
-
 exports.getRecipesByDateAndStatus = async (data) => {
   try {
     let { userId, startDate, endDate, status } = data;
@@ -428,28 +418,7 @@ exports.addRecipeToMeal = async (userId, mealData) => {
   return meal;
 };
 
-// hàm markMealAsEaten dùng update/create meallog khi gọi hàm updateMealStatus
-async function markMealAsEaten({ userId, recipeItem, date }) {
-  // check đã có log chưa (idempotent)
-  const existed = await MealLog.findOne({
-    userId,
-    recipeItemId: recipeItem._id,
-  });
-
-  if (existed) return;
-
-  await MealLog.create({
-    userId,
-    recipeId: recipeItem.recipeId,
-    recipeItemId: recipeItem._id,
-    calories: recipeItem.recipeId.totalNutrition?.calories,
-    protein: recipeItem.recipeId.totalNutrition?.protein,
-    fat: recipeItem.recipeId.totalNutrition?.fat,
-    carbs: recipeItem.recipeId.totalNutrition?.carbs,
-    date,
-    source: "planned",
-  });
-}
+// Note: markMealAsEaten functionality moved to mealLog.service.createMealLog
 
 exports.updateMealStatus = async (mealId, newStatus) => {
   // mealId là _id của một recipe item trong array recipes của DailyMenu
@@ -505,13 +474,19 @@ exports.updateMealStatus = async (mealId, newStatus) => {
 
   // Nếu chuyển sang "eaten", tạo log trong Meallog
   if (newStatus === "eaten") {
-    await markMealAsEaten({
-      userId: dailyMenu.userId,
+    await createMealLog(
+      dailyMenu.userId,
       recipeItem,
-      date: dailyMenu.date,
-    });
+      dailyMenu.date,
+      dailyMenu._id
+    );
   } else {
-    await MealLog.deleteOne({ recipeItemId: mealId });
+    await deleteMealLog(
+      dailyMenu.userId,
+      recipeItem.name,
+      dailyMenu.date,
+      dailyMenu._id
+    );
   }
 
   // Populate recipeId để trả về đầy đủ thông tin

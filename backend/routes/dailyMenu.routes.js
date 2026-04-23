@@ -5,7 +5,7 @@ const rcmController = require("../controllers/mealRcm.controller");
 const router = express.Router();
 
 // Tất cả route đều cần xác thực
-router.use(authenticate); 
+router.use(authenticate);
 
 router.post('/', dailyMenuController.createDailyMenu);
 // router.get('/', dailyMenuController.getAllDailyMenu);
