@@ -1,21 +1,14 @@
 /**
- * mealRecommendation.controller.js
  *
- * Route handlers cho meal recommendation API.
- *
- * Suggested routes (trong router file của bạn):
  *   POST /api/recommendations/day          → recommendDay
  *   POST /api/recommendations/week         → recommendWeek
- *   GET  /api/recommendations/history      → getMealHistory
+ *
  */
-
 
 const {
     recommendDayPlan,
     recommendWeekPlan,
 } = require("../services/mealRecommendation.service");
-
-// const MealLog = require("../models/MealLog");
 
 // ─────────────────────────────────────────────────────────────
 // GET thực đơn 1 ngày
@@ -78,52 +71,7 @@ async function recommendWeek(req, res) {
     }
 }
 
-// ─────────────────────────────────────────────────────────────
-// GET lịch sử ăn uống
-// ─────────────────────────────────────────────────────────────
-/**
- * GET /api/recommendations/history?days=7&page=1&limit=10
- */
-async function getMealHistory(req, res) {
-    try {
-        const userId = req.user._id;
-        const { days = 7, page = 1, limit = 10 } = req.query;
-
-        const since = new Date();
-        since.setDate(since.getDate() - Number(days));
-
-        const [logs, total] = await Promise.all([
-            MealLog.find({ userId, date: { $gte: since } })
-                .sort({ date: -1 })
-                .skip((Number(page) - 1) * Number(limit))
-                .limit(Number(limit))
-                .lean(),
-            MealLog.countDocuments({ userId, date: { $gte: since } }),
-        ]);
-
-        return res.status(200).json({
-            success: true,
-            data: {
-                logs,
-                pagination: {
-                    total,
-                    page:       Number(page),
-                    limit:      Number(limit),
-                    totalPages: Math.ceil(total / Number(limit)),
-                },
-            },
-        });
-    } catch (err) {
-        console.error("[getMealHistory] Error:", err);
-        return res.status(500).json({
-            success: false,
-            message: err.message || "Internal server error",
-        });
-    }
-}
-
 module.exports = {
     recommendDay,
     recommendWeek,
-    getMealHistory,
 };

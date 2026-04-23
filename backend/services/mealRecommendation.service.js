@@ -1,66 +1,18 @@
-/**
- * mealRecommendation.service.js  — v2 (patched + optimised)
- *
- * ═══════════════════════════════════════════════════════════════
- * FIXES so với v1
- * ───────────────────────────────────────────────────────────────
- * FIX-1  Double adjustment: getAdaptiveTarget (DB history) và
- *        rolling-debt trong buildDayPlan từng điều chỉnh target
- *        độc lập → cộng dồn lệch. Giờ:
- *          • getAdaptiveTarget  → điều chỉnh DailyTarget tổng
- *            (dựa trên nợ 3 ngày trước DB, 1 lần duy nhất)
- *          • Rolling-debt bên trong buildDayPlan chỉ còn nhiệm
- *            vụ CÂN BẰNG GIỮA CÁC BỮA trong ngày (≤10% per bữa)
- *            và không dùng debtImportance nữa để tránh khuếch đại.
- *
- * FIX-2  adaptiveCarbsPenalty trong pickOne dùng
- *        context.accumulatedCarbs / context.dailyTargetCarbs
- *        nhưng 2 field đó không bao giờ được truyền vào.
- *        Giờ buildMeal tính accumulated sau mỗi lần push và
- *        truyền đúng vào context trước khi gọi pickOne.
- *
- * FIX-3  recommendWeekPlan bỏ qua getAdaptiveTarget hoàn toàn.
- *        Giờ mỗi ngày trong tuần đều gọi getAdaptiveTarget với
- *        dayDate tương ứng (batch await để không N+1).
- *
- * ═══════════════════════════════════════════════════════════════
- * OPTIMISATIONS
- * ───────────────────────────────────────────────────────────────
- * OPT-1  getAllAdaptiveTargets: tính adaptive targets cho cả tuần
- *        trong 1 query duy nhất thay vì 7 query riêng.
- *
- * OPT-2  Tách rõ hai vai trò:
- *          • getAdaptiveTarget   = lịch sử dài hạn (3-day window)
- *          • intra-day debt      = cân bằng ngắn hạn trong ngày
- *
- * OPT-3  Novelty score cải thiện: dùng hàm sigmoid thay linear
- *        (tránh jump ở ngưỡng và cho kết quả mượt hơn).
- *
- * OPT-4  Pool filtering chỉ chạy 1 lần, kết quả cache theo category
- *        → tránh filter O(n) lặp lại trong mỗi pickOne call.
- *
- * OPT-5  softmaxSample nhận thêm tham số excludeNames để loại
- *        ngay trong sampling thay vì set noveltyScore = 0 rồi
- *        vẫn đưa vào scored array (tiết kiệm compute).
- * ═══════════════════════════════════════════════════════════════
- */
-
 "use strict";
-
 const mongoose = require("mongoose");
-const Recipe = require("../models/Recipe");
-const MealLog = require("../models/MealLog");
+const Recipe        = require("../models/Recipe");
+const DailyMenu      = require("../models/DailyMenu");
 const NutritionGoal = require("../models/NutritionGoal");
-const User = require("../models/User");
-const DailyMenu = require("../models/DailyMenu");
+const User          = require("../models/User");
+const { getRecentlyEatenMap } = require("./mealLog.service");
 // ─────────────────────────────────────────────────────────────
 // CONSTANTS
 // ─────────────────────────────────────────────────────────────
 
 const MEAL_SPLIT = {
   breakfast: 0.25,
-  lunch: 0.4,
-  dinner: 0.35,
+  lunch    : 0.40,
+  dinner   : 0.35,
 };
 
 /**
@@ -71,28 +23,22 @@ const MEAL_SPLIT = {
  */
 const GOAL_PROFILES = {
   lose_weight: {
-    cal_f: 0.8,
-    p: 0.35,
-    f: 0.25,
-    c: 0.4,
-    friedPenaltyBase: 0.5,
-    debtImportance: { calories: 1.2, protein: 1.5, fat: 1.0, carbs: 0.7 },
+    cal_f           : 0.80,
+    p               : 0.35, f: 0.25, c: 0.40,
+    friedPenaltyBase: 0.50,
+    debtImportance  : { calories: 1.2, protein: 1.5, fat: 1.0, carbs: 0.7 },
   },
   maintain_weight: {
-    cal_f: 1.0,
-    p: 0.2,
-    f: 0.3,
-    c: 0.5,
+    cal_f           : 1.00,
+    p               : 0.20, f: 0.30, c: 0.50,
     friedPenaltyBase: 0.25,
-    debtImportance: { calories: 1.0, protein: 1.0, fat: 1.0, carbs: 1.0 },
+    debtImportance  : { calories: 1.0, protein: 1.0, fat: 1.0, carbs: 1.0 },
   },
   gain_weight: {
-    cal_f: 1.15,
-    p: 0.25,
-    f: 0.25,
-    c: 0.5,
-    friedPenaltyBase: 0.1,
-    debtImportance: { calories: 1.0, protein: 1.8, fat: 0.8, carbs: 1.2 },
+    cal_f           : 1.15,
+    p               : 0.25, f: 0.25, c: 0.50,
+    friedPenaltyBase: 0.10,
+    debtImportance  : { calories: 1.0, protein: 1.8, fat: 0.8, carbs: 1.2 },
   },
 };
 
@@ -101,13 +47,13 @@ const DEFAULT_GOAL = "maintain_weight";
 const NUTRITION_WEIGHTS = { calories: 2.0, protein: 2.0, fat: 1.8, carbs: 1.5 };
 
 const MAX_CALO_PER_CAT = {
-  main: 550,
-  base_starch: 350,
-  side_dish: 250,      // tăng từ 200
-  soup_veg: 200,
-  one_dish_meal: 600,
-  dessert: 200,        // tăng từ 120
-  light_supplement: 350, // tăng từ 250
+  main            : 550,
+  base_starch     : 350,
+  side_dish       : 200,
+  soup_veg        : 200,
+  one_dish_meal   : 600,
+  dessert         : 120,
+  light_supplement: 250,
 };
 
 const HISTORY_LOOKBACK_DAYS = 7;
@@ -116,28 +62,23 @@ const HISTORY_LOOKBACK_DAYS = 7;
 const SOFTMAX_TEMP = 6.0;
 
 const PROTEIN_SOURCE_KEYWORDS = {
-  chicken: ["gà", "chicken", "ức gà", "đùi gà"],
-  pork: ["heo", "lợn", "pork", "sườn", "ba chỉ"],
-  beef: ["bò", "beef", "thịt bò"],
-  seafood: ["cá", "tôm", "mực", "cua", "hải sản", "fish", "shrimp"],
-  egg: ["trứng", "egg"],
-  tofu: ["đậu phụ", "tofu", "đậu hũ"],
-  pho: ["phở", "pho"],
-  bun: ["bún", "bun"],
-  mi: ["mì"],
+  chicken : ["gà", "chicken", "ức gà", "đùi gà"],
+  pork    : ["heo", "lợn", "pork", "sườn", "ba chỉ"],
+  beef    : ["bò", "beef", "thịt bò"],
+  seafood : ["cá", "tôm", "mực", "cua", "hải sản", "fish", "shrimp"],
+  egg     : ["trứng", "egg"],
+  tofu    : ["đậu phụ", "tofu", "đậu hũ"],
+  pho     : ["phở", "pho"],
+  bun     : ["bún", "bun"],
+  mi      : ["mì"],
 };
 
 const NUTRITION_DEFAULTS = {
-  tdee: 2000,
-  goal: DEFAULT_GOAL,
+  tdee  : 2000,
+  goal  : DEFAULT_GOAL,
   target: {
-    calories: 2000,
-    protein: 150,
-    fat: 67,
-    carbs: 200,
-    fiber: 25,
-    sugar: 50,
-    sodium: 2300,
+    calories: 2000, protein: 150, fat: 67,
+    carbs: 200, fiber: 25, sugar: 50, sodium: 2300,
   },
 };
 
@@ -167,29 +108,21 @@ function detectMealSource(recipe) {
 }
 
 function getNormalizedScale(item) {
-  const rawCal = item.totalNutritionPerServing?.calories || 0;
+  const rawCal    = item.nutri?.calories || 0;
   const threshold = MAX_CALO_PER_CAT[item.category];
   if (!threshold || rawCal <= 0) return 1.0;
-
-  const scale = rawCal > threshold ? threshold / rawCal : 1.0;
-  const SCALE_STEPS = [1.0, 0.75, 0.5, 0.25];
-  for (const s of SCALE_STEPS) {
-    if (scale >= s) return s;
-  }
-  return 0.25;
+  return rawCal > threshold ? threshold / rawCal : 1.0;
 }
 
 function getScaledNutri(item, scaleOverride = null) {
-  const n = item.totalNutritionPerServing || {};
-  const scale =
-    scaleOverride !== null ? scaleOverride : getNormalizedScale(item);
+  const n     = item.nutri || {};
+  const scale = scaleOverride !== null ? scaleOverride : getNormalizedScale(item);
   return {
     scaled: {
       calories: (n.calories || 0) * scale,
-      protein: (n.protein || 0) * scale,
-      fat: (n.fat || 0) * scale,
-      carbs: (n.carbs || 0) * scale,
-      //TODO: fiber/sugar/sodium
+      protein : (n.protein  || 0) * scale,
+      fat     : (n.fat      || 0) * scale,
+      carbs   : (n.carbs    || 0) * scale,
     },
     scale,
   };
@@ -197,46 +130,31 @@ function getScaledNutri(item, scaleOverride = null) {
 
 /** Gaussian fitness: càng gần target → càng cao (0→1) */
 function gaussianScore(itemNutri, targetVec) {
-  let sse = 0.0,
-    totalW = 0.0;
+  let sse = 0.0, totalW = 0.0;
   for (const [key, w] of Object.entries(NUTRITION_WEIGHTS)) {
-    const t = targetVec[key] || 1;
-    const a = itemNutri[key] || 0;
-    let diff = (a - t) / t;
+    const t    = targetVec[key] || 1;
+    const a    = itemNutri[key] || 0;
+    let   diff = (a - t) / t;
 
     // Asymmetric penalties
     if (key === "protein") {
       // Nếu thừa Protein quá 20%, bắt đầu phạt nặng dần
-      if (diff > 0.2) diff *= 4.0;
+      if (diff > 0.2) diff *= 4.0; 
       // Nếu thiếu Protein, vẫn phạt cực nặng để đảm bảo cơ bắp
       else if (diff < 0) diff *= 5.0;
-    } else if (key === "carbs") {
+    } 
+    else if (key === "carbs") {
       // Nếu thiếu Carbs, phải phạt nặng để hệ thống đi tìm cơm/sắn/ngô
       if (diff < 0) diff *= 3.0;
       // Nếu thừa Carbs, phạt để tránh béo
       else if (diff > 0) diff *= 2.0;
     }
-    sse += w * diff * diff;
+    sse    += w * diff * diff;
     totalW += w;
   }
-  // return Math.exp((-0.5 * sse) / totalW);
-  const macroScore = Math.exp((-0.5 * sse) / totalW);
-
-  // thêm calorie penalty riêng
-  const calT = targetVec.calories || 1;
-  const calA = itemNutri.calories || 0;
-  let calDiff = (calA - calT) / calT;
-
-  // asymmetric
-  if (calDiff > 0)
-    calDiff *= 2.0; // thừa cal phạt mạnh
-  else calDiff *= 1.2; // thiếu cal phạt nhẹ hơn
-
-  const calScore = Math.exp(-0.5 * calDiff * calDiff);
-
-  // combine
-  return macroScore * calScore;
+  return Math.exp((-0.5 * sse) / totalW);
 }
+
 /**
  * OPT-3: Novelty score dùng sigmoid thay linear → mượt hơn
  *   daysAgo=0 → 0.0 | 3 → 0.42 | 7 → 0.73 | 14 → 0.93
@@ -253,9 +171,9 @@ function softmaxSample(scoredItems, temp = SOFTMAX_TEMP) {
   if (!scoredItems.length) return null;
   if (scoredItems.length === 1) return scoredItems[0].item;
 
-  const top = scoredItems.slice(0, Math.min(scoredItems.length, 8));
+  const top  = scoredItems.slice(0, Math.min(scoredItems.length, 8));
   const exps = top.map((x) => Math.exp(x.score * temp));
-  const sum = exps.reduce((a, b) => a + b, 0);
+  const sum  = exps.reduce((a, b) => a + b, 0);
 
   let r = Math.random() * sum;
   for (let i = 0; i < top.length; i++) {
@@ -270,9 +188,9 @@ function sumNutrition(items) {
     (acc, r) => {
       const { scaled } = getScaledNutri(r);
       acc.calories += scaled.calories;
-      acc.protein += scaled.protein;
-      acc.fat += scaled.fat;
-      acc.carbs += scaled.carbs;
+      acc.protein  += scaled.protein;
+      acc.fat      += scaled.fat;
+      acc.carbs    += scaled.carbs;
       return acc;
     },
     { calories: 0, protein: 0, fat: 0, carbs: 0 },
@@ -299,44 +217,12 @@ function buildPoolCache(pool) {
 // ─────────────────────────────────────────────────────────────
 
 /**
- * Lấy lịch sử ăn uống gần đây.
- * @returns {Map<string, number>}  name → daysAgo
- */
-async function getRecentlyEatenMap(
-  userId,
-  lookbackDays = HISTORY_LOOKBACK_DAYS,
-) {
-  const since = new Date();
-  since.setDate(since.getDate() - lookbackDays);
-
-  const logs = await MealLog.find({ userId, eatenAt: { $gte: since } })
-    .sort({ eatenAt: -1 })
-    .lean();
-
-  const eatenMap = new Map();
-  const today = toDateOnly(new Date());
-
-  logs.forEach((log) => {
-    const diffDays = Math.ceil(
-      (today - toDateOnly(log.eatenAt)) / (1000 * 60 * 60 * 24),
-    );
-    log.meals?.forEach((meal) =>
-      meal.items?.forEach((item) => {
-        if (!eatenMap.has(item.name)) eatenMap.set(item.name, diffDays);
-      }),
-    );
-  });
-  console.log(">>> Recently eaten map:", eatenMap);
-  return eatenMap;
-}
-
-/**
  * Chọn 1 món từ pool theo scoring đa tiêu chí.
  *
- * finalScore = 0.60 * nutritionFit
+ * finalScore = 0.50 * nutritionFit
  *            + 0.20 * favouriteBoost
- *            + 0.10 * noveltyScore
- *            + 0.10 * diversityScore
+ *            + 0.15 * noveltyScore
+ *            + 0.15 * diversityScore
  *            - friedPenalty
  *            - adaptiveCarbsPenalty   ← FIX-2: giờ hoạt động đúng
  *
@@ -347,34 +233,38 @@ async function getRecentlyEatenMap(
  */
 function pickOne(poolCache, categories, targetVec, context) {
   const {
-    usedNames = new Set(),
+    usedNames       = new Set(),
     usedMealSources = new Map(),
-    usedCategories = new Map(),
-    favouriteIds = new Set(),
-    goal = DEFAULT_GOAL,
-    mealType = "lunch",
-    recentEatenMap = new Map(),
-    accumulatedNutrition = { calories: 0, protein: 0, fat: 0, carbs: 0 },
-    accumulatedRatio = { calories: 0, protein: 0, fat: 0, carbs: 0 },
-    mealTarget = {},
+    usedCategories  = new Map(),
+    favouriteIds    = new Set(),
+    goal            = DEFAULT_GOAL,
+    mealType        = "lunch",
+    recentEatenMap  = new Map(),
+    // FIX-2: hai field này giờ được truyền đúng từ buildMeal
+    accumulatedCarbs  = 0,
+    dailyTargetCarbs  = Infinity,
   } = context;
 
   const allowedCats = Array.isArray(categories) ? categories : [categories];
-  const profile = GOAL_PROFILES[goal] || GOAL_PROFILES[DEFAULT_GOAL];
+  const profile     = GOAL_PROFILES[goal] || GOAL_PROFILES[DEFAULT_GOAL];
 
   // OPT-4: lấy sub-pool từ cache, O(k) thay vì O(n)
   const subPool = allowedCats.flatMap((c) => poolCache.get(c) || []);
   if (!subPool.length) return null;
 
+  const currentCarbsRatio = dailyTargetCarbs > 0
+    ? accumulatedCarbs / dailyTargetCarbs
+    : 0;
+
   const scored = subPool
     // OPT-5: loại hard exclusion trước khi score
     .filter((item) => !usedNames.has(item.name))
     .map((item) => {
-      const { scaled } = getScaledNutri(item);
-      const proteinSrc = detectMealSource(item);
+      const { scaled }     = getScaledNutri(item);
+      const proteinSrc     = detectMealSource(item);
 
       // 1. Nutrition fitness
-      const nutritionFit = gaussianScore(scaled, targetVec);
+      const nutritionFit   = gaussianScore(scaled, targetVec);
 
       // 2. Favourite boost
       const favouriteBoost = favouriteIds.has(String(item._id)) ? 1.0 : 0.0;
@@ -383,38 +273,35 @@ function pickOne(poolCache, categories, targetVec, context) {
       let noveltyScore = 1.0;
       if (recentEatenMap.has(item.name)) {
         const daysAgo = recentEatenMap.get(item.name);
-        noveltyScore = noveltyFromDays(daysAgo);
+        noveltyScore  = noveltyFromDays(daysAgo);
       }
 
       // 4. Diversity: protein source
-      const proteinCount = usedMealSources.get(proteinSrc) || 0;
+      const proteinCount    = usedMealSources.get(proteinSrc) || 0;
       const proteinDiversity = Math.max(0, 1.0 - proteinCount * 0.35);
 
       // 5. Diversity: category
-      const catCount = usedCategories.get(item.category) || 0;
-      const catDiversity = Math.max(0, 1.0 - catCount * 0.25);
+      const catCount        = usedCategories.get(item.category) || 0;
+      const catDiversity    = Math.max(0, 1.0 - catCount * 0.25);
 
-      const diversityScore = (proteinDiversity + catDiversity) / 2;
+      const diversityScore  = (proteinDiversity + catDiversity) / 2;
 
       // 6. Goal-based penalty (chiên rán)
-      const friedPenalty = item.is_fried
+      const friedPenalty    = item.is_fried
         ? profile.friedPenaltyBase * (mealType === "dinner" ? 1.5 : 1.0)
         : 0.0;
 
-      // 7. Enhanced: Overage penalty cho TẤT CẢ macros — nếu accumulated vượt quá → giảm score
-      let overageMultiplier = 1.0;
-      if (accumulatedRatio.calories > 0.95) overageMultiplier *= 0.7;   // giảm 30% nếu calo >95%
-      if (accumulatedRatio.protein > 1.1) overageMultiplier *= 0.5;     // giảm 50% nếu protein >110%
-      if (accumulatedRatio.fat > 1.05) overageMultiplier *= 0.6;        // giảm 40% nếu fat >105%
-      if (accumulatedRatio.carbs > 0.85 && item.category === "base_starch")
-        overageMultiplier *= 0.3;  // giảm 70% nếu carbs >85% và item là starch
+      // 7. FIX-2: adaptive carbs penalty — giờ currentCarbsRatio có giá trị thực
+      const adaptiveCarbsPenalty =
+        currentCarbsRatio > 0.7 && item.category === "base_starch" ? 0.4 : 0;
 
       const finalScore =
-        (0.6 * nutritionFit +
-        0.2 * favouriteBoost +
-        0.1 * noveltyScore +
-        0.1 * diversityScore -
-        friedPenalty) * overageMultiplier;
+        0.50 * nutritionFit  +
+        0.20 * favouriteBoost +
+        0.15 * noveltyScore  +
+        0.15 * diversityScore -
+        friedPenalty         -
+        adaptiveCarbsPenalty;
 
       return { score: Math.max(0, finalScore), item };
     });
@@ -434,73 +321,48 @@ function pickOne(poolCache, categories, targetVec, context) {
  *
  * Giới hạn điều chỉnh: ±15% so với target gốc.
  */
-async function getAdaptiveTarget(
-  userId,
-  originalTarget,
-  targetDate = new Date(),
-) {
+async function getAdaptiveTarget(userId, originalTarget, targetDate = new Date()) {
   try {
-    const { goal } = await getUserNutritionProfile(userId);
-    const profile = GOAL_PROFILES[goal] || GOAL_PROFILES.maintain_weight;
+    const { goal }   = await getUserNutritionProfile(userId);
+    const profile    = GOAL_PROFILES[goal] || GOAL_PROFILES.maintain_weight;
     const debtImport = profile.debtImportance || {};
 
     const referenceDate = toDateOnly(targetDate);
-    const threeDaysAgo = new Date(referenceDate);
+    const threeDaysAgo  = new Date(referenceDate);
     threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
     const yesterday = new Date(referenceDate);
     yesterday.setDate(yesterday.getDate() - 1);
 
     const logs = await MealLog.find({
       userId,
-      eatenAt: { $gte: threeDaysAgo, $lte: yesterday },
+      eatenAt: { 
+        $gte: threeDaysAgoStart, 
+        $lt: targetDayStart // Lấy dữ liệu của 3 ngày TRƯỚC ngày target
+      },
     }).lean();
 
-    if (!logs.length) return originalTarget;
+    if (!logs?.length) return originalTarget;
 
-    // group theo ngày
-    const dailyTotals = {};
+    // Tổng nợ (target - actual) trong 3 ngày
+    const totalDebt = {};
+    Object.keys(originalTarget).forEach((k) => (totalDebt[k] = 0));
     logs.forEach((log) => {
-      const day = new Date(log.eatenAt).toISOString().slice(0, 10);
-
-      if (!dailyTotals[day]) {
-        dailyTotals[day] = {};
-        Object.keys(originalTarget).forEach((k) => (dailyTotals[day][k] = 0));
-      }
-
-      const nutri = log.recipe?.nutrition || {};
-      const scale = log.recipe?.scale || 1.0;
+      const actual = log.dailyTotalNutrition || {};
       for (const k in originalTarget) {
-        if (typeof nutri[k] === "number") {
-          dailyTotals[day][k] += nutri[k] * scale;
+        if (typeof actual[k] === "number" && typeof originalTarget[k] === "number") {
+          totalDebt[k] += originalTarget[k] - actual[k];
         }
       }
     });
 
-    // tính debt
-    const totalDebt = {};
-    Object.keys(originalTarget).forEach((k) => (totalDebt[k] = 0));
-
-    Object.values(dailyTotals).forEach((actual) => {
-      for (const k in originalTarget) {
-        totalDebt[k] += (originalTarget[k] || 0) - (actual[k] || 0);
-      }
-    });
-
-    const daysCount = Object.keys(dailyTotals).length || 1;
-
     const adaptiveTarget = { ...originalTarget };
-
     for (const k in originalTarget) {
-      const avgDebt = totalDebt[k] / daysCount;
-      const importance = debtImport[k] || 1.0;
-      const maxAdj = originalTarget[k] * 0.15;
-
-      const finalAdj = Math.max(
-        -maxAdj,
-        Math.min(maxAdj, avgDebt * importance),
-      );
-
-      adaptiveTarget[k] = parseFloat((originalTarget[k] + finalAdj).toFixed(1));
+      if (typeof originalTarget[k] !== "number") continue;
+      const avgDebt      = totalDebt[k] / 3;
+      const importance   = debtImport[k] || 1.0;
+      const maxAdj       = originalTarget[k] * 0.15;
+      const finalAdj     = Math.max(-maxAdj, Math.min(maxAdj, avgDebt * importance));
+      adaptiveTarget[k]  = parseFloat((originalTarget[k] + finalAdj).toFixed(1));
     }
 
     return adaptiveTarget;
@@ -520,86 +382,68 @@ async function getAdaptiveTarget(
  * @returns {Promise<Map<string, Object>>}  dateStr → adaptiveTarget
  */
 async function getAllAdaptiveTargets(userId, originalTarget, dates) {
-  const sorted = dates.map((d) => toDateOnly(d)).sort((a, b) => a - b);
-
+  // Lấy khoảng cần truy vấn (sớm nhất - 3 ngày đến muộn nhất - 1 ngày)
+  const sorted    = dates.map((d) => toDateOnly(d)).sort((a, b) => a - b);
   const queryFrom = new Date(sorted[0]);
   queryFrom.setDate(queryFrom.getDate() - 3);
-
-  const queryTo = new Date(sorted[sorted.length - 1]);
+  const queryTo   = new Date(sorted[sorted.length - 1]);
   queryTo.setDate(queryTo.getDate() - 1);
 
   const logs = await MealLog.find({
-    userId,
-    eatenAt: { $gte: queryFrom, $lte: queryTo },
-  }).lean();
+      userId,
+      eatenAt: { 
+        $gte: queryFrom, 
+        $lt: queryTo 
+      },
+    }).lean();
 
-  // group theo ngày
-  const dailyTotals = new Map();
-
+  // Group logs theo ngày
+  const logsByDate = new Map();
   logs.forEach((log) => {
-    const day = new Date(log.eatenAt).toISOString().slice(0, 10);
-
-    if (!dailyTotals.has(day)) {
-      const init = {};
-      Object.keys(originalTarget).forEach((k) => (init[k] = 0));
-      dailyTotals.set(day, init);
-    }
-
-    const nutri = log.recipe?.nutrition || {};
-    const scale = log.recipe?.scale || 1.0;
-    const current = dailyTotals.get(day);
-
-    for (const k in originalTarget) {
-      if (typeof nutri[k] === "number") {
-        current[k] += nutri[k] * scale;
-      }
-    }
+    const key = toDateOnly(log.date).toISOString();
+    if (!logsByDate.has(key)) logsByDate.set(key, []);
+    logsByDate.get(key).push(log);
   });
 
-  const { goal } = await getUserNutritionProfile(userId);
-  const profile = GOAL_PROFILES[goal] || GOAL_PROFILES.maintain_weight;
+  const { goal }   = await getUserNutritionProfile(userId);
+  const profile    = GOAL_PROFILES[goal] || GOAL_PROFILES.maintain_weight;
   const debtImport = profile.debtImportance || {};
 
   const result = new Map();
 
   for (const date of dates) {
-    const ref = toDateOnly(date);
+    const ref       = toDateOnly(date);
     const dayTarget = { ...originalTarget };
 
-    const windowDays = [];
-
+    // Lấy 3 ngày liền trước
+    const windowLogs = [];
     for (let i = 1; i <= 3; i++) {
-      const d = new Date(ref);
+      const d   = new Date(ref);
       d.setDate(d.getDate() - i);
-      const key = d.toISOString().slice(0, 10);
-
-      if (dailyTotals.has(key)) {
-        windowDays.push(dailyTotals.get(key));
-      }
+      const key = d.toISOString();
+      if (logsByDate.has(key)) windowLogs.push(...logsByDate.get(key));
     }
 
-    if (windowDays.length) {
+    if (windowLogs.length) {
       const totalDebt = {};
       Object.keys(originalTarget).forEach((k) => (totalDebt[k] = 0));
-
-      windowDays.forEach((actual) => {
+      windowLogs.forEach((log) => {
+        const actual = log.dailyTotalNutrition || {};
         for (const k in originalTarget) {
-          totalDebt[k] += (originalTarget[k] || 0) - (actual[k] || 0);
+          if (typeof actual[k] === "number" && typeof originalTarget[k] === "number") {
+            totalDebt[k] += originalTarget[k] - actual[k];
+          }
         }
       });
 
-      const daysCount = windowDays.length;
-
       for (const k in originalTarget) {
-        const avgDebt = totalDebt[k] / daysCount;
-
-        const maxAdj = originalTarget[k] * 0.15;
-
+        if (typeof originalTarget[k] !== "number") continue;
+        const avgDebt  = totalDebt[k] / 3;
+        const maxAdj   = originalTarget[k] * 0.15;
         const finalAdj = Math.max(
           -maxAdj,
           Math.min(maxAdj, avgDebt * (debtImport[k] || 1.0)),
         );
-
         dayTarget[k] = parseFloat((originalTarget[k] + finalAdj).toFixed(1));
       }
     }
@@ -613,7 +457,6 @@ async function getAllAdaptiveTargets(userId, originalTarget, dates) {
 // ─────────────────────────────────────────────────────────────
 // BUILD MEAL
 // ─────────────────────────────────────────────────────────────
-
 
 /**
  * Xây dựng 1 bữa ăn hoàn chỉnh.
@@ -629,31 +472,19 @@ async function getAllAdaptiveTargets(userId, originalTarget, dates) {
 function buildMeal(poolCache, mealType, adjTarget, context) {
   const chosen = [];
 
-  // Helper: scale đồng bộ TẤT CẢ macro theo tỷ lệ — FIX 1
-  function scaledTarget(ratio) {
-    return {
-      calories: adjTarget.calories * ratio,
-      protein:  adjTarget.protein  * ratio,
-      fat:      adjTarget.fat      * ratio,
-      carbs:    adjTarget.carbs    * ratio,
-    };
-  }
-
+  /**
+   * Helper nội bộ: pickOne + tự cập nhật accumulatedCarbs trước khi gọi.
+   * FIX-2: đảm bảo adaptiveCarbsPenalty luôn nhận giá trị thực tế.
+   */
   function pick(categories, target) {
-    const accumulated = sumNutrition(chosen);
-    const accumulatedRatio = {
-      calories: adjTarget.calories > 0 ? accumulated.calories / adjTarget.calories : 0,
-      protein:  adjTarget.protein  > 0 ? accumulated.protein  / adjTarget.protein  : 0,
-      fat:      adjTarget.fat      > 0 ? accumulated.fat      / adjTarget.fat      : 0,
-      carbs:    adjTarget.carbs    > 0 ? accumulated.carbs    / adjTarget.carbs    : 0,
-    };
-    return pickOne(poolCache, categories, target, {
+    const accumulated      = sumNutrition(chosen);
+    const enrichedContext  = {
       ...context,
       mealType,
-      accumulatedNutrition: accumulated,
-      accumulatedRatio,
-      mealTarget: adjTarget,
-    });
+      accumulatedCarbs : accumulated.carbs,
+      dailyTargetCarbs : adjTarget.carbs,
+    };
+    return pickOne(poolCache, categories, target, enrichedContext);
   }
 
   function push(item) {
@@ -661,73 +492,49 @@ function buildMeal(poolCache, mealType, adjTarget, context) {
   }
 
   function remainRatio() {
-    const used = sumNutrition(chosen).calories;
-    return Math.max(0, (adjTarget.calories - used) / adjTarget.calories);
+    return (adjTarget.calories - sumNutrition(chosen).calories) / adjTarget.calories;
   }
 
-  // ─── BREAKFAST ───────────────────────────────────────────────
   if (mealType === "breakfast") {
-    // FIX 2: nhắm 70% thay vì 100% để tránh overshoot
-    const oneDish = pick(["one_dish_meal"], scaledTarget(0.70));
+    const oneDish = pick(["one_dish_meal"], adjTarget);
     push(oneDish);
 
-    if (remainRatio() > 0.15)
-      push(pick(["light_supplement"], scaledTarget(remainRatio() * 0.6)));
+    if (remainRatio() > 0.20)
+      push(pick(["light_supplement"], { calories: adjTarget.calories * 0.20 }));
 
-    if (remainRatio() > 0.05)
-      push(pick(["drink", "dessert", "fruit"], scaledTarget(remainRatio())));
+    if (remainRatio() > 0.15)
+      push(pick(["drink", "dessert", "fruit"], { calories: adjTarget.calories * 0.15 }));
 
     // Fallback nếu không có one_dish_meal
     if (!oneDish) {
-      push(pick(["main"],      scaledTarget(0.45)));
-      push(pick(["base_starch"], scaledTarget(0.35)));
-      push(pick(["soup_veg"],  scaledTarget(0.20)));
-
+      push(pick(["main"],       { ...adjTarget, calories: adjTarget.calories * 0.45 }));
+      push(pick(["base_starch"],{ ...adjTarget, calories: adjTarget.calories * 0.35 }));
+      push(pick(["soup_veg"],   { ...adjTarget, calories: adjTarget.calories * 0.20 }));
       if (remainRatio() > 0.15)
-        push(pick(["light_supplement"], scaledTarget(remainRatio() * 0.5)));
-      if (remainRatio() > 0.10)
-        push(pick(["dessert", "drink", "fruit"], scaledTarget(remainRatio())));
+        push(pick(["light_supplement"], { calories: adjTarget.calories * remainRatio() * 0.5 }));
+      if (remainRatio() > 0.15)
+        push(pick(["dessert", "drink", "fruit"], { calories: adjTarget.calories * remainRatio() * 0.5 }));
     }
-
-  // ─── LUNCH / DINNER ──────────────────────────────────────────
-  } else if (mealType === "lunch" || mealType === "dinner") {
+  } else {
+    // Lunch / Dinner: 60% combo, 40% one-dish
     if (Math.random() < 0.6) {
-      // Combo: main + starch + soup/veg → tổng = 100%, macro đồng bộ — FIX 1
-      push(pick(["main"],             scaledTarget(0.45)));
-      push(pick(["base_starch"],      scaledTarget(0.35)));
-      push(pick(["soup_veg", "side"], scaledTarget(0.20)));
-
+      push(pick(["main"],             { ...adjTarget, calories: adjTarget.calories * 0.45 }));
+      push(pick(["base_starch"],      { ...adjTarget, calories: adjTarget.calories * 0.35 }));
+      push(pick(["soup_veg", "side"], { ...adjTarget, calories: adjTarget.calories * 0.20 }));
       if (remainRatio() > 0.15)
-        push(pick(["side"],                    scaledTarget(remainRatio() * 0.6)));
-      if (remainRatio() > 0.10)
-        push(pick(["dessert", "light_supplement"], scaledTarget(remainRatio())));
+        push(pick(["side"], { calories: adjTarget.calories * remainRatio() * 0.5 }));
+      if (remainRatio() > 0.15)
+        push(pick(["dessert", "light_supplement"], { calories: adjTarget.calories * remainRatio() * 0.5 }));
     } else {
-      // One-dish: nhắm 75%, phần còn lại dành cho side/fruit
-      push(pick(["one_dish_meal"], scaledTarget(0.75)));
-
-      if (remainRatio() > 0.15)
-        push(pick(["side"],                      scaledTarget(remainRatio() * 0.6)));
-      if (remainRatio() > 0.10)
-        push(pick(["fruit", "light_supplement"], scaledTarget(remainRatio())));
+      push(pick(["one_dish_meal"], adjTarget));
+      if (remainRatio() > 0.40)
+        push(pick(["side"], { calories: adjTarget.calories * 0.4 }));
+      if (remainRatio() > 0.20)
+        push(pick(["fruit", "light_supplement"], { calories: adjTarget.calories * 0.2 }));
     }
-
-  // ─── SNACK ───────────────────────────────────────────────────
-  } else if (mealType === "snack") {
-    push(pick(
-      ["dessert", "fruit", "light_supplement"],
-      scaledTarget(0.5),
-    ));
   }
 
-  // ─── CLEANUP: nếu vẫn vượt >15% thì pop từ cuối ─────────────
-  while (
-    chosen.length > 1 &&
-    sumNutrition(chosen).calories > adjTarget.calories * 1.15
-  ) {
-    chosen.pop();
-  }
-
-  // ─── Cập nhật shared context ──────────────────────────────────
+  // Cập nhật shared context (mutation in-place)
   chosen.forEach((r) => {
     context.usedNames.add(r.name);
     const src = detectMealSource(r);
@@ -735,7 +542,7 @@ function buildMeal(poolCache, mealType, adjTarget, context) {
     context.usedCategories.set(r.category, (context.usedCategories.get(r.category) || 0) + 1);
   });
 
-  // ─── Build output ─────────────────────────────────────────────
+  // Build output với scaled nutrition (source of truth)
   const itemsWithScaled = chosen.map((r) => {
     const { scaled, scale } = getScaledNutri(r);
     return { r, scaled, scale };
@@ -751,26 +558,24 @@ function buildMeal(poolCache, mealType, adjTarget, context) {
     },
     { calories: 0, protein: 0, fat: 0, carbs: 0 },
   );
+
   for (const k in totalNutrition)
     totalNutrition[k] = parseFloat(totalNutrition[k].toFixed(1));
 
   return {
     mealType,
     items: itemsWithScaled.map(({ r, scaled, scale }) => ({
-      recipeId:    r._id,
-      name:        r.name,
-      imageUrl:    r.imageUrl,
-      description: r.description,
-      scale:       parseFloat(scale.toFixed(3)),
-      mealSource:  detectMealSource(r),
-      nutrition: {
-        calories: parseFloat(r.totalNutritionPerServing.calories.toFixed(1)),
-        protein:  parseFloat(r.totalNutritionPerServing.protein.toFixed(1)),
-        fat:      parseFloat(r.totalNutritionPerServing.fat.toFixed(1)),
-        carbs:    parseFloat(r.totalNutritionPerServing.carbs.toFixed(1)),
+      recipeId  : r._id,
+      name      : r.name,
+      category  : r.category,
+      scale     : parseFloat(scale.toFixed(3)),
+      mealSource: detectMealSource(r),
+      nutrition : {
+        calories: parseFloat(scaled.calories.toFixed(1)),
+        protein : parseFloat(scaled.protein.toFixed(1)),
+        fat     : parseFloat(scaled.fat.toFixed(1)),
+        carbs   : parseFloat(scaled.carbs.toFixed(1)),
       },
-      servingTime: mealType,
-      isChecked:   false,
     })),
     totalNutrition,
   };
@@ -793,8 +598,8 @@ function buildMeal(poolCache, mealType, adjTarget, context) {
  * @param {Object} sharedContext
  */
 function buildDayPlan(poolCache, dailyTarget, goal, sharedContext) {
-  console.log(">>> Adaptive target lại là:", dailyTarget);
-  const debt = { calories: 0, protein: 0, fat: 0, carbs: 0 };
+  console.log("adtive target for the day:", dailyTarget);
+  const debt    = { calories: 0, protein: 0, fat: 0, carbs: 0 };
   const dayMeals = [];
 
   for (const mealKey of ["breakfast", "lunch", "dinner"]) {
@@ -805,9 +610,9 @@ function buildDayPlan(poolCache, dailyTarget, goal, sharedContext) {
     // FIX-1: intra-day rolling debt — giới hạn ±10%, không dùng debtImportance
     const adjTarget = {};
     for (const k in baseTarget) {
-      const maxAdj = baseTarget[k] * 0.1;
-      const adjVal = Math.max(-maxAdj, Math.min(maxAdj, (debt[k] || 0) / 2));
-      adjTarget[k] = Math.max(0, baseTarget[k] + adjVal);
+      const maxAdj  = baseTarget[k] * 0.10;
+      const adjVal  = Math.max(-maxAdj, Math.min(maxAdj, (debt[k] || 0) / 2));
+      adjTarget[k]  = Math.max(0, baseTarget[k] + adjVal);
     }
 
     const meal = buildMeal(poolCache, mealKey, adjTarget, {
@@ -824,51 +629,15 @@ function buildDayPlan(poolCache, dailyTarget, goal, sharedContext) {
   const dailyTotal = dayMeals.reduce(
     (acc, m) => {
       acc.calories += m.totalNutrition.calories;
-      acc.protein += m.totalNutrition.protein;
-      acc.fat += m.totalNutrition.fat;
-      acc.carbs += m.totalNutrition.carbs;
-      //TODO: sau nàu thêm fiber, sugar, sodium
+      acc.protein  += m.totalNutrition.protein;
+      acc.fat      += m.totalNutrition.fat;
+      acc.carbs    += m.totalNutrition.carbs;
       return acc;
     },
     { calories: 0, protein: 0, fat: 0, carbs: 0 },
   );
   for (const k in dailyTotal)
     dailyTotal[k] = parseFloat(dailyTotal[k].toFixed(1));
-
-  // Snack fallback: nếu 3 bữa vẫn thiếu >10% bất kỳ macro → thêm 1 bữa snack
-  const debts = {
-    calories: dailyTotal.calories < dailyTarget.calories * 0.9,
-    protein: dailyTotal.protein < dailyTarget.protein * 0.9,
-  };
-
-  if (debts.calories || debts.protein) {
-    const snackTarget = {
-      calories: Math.min(
-        Math.max(0, dailyTarget.calories - dailyTotal.calories),
-        300  // max 300 kcal cho snack
-      ),
-      protein: Math.max(0, dailyTarget.protein - dailyTotal.protein),
-      fat: Math.max(0, dailyTarget.fat - dailyTotal.fat) * 0.5,  // relax hơn
-      carbs: Math.max(0, dailyTarget.carbs - dailyTotal.carbs) * 0.3,  // relax hơn
-    };
-
-    const snack = buildMeal(poolCache, "snack", snackTarget, {
-      ...sharedContext,
-      goal,
-      mealType: "snack",
-    });
-
-    if (snack && snack.items.length > 0) {
-      dayMeals.push(snack);
-      // Update dailyTotal với snack
-      dailyTotal.calories += snack.totalNutrition.calories;
-      dailyTotal.protein += snack.totalNutrition.protein;
-      dailyTotal.fat += snack.totalNutrition.fat;
-      dailyTotal.carbs += snack.totalNutrition.carbs;
-      for (const k in dailyTotal)
-        dailyTotal[k] = parseFloat(dailyTotal[k].toFixed(1));
-    }
-  }
 
   return { meals: dayMeals, dailyTotal };
 }
@@ -882,8 +651,8 @@ async function getUserNutritionProfile(userId) {
     const ng = await NutritionGoal.findOne({ userId, status: "active" }).lean();
     if (ng) {
       return {
-        tdee: ng.tdee?.calories || 2000,
-        goal: ng.bodySnapshot?.goal || DEFAULT_GOAL,
+        tdee  : ng.tdee?.calories || 2000,
+        goal  : ng.bodySnapshot?.goal || DEFAULT_GOAL,
         target: ng.targetNutrition,
       };
     }
@@ -902,36 +671,28 @@ async function getFavouriteIds(userId) {
 
 function normalizeRecipes(rawRecipes, allergies = []) {
   const allergyLower = allergies.map((a) => a.toLowerCase());
-  // console.log("rawRecipe:", rawRecipes[0])
-  return rawRecipes.reduce((acc, item) => {
-    // 1. PHẦN FILTER: Kiểm tra điều kiện ngay tại đây
-    const calories = parseFloat(item.totalNutritionPerServing?.calories || 0);
-    // Nếu calories không hợp lệ -> return acc luôn (bỏ qua phần tử này)
-    if (calories <= 0) return acc;
-
-    // Kiểm tra dị ứng
-    if (allergyLower.length) {
-      const txt = (
-        item.name +
-        " " +
-        (item.ingredients || [])
-          .map((i) => i.name || i.rawName || "")
-          .join(" ") +
-        (item.allergy_tags || []).join(" ")
-      ).toLowerCase();
-
-      // Nếu chứa dị ứng -> return acc luôn
-      if (allergyLower.some((a) => txt.includes(a))) return acc;
-    }
-
-    // 2. PHẦN MAP: Xây dựng object mới khi đã vượt qua bộ lọc
-    const newItem = {
+  return rawRecipes
+    .map((item) => ({
       ...item,
-    };
-    // 3. Thêm vào mảng kết quả
-    acc.push(newItem);
-    return acc;
-  }, []); // Khởi tạo mảng rỗng làm giá trị bắt đầu
+      nutri: {
+        calories: parseFloat(item.totalNutritionPerServing?.calories || 0),
+        protein : parseFloat(item.totalNutritionPerServing?.protein  || 0),
+        fat     : parseFloat(item.totalNutritionPerServing?.fat      || 0),
+        carbs   : parseFloat(item.totalNutritionPerServing?.carbs    || 0),
+      },
+    }))
+    .filter((r) => {
+      if (r.nutri.calories <= 0) return false;
+      if (allergyLower.length) {
+        const txt = (
+          r.name + " " +
+          (r.ingredients   || []).join(" ") + " " +
+          (r.allergy_tags  || []).join(" ")
+        ).toLowerCase();
+        if (allergyLower.some((a) => txt.includes(a))) return false;
+      }
+      return true;
+    });
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -950,99 +711,58 @@ async function recommendDayPlan(userId, options = {}) {
   const { saveToDB = false, date = new Date() } = options;
 
   // 1. Profile + adaptive target (getAdaptiveTarget = điều chỉnh lịch sử DB)
-  const {
-    tdee,
-    goal,
-    target: dailyTarget,
-  } = await getUserNutritionProfile(userId);
+  const { tdee, goal, target: dailyTarget } = await getUserNutritionProfile(userId);
   const adaptiveTarget = await getAdaptiveTarget(userId, dailyTarget, date);
 
   // 2. Load data song song
   const [rawRecipes, recentNames, favouriteIds, user] = await Promise.all([
-    Recipe.aggregate([
-      {
-        $match: {
-          deleted: { $ne: true },
-          verified: true,
-          "totalNutritionPerServing.calories": { $gt: 0 },
-        },
-      },
-      {
-        $project: {
-          _id: 1,
-          name: 1,
-          totalWeight: 1,
-          category: 1,
-          description: 1,
-          allergy_tags: 1,
-          ingredients: 1,
-          servings: 1,
-          totalNutritionPerServing: 1,
-          imageUrl: 1,
-          nutritionVector: 1,
-        },
-      },
-    ]),
+    Recipe.find({}).lean(),
     getRecentlyEatenMap(userId),
     getFavouriteIds(userId),
     User.findById(userId).select("allergies").lean(),
   ]);
 
   // 3. Normalize + OPT-4 cache
-  const recipes = normalizeRecipes(rawRecipes, user?.allergies || []);
+  const recipes   = normalizeRecipes(rawRecipes, user?.allergies || []);
   const poolCache = buildPoolCache(recipes);
 
   // 4. Context ngày
   const dayContext = {
-    usedNames: new Set(),
+    usedNames      : new Set(),
     usedMealSources: new Map(),
-    usedCategories: new Map(),
+    usedCategories : new Map(),
     favouriteIds,
-    recentEatenMap: recentNames,
+    recentEatenMap : recentNames,
   };
 
   // 5. Build plan — FIX-1: truyền adaptiveTarget (bù lịch sử DB đã xong)
   //    buildDayPlan chỉ còn lo rolling-debt nội ngày
   const { meals, dailyTotal } = buildDayPlan(
-    poolCache,
-    adaptiveTarget,
-    goal,
-    dayContext,
+    poolCache, adaptiveTarget, goal, dayContext,
   );
-  console.log("meals:", meals[1]);
-  const mealToRecipe = meals.flatMap((meal) => {
-    // Map qua các items bên trong meal
-    return meal.items;
-  });
+
   // 6. Optionally save
   let dailyMenuId = null;
   if (saveToDB) {
     const logDate = toDateOnly(date);
-    const logDoc = await DailyMenu.findOneAndUpdate(
+    const logDoc  = await dailyMenuService.createDailyMenu(
       { userId, date: logDate },
-      {
-        userId,
-        date: logDate,
-        recipes: mealToRecipe,
-        totalNutrition: dailyTotal,
-        targetNutrition: adaptiveTarget,
-        status: "planned",
-      },
+      { userId, date: logDate, meals, dailyTotalNutrition: dailyTotal, dailyTargetNutrition: adaptiveTarget, source: "recommended" },
       { upsert: true, new: true, setDefaultsOnInsert: true },
     );
     dailyMenuId = logDoc._id;
   }
 
   return {
-    date: toDateOnly(date),
-    recipes: mealToRecipe,
-    totalNutrition: { ...dailyTotal },
-    targetNutrition: { ...adaptiveTarget },
-    status: "planned",
-    ...(dailyMenuId && { _id: dailyMenuId }),
+    date    : toDateOnly(date),
+    goal,
+    tdee    : parseFloat(tdee.toFixed(0)),
+    target  : { ...dailyTarget },
+    meals,
+    dailyTotal,
+    ...(dailyMenuId && { dailyMenuId }),
   };
 }
-//TODO: để thống nhất kiểu trả về ban đầu nên return _id. Sau này nên đổi
 
 /**
  * Gợi ý thực đơn 7 ngày.
@@ -1060,11 +780,7 @@ async function recommendWeekPlan(userId, options = {}) {
   const numDays = Math.min(Math.max(days, 1), 14);
 
   // 1. Profile
-  const {
-    tdee,
-    goal,
-    target: dailyTarget,
-  } = await getUserNutritionProfile(userId);
+  const { tdee, goal, target: dailyTarget } = await getUserNutritionProfile(userId);
 
   // 2. Load data + FIX-3/OPT-1: tính adaptive targets cho cả tuần 1 lần
   const dates = Array.from({ length: numDays }, (_, i) => {
@@ -1079,63 +795,48 @@ async function recommendWeekPlan(userId, options = {}) {
       getRecentlyEatenMap(userId),
       getFavouriteIds(userId),
       User.findById(userId).select("allergies").lean(),
-      getAllAdaptiveTargets(userId, dailyTarget, dates), // FIX-3 + OPT-1
+      getAllAdaptiveTargets(userId, dailyTarget, dates),   // FIX-3 + OPT-1
     ]);
 
-  const recipes = normalizeRecipes(rawRecipes, user?.allergies || []);
-  const poolCache = buildPoolCache(recipes); // OPT-4
+  const recipes   = normalizeRecipes(rawRecipes, user?.allergies || []);
+  const poolCache = buildPoolCache(recipes);   // OPT-4
 
   // 3. Weekly shared context
   const weekContext = {
-    usedNames: new Set(), // tích lũy cả tuần → tránh lặp
+    usedNames      : new Set(),        // tích lũy cả tuần → tránh lặp
     favouriteIds,
-    recentEatenMap: recentNames,
+    recentEatenMap : recentNames,
   };
 
-  const weekPlan = [];
-  const logPromises = [];
+  const weekPlan     = [];
+  const logPromises  = [];
 
   for (let i = 0; i < numDays; i++) {
-    const dayDate = dates[i];
-    const adaptiveTarget =
-      adaptiveTargetsMap.get(toDateOnly(dayDate).toISOString()) || dailyTarget;
+    const dayDate        = dates[i];
+    const adaptiveTarget = adaptiveTargetsMap.get(toDateOnly(dayDate).toISOString())
+                        || dailyTarget;
 
     // Per-day context: protein/category diversity reset hàng ngày
     const dayContext = {
-      usedNames: weekContext.usedNames, // shared → tránh lặp cả tuần
-      usedMealSources: new Map(), // reset mỗi ngày
-      usedCategories: new Map(), // reset mỗi ngày
+      usedNames      : weekContext.usedNames,   // shared → tránh lặp cả tuần
+      usedMealSources: new Map(),               // reset mỗi ngày
+      usedCategories : new Map(),               // reset mỗi ngày
       favouriteIds,
-      recentEatenMap: weekContext.recentEatenMap,
+      recentEatenMap : weekContext.recentEatenMap,
     };
 
     const { meals, dailyTotal } = buildDayPlan(
-      poolCache,
-      adaptiveTarget,
-      goal,
-      dayContext,
+      poolCache, adaptiveTarget, goal, dayContext,
     );
 
-    weekPlan.push({
-      dayIndex: i + 1,
-      date: toDateOnly(dayDate),
-      meals,
-      dailyTotal,
-    });
+    weekPlan.push({ dayIndex: i + 1, date: toDateOnly(dayDate), meals, dailyTotal });
 
     if (saveToDB) {
       const logDate = toDateOnly(dayDate);
       logPromises.push(
-        MealLog.findOneAndUpdate(
+        DailyMenu.findOneAndUpdate(
           { userId, date: logDate },
-          {
-            userId,
-            date: logDate,
-            meals,
-            dailyTotalNutrition: dailyTotal,
-            dailyTargetNutrition: adaptiveTarget,
-            source: "recommended",
-          },
+          { userId, date: logDate, meals, dailyTotalNutrition: dailyTotal, dailyTargetNutrition: adaptiveTarget, source: "recommended" },
           { upsert: true, new: true, setDefaultsOnInsert: true },
         ),
       );
@@ -1147,9 +848,9 @@ async function recommendWeekPlan(userId, options = {}) {
   const weeklyTotal = weekPlan.reduce(
     (acc, day) => {
       acc.calories += day.dailyTotal.calories;
-      acc.protein += day.dailyTotal.protein;
-      acc.fat += day.dailyTotal.fat;
-      acc.carbs += day.dailyTotal.carbs;
+      acc.protein  += day.dailyTotal.protein;
+      acc.fat      += day.dailyTotal.fat;
+      acc.carbs    += day.dailyTotal.carbs;
       return acc;
     },
     { calories: 0, protein: 0, fat: 0, carbs: 0 },
@@ -1161,18 +862,18 @@ async function recommendWeekPlan(userId, options = {}) {
   endDate.setDate(endDate.getDate() + numDays - 1);
 
   return {
-    startDate: toDateOnly(startDate),
-    endDate: toDateOnly(endDate),
+    startDate   : toDateOnly(startDate),
+    endDate     : toDateOnly(endDate),
     goal,
-    tdee: parseFloat(tdee.toFixed(0)),
+    tdee        : parseFloat(tdee.toFixed(0)),
     dailyTarget,
     weekPlan,
     weeklyTotal,
     weeklyAverage: {
       calories: parseFloat((weeklyTotal.calories / numDays).toFixed(1)),
-      protein: parseFloat((weeklyTotal.protein / numDays).toFixed(1)),
-      fat: parseFloat((weeklyTotal.fat / numDays).toFixed(1)),
-      carbs: parseFloat((weeklyTotal.carbs / numDays).toFixed(1)),
+      protein : parseFloat((weeklyTotal.protein  / numDays).toFixed(1)),
+      fat     : parseFloat((weeklyTotal.fat       / numDays).toFixed(1)),
+      carbs   : parseFloat((weeklyTotal.carbs     / numDays).toFixed(1)),
     },
   };
 }
