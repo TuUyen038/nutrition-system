@@ -5,6 +5,7 @@ const DailyMenu      = require("../models/DailyMenu");
 const NutritionGoal = require("../models/NutritionGoal");
 const User          = require("../models/User");
 const { getRecentlyEatenMap } = require("./mealLog.service");
+const { createDailyMenu } = require("./dailyMenu.service");
 // ─────────────────────────────────────────────────────────────
 // CONSTANTS
 // ─────────────────────────────────────────────────────────────
@@ -745,7 +746,7 @@ async function recommendDayPlan(userId, options = {}) {
   let dailyMenuId = null;
   if (saveToDB) {
     const logDate = toDateOnly(date);
-    const logDoc  = await dailyMenuService.createDailyMenu(
+    const logDoc  = await createDailyMenu(
       { userId, date: logDate },
       { userId, date: logDate, meals, dailyTotalNutrition: dailyTotal, dailyTargetNutrition: adaptiveTarget, source: "recommended" },
       { upsert: true, new: true, setDefaultsOnInsert: true },

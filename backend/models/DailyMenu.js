@@ -8,14 +8,15 @@ const dailyMenuSchema = new mongoose.Schema(
       ref: "User",
       required: false,
     },
-    date: { type: String, required: true },
+    date: { type: Date, required: true },
 
     recipes: [
       {
         ...recipeItemSchema.obj,
         servingTime: {
           type: String,
-          enum: ["breakfast", "lunch", "dinner", "snack"],
+          enum: ["breakfast", "lunch", "dinner", "snack", "other"],
+          default: "other",
         },
         isChecked: Boolean,
       },
@@ -46,25 +47,19 @@ const dailyMenuSchema = new mongoose.Schema(
     status: {
       type: String,
       enum: [
-        "planned",
-        "selected",
+        "manual",
         "suggested",
+        "selected",
         "completed",
         "deleted",
-        "edited",
+        "expired",
       ],
-      default: "planned",
-    },
-    originalMealId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "DailyMenu",
-      required: false,
     },
     feedback: String,
   },
   { timestamps: true },
 );
 
-dailyMenuSchema.index({ userId: 1, date: -1 });
+dailyMenuSchema.index({ userId: 1, status: 1, date: -1 });
 
 module.exports = mongoose.model("DailyMenu", dailyMenuSchema);

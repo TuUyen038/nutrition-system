@@ -1,55 +1,107 @@
 const dailyMenuService = require("../services/dailyMenu.service");
 const DailyMenu = require("../models/DailyMenu");
-const mealRecommendationService = require("../services/mealRecommendation.service");
+const {
+    recommendDayPlan,
+    recommendWeekPlan,
+} = require("../services/mealRecommendation.service");
 
 exports.suggestDailyMenuV2 = async (req, res) => {
   try {
-    const userId = req.user._id;
-    const { date } = req.body;
+        const userId = req.user._id; // từ auth middleware
+        const { date, saveToDB = false } = req.body;
 
-    if (!date) {
-      return res.status(400).json({ message: "date là bắt buộc" });
+        const result = await recommendDayPlan(userId, {
+            date:     date ? new Date(date) : new Date(),
+            saveToDB: Boolean(saveToDB),
+        });
+
+        return res.status(200).json({
+            success: true,
+            data: result,
+        });
+    } catch (err) {
+        console.error("[recommendDay] Error:", err);
+        return res.status(400).json({
+            success: false,
+            message: err.message || "Internal server error",
+        });
     }
+};
+exports.addRecipe = async (req, res) => {
+  try {
+    const data = {
+      userId: req.user._id,
+      ...req.validatedData 
+    };
 
-    // Lấy user info + daily target
-    const user = await User.findById(userId).lean();
-    const goal = await NutritionGoal.findOne({ userId, status: "active" })
-      .sort({ createdAt: -1 })
-      .lean();
+    const updatedMenu = await dailyMenuService.addRecipeToMenu(data);
 
-    if (!goal) {
-      return res.status(400).json({ message: "Chưa set nutrition goal" });
-    }
-
-    const dailyTarget = goal.targetNutrition;
-
-    // Generate daily menu
-    const { recipesPlanned, nutritionSum } =
-      await mealRecommendationService.generateDailyMenuDataV2({
-        userId,
-        dateStr: date,
-        user,
-        dailyTarget,
-      });
-
-    // Tạo hoặc update DailyMenu
-    const DailyMenu = require("../models/DailyMenu");
-    const dailyMenu = await DailyMenu.findOneAndUpdate(
-      { userId, date },
-      {
-        recipes: recipesPlanned,
-        totalNutrition: nutritionSum,
-        status: "suggested",
-      },
-      { upsert: true, new: true }
-    ).populate("recipes.recipeId");
-
-    return res.status(200).json(dailyMenu);
-  } catch (err) {
-    console.error("Error suggestDailyMenuV2:", err);
-    return res.status(500).json({ message: err.message });
+    return res.status(200).json({
+      success: true,
+      message: "Đã thêm món ăn vào thực đơn",
+      data: updatedMenu
+    });
+  } catch (error) {
+    return res.status(400).json({ success: false, message: error.message });
   }
 };
+exports.updateRecipe = async (req, res) => {
+  try {
+    const data = {
+      userId: req.user._id,
+      ...req.validatedData, // Chứa: date, recipeId, servingTime, newScale, checked
+    };
+
+    const updatedMenu = await dailyMenuService.updateRecipeInMenu(data);
+
+    return res.status(200).json({
+      success: true,
+      message: "Cập nhật thực đơn thành công",
+      data: updatedMenu
+    });
+  } catch (error) {
+    return res.status(400).json({ success: false, message: error.message });
+  }
+};
+exports.deleteRecipe = async (req, res) => {
+  try {
+    const data = {
+      userId: req.user._id,
+      ...req.validatedData // Chứa: date, recipeId
+    };
+
+    const updatedMenu = await dailyMenuService.deleteRecipeInMenu(data);
+
+    return res.status(200).json({
+      success: true,
+      message: "Đã xoá món ăn khỏi thực đơn",
+      data: updatedMenu
+    });
+  } catch (error) {
+    return res.status(400).json({ success: false, message: error.message });
+  }
+}
+exports.updateStatus = async (req, res) => {
+  try {
+    const data = {
+      userId: req.user._id,
+      ...req.validatedData 
+    };
+
+    const dailyMenu = await dailyMenuService.updateDailyMenuStatus(data);
+    return res.status(200).json({
+      success: true,
+      message: "Đã cập nhật trạng thái của thực đơn",
+      data: dailyMenu
+    });
+  } catch (error) {
+    return res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+
+
+
 
 // Thêm vào dailyMenu.controller.js
 exports.suggestRecipesForMeal = async (req, res) => {
@@ -72,7 +124,6 @@ exports.suggestRecipesForMeal = async (req, res) => {
     }
 
     // Lấy nutrition đã gọi trong ngày (nếu có)
-    const DailyMenu = require("../models/DailyMenu");
     const existing = await DailyMenu.findOne({ userId, date }).lean();
 
     const currentDayNutrition = existing?.totalNutrition || {
@@ -111,42 +162,31 @@ exports.suggestRecipesForMeal = async (req, res) => {
     return res.status(500).json({ message: err.message });
   }
 };
-exports.suggestDailyMenu = async (req, res) => {
-  try {
-    const userId = req.user._id; // Lấy từ authenticated user
-    const { date } = req.body;
+// exports.suggestDailyMenu = async (req, res) => {
+//   try {
+//     const userId = req.user._id; // Lấy từ authenticated user
+//     const { date } = req.body;
 
-    if (!date) {
-      return res.status(400).json({ message: "date là bắt buộc" });
-    }
+//     if (!date) {
+//       return res.status(400).json({ message: "date là bắt buộc" });
+//     }
 
-    const dailyMenu = await dailyMenuService.suggestDailyMenu({
-      userId,
-      dateStr: date,
-    });
-    await dailyMenu.populate({
-      path: "recipes.recipeId",
-      model: "Recipe",
-    });
-    return res.status(201).json(dailyMenu);
-  } catch (err) {
-    console.error("Error suggestDailyMenu:", err);
-    return res.status(500).json({ message: "Internal server error" });
-  }
-};
-exports.createDailyMenu = async (req, res) => {
-  try {
-    const userId = req.user._id.toString();
+//     const dailyMenu = await dailyMenuService.suggestDailyMenu({
+//       userId,
+//       dateStr: date,
+//     });
+//     await dailyMenu.populate({
+//       path: "recipes.recipeId",
+//       model: "Recipe",
+//     });
+//     return res.status(201).json(dailyMenu);
+//   } catch (err) {
+//     console.error("Error suggestDailyMenu:", err);
+//     return res.status(500).json({ message: "Internal server error" });
+//   }
+// };
 
-    const meal = await dailyMenuService.createDailyMenu({
-      ...req.body,
-      userId,
-    });
-    res.status(200).json(meal);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
-};
+
 // exports.getDailyMenuById = async (req, res) => {
 //   try {
 //     const { id } = req.params;
@@ -167,137 +207,20 @@ exports.createDailyMenu = async (req, res) => {
 //   }
 // };
 
-exports.getRecipesByDateAndStatus = async (req, res) => {
-  try {
-    const userId = req.user._id.toString();
+// exports.getRecipesByDateAndStatus = async (req, res) => {
+//   try {
+//     const userId = req.user._id.toString();
 
-    const { startDate, endDate, status } = req.query;
+//     const { startDate, endDate, status } = req.query;
 
-    const data = await dailyMenuService.getRecipesByDateAndStatus({
-      userId,
-      startDate,
-      endDate,
-      status,
-    });
-    res.status(200).json(data);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-exports.getHistory = async (req, res) => {
-  try {
-    const userId = req.user._id; // Lấy userId từ middleware xác thực
-    const history = await dailyMenuService.getMealHistory(userId);
-    res.status(200).json(history);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Error retrieving meal history" });
-  }
-};
-exports.addRecipe = async (req, res) => {
-  try {
-    const userId = req.user._id; // Lấy từ authenticated user
-    const { date, mealType, recipeId, portion } = req.body;
-
-    if (!date || !mealType || !recipeId) {
-      return res
-        .status(400)
-        .json({ message: "Missing required fields: date, mealType, recipeId" });
-    }
-
-    const updatedMeal = await dailyMenuService.addRecipeToMeal(
-      userId,
-      req.body,
-    );
-
-    res.status(200).json(updatedMeal);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Error adding recipe to meal" });
-  }
-};
-exports.updateStatus = async (req, res) => {
-  try {
-    const userId = req.user._id.toString();
-
-    const { mealId } = req.params;
-    const { newStatus } = req.body;
-
-    // Kiểm tra quyền sở hữu (quyền logic nên nằm trong service, nhưng ta đơn giản hóa ở đây)
-    // const meal = await Meal.findById(mealId);
-    // if (meal.userId.toString() !== req.user.id) return res.status(403).send('Forbidden');
-
-    const updatedMeal = await dailyMenuService.updateMealStatus(
-      mealId,
-      newStatus,
-    );
-    res.status(200).json(updatedMeal);
-  } catch (error) {
-    console.error(error);
-    res
-      .status(404)
-      .json({ message: error.message || "Error updating meal status" });
-  }
-};
-// API: PUT /api/meals/:mealId
-exports.updateMeal = async (req, res) => {
-  try {
-    const userId = req.user._id; // Lấy ID người dùng từ token
-    const { mealId } = req.params;
-    const updateData = req.body;
-
-    const updatedMeal = await dailyMenuService.updateMeal(
-      mealId,
-      updateData,
-      userId,
-    );
-
-    res.status(200).json(updatedMeal);
-  } catch (error) {
-    console.error(error);
-    if (error.message.includes("not found")) {
-      return res.status(404).json({ message: error.message });
-    }
-    if (error.message.includes("Permission denied")) {
-      return res.status(403).json({ message: error.message });
-    }
-    res.status(500).json({ message: "Error updating meal: " + error.message });
-  }
-};
-exports.addRecipeToDailyMenu = async (req, res) => {
-  try {
-    const userId = req.user._id; // Lấy từ authenticated user
-    const { date, recipeId, portion, note, servingTime } = req.body;
-
-    if (!date || !recipeId) {
-      return res.status(400).json({ message: "Thiếu thông tin bắt buộc" });
-    }
-
-    // Tìm dailyMenu của ngày đó
-    let dailyMenu = await DailyMenu.findOne({ userId, date: date });
-
-    if (!dailyMenu) {
-      // Nếu chưa có, tạo mới
-      dailyMenu = new DailyMenu({
-        userId,
-        date: date,
-        recipes: [],
-      });
-    }
-
-    // Thêm recipe mới vào array
-    dailyMenu.recipes.push({
-      recipeId,
-      portion: portion || 1,
-      note: note || "",
-      servingTime: servingTime || "other",
-    });
-
-    await dailyMenu.save();
-
-    res.status(200).json({ message: "Thêm món ăn thành công", dailyMenu });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Lỗi khi thêm món ăn" });
-  }
-};
+//     const data = await dailyMenuService.getRecipesByDateAndStatus({
+//       userId,
+//       startDate,
+//       endDate,
+//       status,
+//     });
+//     res.status(200).json(data);
+//   } catch (error) {
+//     res.status(500).json({ message: error.message });
+//   }
+// };
