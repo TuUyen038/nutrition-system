@@ -273,7 +273,10 @@ const options = {
             gender: { type: "string", enum: ["male", "female", "other"] },
             height: { type: "number" },
             weight: { type: "number" },
-            goal: { type: "string", enum: ["lose_weight", "maintain_weight", "gain_weight"] },
+            goal: {
+              type: "string",
+              enum: ["lose_weight", "maintain_weight", "gain_weight"],
+            },
             allergies: { type: "array", items: { type: "string" } },
           },
         },
@@ -315,7 +318,17 @@ const options = {
             },
             category: {
               type: "string",
-              enum: ["protein", "carb", "fat", "vegetable", "fruit", "dairy", "seasoning", "beverage", "other"],
+              enum: [
+                "protein",
+                "carb",
+                "fat",
+                "vegetable",
+                "fruit",
+                "dairy",
+                "seasoning",
+                "beverage",
+                "other",
+              ],
               example: "protein",
             },
             aliases: {
@@ -351,7 +364,17 @@ const options = {
             },
             category: {
               type: "string",
-              enum: ["protein", "carb", "fat", "vegetable", "fruit", "dairy", "seasoning", "beverage", "other"],
+              enum: [
+                "protein",
+                "carb",
+                "fat",
+                "vegetable",
+                "fruit",
+                "dairy",
+                "seasoning",
+                "beverage",
+                "other",
+              ],
             },
             aliases: {
               type: "array",
@@ -449,7 +472,7 @@ const options = {
                 "hiit",
                 "aerobic_dance",
                 "yoga_stretching",
-                "functional_training"
+                "functional_training",
               ],
               example: "strength_training",
               description: "Loại hoạt động",
@@ -507,7 +530,16 @@ const options = {
                       amount: { type: "number" },
                       unit: {
                         type: "string",
-                        enum: ["g", "kg", "l", "ml", "cup", "tbsp", "tsp", "unit"],
+                        enum: [
+                          "g",
+                          "kg",
+                          "l",
+                          "ml",
+                          "cup",
+                          "tbsp",
+                          "tsp",
+                          "unit",
+                        ],
                       },
                     },
                   },
@@ -545,7 +577,10 @@ const options = {
           properties: {
             name: { type: "string" },
             description: { type: "string" },
-            category: { type: "string", enum: ["main", "side", "dessert", "drink"] },
+            category: {
+              type: "string",
+              enum: ["main", "side", "dessert", "drink"],
+            },
             instructions: { type: "array", items: { type: "string" } },
             ingredients: {
               type: "array",
@@ -628,51 +663,97 @@ const options = {
         DailyMenu: {
           type: "object",
           properties: {
-            _id: {
-              type: "string",
-              format: "ObjectId",
-            },
-            userId: {
-              type: "string",
-              format: "ObjectId",
-            },
+            _id: { type: "string", format: "ObjectId" },
+            userId: { type: "string", format: "ObjectId" },
+
             date: {
               type: "string",
               format: "date",
               example: "2025-02-13",
             },
+
             recipes: {
               type: "array",
               items: {
                 type: "object",
                 properties: {
+                  _id: { type: "string", format: "ObjectId" },
+
                   recipeId: { type: "string", format: "ObjectId" },
-                  portion: { type: "number", description: "Số khẩu phần" },
+
+                  name: { type: "string" },
+                  imageUrl: { type: "string" },
+                  description: { type: "string" },
+
+                  mealSource: {
+                    type: "string",
+                    enum: [
+                      "chicken",
+                      "pork",
+                      "beef",
+                      "seafood",
+                      "egg",
+                      "tofu",
+                      "other",
+                      "pho",
+                      "bun",
+                      "mi",
+                      "none",
+                    ],
+                  },
+
+                  scale: { type: "number", example: 1 },
+
+                  nutrition: {
+                    $ref: "#/components/schemas/Nutrition",
+                  },
+
                   servingTime: {
                     type: "string",
-                    enum: ["breakfast", "lunch", "dinner", "other"],
+                    enum: ["breakfast", "lunch", "dinner", "snack", "other"],
                   },
-                  status: {
-                    type: "string",
-                    enum: ["planned", "eaten", "deleted"],
-                  },
-                  note: { type: "string" },
+
+                  isChecked: { type: "boolean" },
                 },
               },
             },
+
             totalNutrition: {
               $ref: "#/components/schemas/Nutrition",
             },
+
+            targetNutrition: {
+              $ref: "#/components/schemas/Nutrition",
+            },
+
             status: {
               type: "string",
-              enum: ["planned", "selected", "suggested", "completed", "deleted", "edited"],
-              description: "suggested: từ AI gợi ý, selected: user chọn, edited: đã chỉnh sửa",
+              enum: [
+                "manual",
+                "suggested",
+                "selected",
+                "completed",
+                "deleted",
+                "expired",
+              ],
             },
+
             feedback: { type: "string" },
-            createdAt: {
-              type: "string",
-              format: "date-time",
-            },
+
+            createdAt: { type: "string", format: "date-time" },
+            updatedAt: { type: "string", format: "date-time" },
+          },
+        },
+        Nutrition: {
+          type: "object",
+          properties: {
+            calories: { type: "number", example: 500 },
+            protein: { type: "number", example: 30 },
+            fat: { type: "number", example: 20 },
+            carbs: { type: "number", example: 50 },
+            fiber: { type: "number", example: 5 },
+            sugar: { type: "number", example: 10 },
+            sodium: { type: "number", example: 300 },
           },
         },
         CreateDailyMenuRequest: {
@@ -703,15 +784,103 @@ const options = {
         },
         AddRecipeRequest: {
           type: "object",
-          required: ["recipeId", "servingTime"],
+          required: ["date", "recipeId"],
           properties: {
-            recipeId: { type: "string", format: "ObjectId" },
-            portion: { type: "number", default: 1 },
+            date: {
+              type: "string",
+              format: "date",
+              example: "2025-02-13",
+            },
+
+            dailyMenuId: {
+              type: "string",
+              format: "ObjectId",
+            },
+
+            recipeId: {
+              type: "string",
+              format: "ObjectId",
+            },
+
+            scale: {
+              type: "number",
+              default: 1,
+            },
+
             servingTime: {
               type: "string",
-              enum: ["breakfast", "lunch", "dinner", "other"],
+              enum: ["breakfast", "lunch", "dinner", "snack", "other"],
+              default: "other",
             },
-            note: { type: "string" },
+          },
+        },
+        UpdateRecipeRequest: {
+          type: "object",
+          required: ["date", "dailyMenuId", "recipeItemId"],
+          properties: {
+            date: { type: "string", format: "date" },
+            dailyMenuId: { type: "string", format: "ObjectId" },
+            recipeItemId: { type: "string", format: "ObjectId" },
+
+            newScale: {
+              type: "number",
+              minimum: 0,
+            },
+
+            checked: {
+              type: "boolean",
+            },
+          },
+        },
+        DeleteRecipeRequest: {
+          type: "object",
+          required: ["dailyMenuId", "recipeItemId"],
+          properties: {
+            dailyMenuId: {
+              type: "string",
+              format: "ObjectId",
+              description: "ID của daily menu",
+            },
+            recipeItemId: {
+              type: "string",
+              format: "ObjectId",
+              description: "ID của món ăn trong menu cần xóa",
+            },
+          },
+        },
+        UpdateStatusRequest: {
+          type: "object",
+          required: ["dailyMenuId", "newStatus"],
+          properties: {
+            dailyMenuId: {
+              type: "string",
+              format: "ObjectId",
+              description: "ID của daily menu",
+            },
+            newStatus: {
+              type: "string",
+              enum: [
+                "manual",
+                "suggested",
+                "selected",
+                "completed",
+                "deleted",
+                "expired",
+              ],
+              description: "Trạng thái mới của thực đơn",
+            },
+          },
+        },
+        CreateDailyMenuV2Request: {
+          type: "object",
+          required: ["date"],
+          properties: {
+            date: {
+              type: "string",
+              format: "date",
+              example: "2025-02-13",
+              description: "Ngày cần tạo menu theo định dạng YYYY-MM-DD",
+            },
           },
         },
 
@@ -827,11 +996,28 @@ const options = {
             },
             action: {
               type: "string",
-              enum: ["CREATE", "UPDATE", "DELETE", "LOGIN", "LOGOUT", "VERIFY", "UNVERIFY", "PASSWORD_RESET_REQUEST", "PASSWORD_RESET"],
+              enum: [
+                "CREATE",
+                "UPDATE",
+                "DELETE",
+                "LOGIN",
+                "LOGOUT",
+                "VERIFY",
+                "UNVERIFY",
+                "PASSWORD_RESET_REQUEST",
+                "PASSWORD_RESET",
+              ],
             },
             resourceType: {
               type: "string",
-              enum: ["User", "Ingredient", "Recipe", "DailyMenu", "MealPlan", "Auth"],
+              enum: [
+                "User",
+                "Ingredient",
+                "Recipe",
+                "DailyMenu",
+                "MealPlan",
+                "Auth",
+              ],
             },
             resourceId: {
               type: "string",
@@ -932,7 +1118,8 @@ const options = {
         post: {
           tags: ["Auth"],
           summary: "Đăng nhập",
-          description: "Xác thực người dùng bằng email và mật khẩu, trả về JWT token",
+          description:
+            "Xác thực người dùng bằng email và mật khẩu, trả về JWT token",
           requestBody: {
             required: true,
             content: {
@@ -1016,7 +1203,9 @@ const options = {
             required: true,
             content: {
               "application/json": {
-                schema: { $ref: "#/components/schemas/VerifyResetPasswordOTPRequest" },
+                schema: {
+                  $ref: "#/components/schemas/VerifyResetPasswordOTPRequest",
+                },
               },
             },
           },
@@ -1092,7 +1281,9 @@ const options = {
             required: true,
             content: {
               "application/json": {
-                schema: { $ref: "#/components/schemas/SendVerificationOTPRequest" },
+                schema: {
+                  $ref: "#/components/schemas/SendVerificationOTPRequest",
+                },
               },
             },
           },
@@ -1152,7 +1343,9 @@ const options = {
             required: true,
             content: {
               "application/json": {
-                schema: { $ref: "#/components/schemas/SendVerificationOTPRequest" },
+                schema: {
+                  $ref: "#/components/schemas/SendVerificationOTPRequest",
+                },
               },
             },
           },
@@ -1182,7 +1375,9 @@ const options = {
             required: true,
             content: {
               "application/json": {
-                schema: { $ref: "#/components/schemas/SendVerificationOTPRequest" },
+                schema: {
+                  $ref: "#/components/schemas/SendVerificationOTPRequest",
+                },
               },
             },
           },
@@ -1303,7 +1498,8 @@ const options = {
         get: {
           tags: ["Users"],
           summary: "Lấy thông tin user theo ID",
-          description: "USER chỉ có thể xem thông tin của chính mình, ADMIN có thể xem ai cũng được",
+          description:
+            "USER chỉ có thể xem thông tin của chính mình, ADMIN có thể xem ai cũng được",
           security: [{ bearerAuth: [] }],
           parameters: [
             {
@@ -1334,7 +1530,8 @@ const options = {
         put: {
           tags: ["Users"],
           summary: "Cập nhật thông tin user",
-          description: "USER chỉ có thể cập nhật thông tin của chính mình, ADMIN có thể cập nhật ai cũng được",
+          description:
+            "USER chỉ có thể cập nhật thông tin của chính mình, ADMIN có thể cập nhật ai cũng được",
           security: [{ bearerAuth: [] }],
           parameters: [
             {
@@ -1430,7 +1627,9 @@ const options = {
             required: true,
             content: {
               "application/json": {
-                schema: { $ref: "#/components/schemas/CreateIngredientRequest" },
+                schema: {
+                  $ref: "#/components/schemas/CreateIngredientRequest",
+                },
               },
             },
           },
@@ -1490,7 +1689,9 @@ const options = {
             required: true,
             content: {
               "application/json": {
-                schema: { $ref: "#/components/schemas/CreateIngredientRequest" },
+                schema: {
+                  $ref: "#/components/schemas/CreateIngredientRequest",
+                },
               },
             },
           },
@@ -1615,7 +1816,8 @@ const options = {
         get: {
           tags: ["Exercise"],
           summary: "Lấy danh sách exercise",
-          description: "Lấy toàn bộ exercises hoặc filter theo categoryId, muscleIds, equipmentIds",
+          description:
+            "Lấy toàn bộ exercises hoặc filter theo categoryId, muscleIds, equipmentIds",
           parameters: [
             {
               in: "query",
@@ -1699,7 +1901,8 @@ const options = {
         get: {
           tags: ["Recipes"],
           summary: "Lấy danh sách công thức nấu ăn",
-          description: "Trả về danh sách công thức với hỗ trợ search, filter, sort và pagination",
+          description:
+            "Trả về danh sách công thức với hỗ trợ search, filter, sort và pagination",
           parameters: [
             {
               in: "query",
@@ -1734,7 +1937,11 @@ const options = {
             {
               in: "query",
               name: "sortOrder",
-              schema: { type: "string", enum: ["asc", "desc"], default: "desc" },
+              schema: {
+                type: "string",
+                enum: ["asc", "desc"],
+                default: "desc",
+              },
             },
           ],
           responses: {
@@ -1896,7 +2103,8 @@ const options = {
         post: {
           tags: ["Recipes"],
           summary: "Tìm kiếm công thức từ ảnh",
-          description: "Tải lên ảnh thực phẩm để nhận dạng và tìm công thức tương tự",
+          description:
+            "Tải lên ảnh thực phẩm để nhận dạng và tìm công thức tương tự",
           requestBody: {
             required: true,
             content: {
@@ -2020,92 +2228,12 @@ const options = {
       },
 
       // ==================== DAILY MENU ENDPOINTS ====================
-      "/daily-menu": {
-        post: {
-          tags: ["Daily Menu"],
-          summary: "Tạo menu hàng ngày",
-          description: "Tạo menu cho một ngày cụ thể",
-          security: [{ bearerAuth: [] }],
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: { $ref: "#/components/schemas/CreateDailyMenuRequest" },
-              },
-            },
-          },
-          responses: {
-            201: {
-              description: "Menu đã được tạo",
-              content: {
-                "application/json": {
-                  schema: { $ref: "#/components/schemas/DailyMenu" },
-                },
-              },
-            },
-          },
-        },
-      },
-      "/daily-menu/recipes": {
-        get: {
-          tags: ["Daily Menu"],
-          summary: "Lấy công thức theo ngày và trạng thái",
-          description: "Lấy danh sách công thức trong menu theo ngày và trạng thái",
-          security: [{ bearerAuth: [] }],
-          parameters: [
-            {
-              in: "query",
-              name: "date",
-              required: true,
-              schema: { type: "string", format: "date" },
-            },
-            {
-              in: "query",
-              name: "status",
-              schema: { type: "string" },
-            },
-          ],
-          responses: {
-            200: {
-              description: "Danh sách công thức",
-              content: {
-                "application/json": {
-                  schema: {
-                    type: "array",
-                    items: { $ref: "#/components/schemas/Recipe" },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-      "/daily-menu/history": {
-        get: {
-          tags: ["Daily Menu"],
-          summary: "Lấy lịch sử menu",
-          description: "Lấy danh sách menu trong quá khứ",
-          security: [{ bearerAuth: [] }],
-          responses: {
-            200: {
-              description: "Lịch sử menu",
-              content: {
-                "application/json": {
-                  schema: {
-                    type: "array",
-                    items: { $ref: "#/components/schemas/DailyMenu" },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
       "/daily-menu/add-recipe": {
         post: {
           tags: ["Daily Menu"],
-          summary: "Thêm công thức vào menu",
-          description: "Thêm một công thức vào menu hàng ngày",
+          summary: "Thêm công thức vào thực đơn hàng ngày",
+          description:
+            "Thêm một công thức vào thực đơn hàng ngày của người dùng",
           security: [{ bearerAuth: [] }],
           requestBody: {
             required: true,
@@ -2117,117 +2245,310 @@ const options = {
           },
           responses: {
             200: {
-              description: "Công thức đã được thêm",
+              description: "Thêm món ăn thành công",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/DailyMenu" },
-                },
-              },
-            },
-          },
-        },
-      },
-      "/daily-menu/{mealId}/status": {
-        put: {
-          tags: ["Daily Menu"],
-          summary: "Cập nhật trạng thái bữa ăn",
-          description: "Thay đổi trạng thái bữa ăn (planned, eaten, deleted...)",
-          security: [{ bearerAuth: [] }],
-          parameters: [
-            {
-              in: "path",
-              name: "mealId",
-              required: true,
-              schema: { type: "string", format: "ObjectId" },
-            },
-          ],
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    status: {
-                      type: "string",
-                      enum: ["planned", "eaten", "deleted"],
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      message: { type: "string" },
+                      data: { $ref: "#/components/schemas/DailyMenu" },
                     },
                   },
                 },
               },
             },
-          },
-          responses: {
-            200: {
-              description: "Trạng thái đã được cập nhật",
+            400: {
+              description: "Dữ liệu không hợp lệ",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/DailyMenu" },
+                  schema: { $ref: "#/components/schemas/ErrorResponse" },
                 },
               },
             },
           },
         },
       },
-      "/daily-menu/{mealId}": {
-        put: {
+      "/daily-menu/update-status": {
+        patch: {
           tags: ["Daily Menu"],
-          summary: "Cập nhật menu hàng ngày",
-          description: "Chỉnh sửa thông tin menu",
+          summary: "Cập nhật trạng thái thực đơn",
+          description:
+            "Cập nhật trạng thái của thực đơn hàng ngày (manual, suggested, selected, completed, deleted, expired)",
           security: [{ bearerAuth: [] }],
-          parameters: [
-            {
-              in: "path",
-              name: "mealId",
-              required: true,
-              schema: { type: "string", format: "ObjectId" },
-            },
-          ],
           requestBody: {
             required: true,
             content: {
               "application/json": {
-                schema: { $ref: "#/components/schemas/CreateDailyMenuRequest" },
+                schema: { $ref: "#/components/schemas/UpdateStatusRequest" },
               },
             },
           },
           responses: {
             200: {
-              description: "Menu đã được cập nhật",
+              description: "Cập nhật trạng thái thành công",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/DailyMenu" },
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      message: { type: "string" },
+                      data: { $ref: "#/components/schemas/DailyMenu" },
+                    },
+                  },
+                },
+              },
+            },
+            400: {
+              description: "Dữ liệu không hợp lệ",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/ErrorResponse" },
                 },
               },
             },
           },
         },
       },
-      "/daily-menu/suggest": {
+      "/daily-menu/update-recipe": {
+        patch: {
+          tags: ["Daily Menu"],
+          summary: "Cập nhật món ăn trong thực đơn",
+          description:
+            "Cập nhật thông tin món ăn (số khẩu phần, trạng thái checked) trong thực đơn hàng ngày",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/UpdateRecipeRequest" },
+              },
+            },
+          },
+          responses: {
+            200: {
+              description: "Cập nhật món ăn thành công",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      message: { type: "string" },
+                      data: { $ref: "#/components/schemas/DailyMenu" },
+                    },
+                  },
+                },
+              },
+            },
+            400: {
+              description: "Dữ liệu không hợp lệ",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/ErrorResponse" },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/daily-menu/delete-recipe": {
+        delete: {
+          tags: ["Daily Menu"],
+          summary: "Xóa món ăn khỏi thực đơn",
+          description: "Xóa một món ăn khỏi thực đơn hàng ngày",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/DeleteRecipeRequest" },
+              },
+            },
+          },
+          responses: {
+            200: {
+              description: "Xóa món ăn thành công",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      message: { type: "string" },
+                      data: { $ref: "#/components/schemas/DailyMenu" },
+                    },
+                  },
+                },
+              },
+            },
+            400: {
+              description: "Dữ liệu không hợp lệ",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/ErrorResponse" },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/daily-menu/recommendations/day": {
         post: {
           tags: ["Daily Menu"],
-          summary: "Gợi ý menu hàng ngày (AI)",
-          description: "Sử dụng AI để gợi ý menu dựa trên mục tiêu và sở thích",
+          summary: "Gợi ý thực đơn hàng ngày",
+          description:
+            "Sử dụng AI để gợi ý thực đơn hàng ngày dựa trên mục tiêu dinh dưỡng và sở thích của người dùng",
           security: [{ bearerAuth: [] }],
           requestBody: {
             required: true,
             content: {
               "application/json": {
                 schema: {
-                  type: "object",
-                  properties: {
-                    date: { type: "string", format: "date" },
-                  },
+                  $ref: "#/components/schemas/CreateDailyMenuV2Request",
                 },
               },
             },
           },
           responses: {
             200: {
-              description: "Menu được gợi ý",
+              description: "Gợi ý thực đơn thành công",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/DailyMenu" },
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      data: { $ref: "#/components/schemas/DailyMenu" },
+                    },
+                  },
+                },
+              },
+            },
+            400: {
+              description: "Lỗi khi gợi ý thực đơn",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/ErrorResponse" },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/daily-menu/by-date": {
+        get: {
+          tags: ["Daily Menu"],
+          summary: "Lấy thực đơn theo ngày",
+          description: "Lấy thực đơn của người dùng theo một ngày cụ thể",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              in: "query",
+              name: "date",
+              required: true,
+              schema: {
+                type: "string",
+                format: "date",
+                example: "2025-02-13",
+              },
+              description: "Ngày cần lấy thực đơn (YYYY-MM-DD)",
+            },
+          ],
+          responses: {
+            200: {
+              description: "Lấy thực đơn thành công",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean", example: true },
+                      message: {
+                        type: "string",
+                        example: "Lấy thực đơn theo ngày thành công",
+                      },
+                      data: {
+                        $ref: "#/components/schemas/DailyMenu",
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            400: {
+              description: "Lỗi khi lấy thực đơn",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/ErrorResponse" },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/daily-menu/by-range": {
+        get: {
+          tags: ["Daily Menu"],
+          summary: "Lấy danh sách thực đơn theo khoảng ngày",
+          description:
+            "Lấy danh sách thực đơn của người dùng trong một khoảng thời gian",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              in: "query",
+              name: "startDate",
+              required: true,
+              schema: {
+                type: "string",
+                format: "date",
+                example: "2025-02-01",
+              },
+              description: "Ngày bắt đầu (YYYY-MM-DD)",
+            },
+            {
+              in: "query",
+              name: "endDate",
+              required: true,
+              schema: {
+                type: "string",
+                format: "date",
+                example: "2025-02-07",
+              },
+              description: "Ngày kết thúc (YYYY-MM-DD)",
+            },
+          ],
+          responses: {
+            200: {
+              description: "Lấy danh sách thực đơn thành công",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean", example: true },
+                      message: {
+                        type: "string",
+                        example: "Lấy danh sách thực đơn thành công",
+                      },
+                      data: {
+                        type: "array",
+                        items: {
+                          $ref: "#/components/schemas/DailyMenu",
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            400: {
+              description: "Lỗi khi lấy danh sách thực đơn",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/ErrorResponse" },
                 },
               },
             },
@@ -2312,7 +2633,8 @@ const options = {
         delete: {
           tags: ["Meal Plans"],
           summary: "Xóa kế hoạch bữa ăn",
-          description: "Xóa kế hoạch (chỉ có thể xóa kế hoạch ở trạng thái 'suggested')",
+          description:
+            "Xóa kế hoạch (chỉ có thể xóa kế hoạch ở trạng thái 'suggested')",
           security: [{ bearerAuth: [] }],
           parameters: [
             {
@@ -2386,7 +2708,8 @@ const options = {
         patch: {
           tags: ["Meal Plans"],
           summary: "Cập nhật trạng thái kế hoạch",
-          description: "Thay đổi trạng thái kế hoạch (suggested, planned, completed, cancelled)",
+          description:
+            "Thay đổi trạng thái kế hoạch (suggested, planned, completed, cancelled)",
           security: [{ bearerAuth: [] }],
           parameters: [
             {
@@ -2428,7 +2751,8 @@ const options = {
         post: {
           tags: ["Meal Plans"],
           summary: "Gợi ý kế hoạch bữa ăn theo tuần (AI)",
-          description: "Sử dụng AI để gợi ý toàn bộ kế hoạch bữa ăn cho một tuần",
+          description:
+            "Sử dụng AI để gợi ý toàn bộ kế hoạch bữa ăn cho một tuần",
           security: [{ bearerAuth: [] }],
           requestBody: {
             required: true,
@@ -2528,7 +2852,8 @@ const options = {
         get: {
           tags: ["Favorites"],
           summary: "Kiểm tra công thức có trong yêu thích không",
-          description: "Kiểm tra xem công thức đó có trong danh sách yêu thích không",
+          description:
+            "Kiểm tra xem công thức đó có trong danh sách yêu thích không",
           security: [{ bearerAuth: [] }],
           parameters: [
             {
@@ -2587,7 +2912,8 @@ const options = {
         post: {
           tags: ["Upload"],
           summary: "Tải lên ảnh",
-          description: "Tải lên ảnh (công thức, nguyên liệu, avatar...) lên Cloudinary",
+          description:
+            "Tải lên ảnh (công thức, nguyên liệu, avatar...) lên Cloudinary",
           requestBody: {
             required: true,
             content: {

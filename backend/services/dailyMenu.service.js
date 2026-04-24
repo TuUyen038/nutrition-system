@@ -201,7 +201,11 @@ const { createMealLog, deleteMealLog } = require("./mealLog.service");
 
 //   return dailyMenu;
 // };
-
+function toDateOnly(d) {
+  const dt = new Date(d);
+  dt.setUTCHours(0, 0, 0, 0);
+  return dt;
+}
 exports.getRecipesByDateAndStatus = async (data) => {
   try {
     let { userId, startDate, endDate, status } = data;
@@ -295,6 +299,7 @@ exports.addRecipeToMenu = async ({
         recipes: [],
         totalNutrition: { calories: 0, protein: 0, fat: 0, carbs: 0 },
         targetNutrition: { calories: 0, protein: 0, fat: 0, carbs: 0 },
+        status: "manual",
       },
     },
     { new: true, upsert: true },
@@ -302,16 +307,17 @@ exports.addRecipeToMenu = async ({
 
   // 2. Lấy thông tin dinh dưỡng gốc của Recipe
   const recipeData = await Recipe.findById(recipeId)
-    .select("name imageUrl description totalNutrition mealSources")
+    .select("name imageUrl description totalNutritionPerServing mealSources")
     .lean();
-
+  console.log("Recipe data:", recipeData);
   if (!recipeData) throw new Error("Món ăn không tồn tại!");
 
   // 3. CẬP NHẬT TOTAL NUTRITION CỦA DAILY MENU (Cộng dồn vào tổng hiện tại)
   // Logic: Tổng_Ngày_Mới = Tổng_Ngày_Cũ + (Dinh_Dưỡng_Món * Lượng_Thêm)
   const nutrients = ["calories", "protein", "fat", "carbs"];
   nutrients.forEach((field) => {
-    const addedValue = (recipeData.totalNutrition[field] || 0) * amountToAdd;
+    const addedValue =
+      (recipeData.totalNutritionPerServing?.[field] || 0) * amountToAdd;
 
     // Cộng trực tiếp vào object totalNutrition của dailyMenu vừa lấy được
     dailyMenu.totalNutrition[field] =
@@ -324,7 +330,7 @@ exports.addRecipeToMenu = async ({
     name: recipeData.name,
     imageUrl: recipeData.imageUrl,
     description: recipeData.description,
-    nutrition: recipeData.totalNutrition,
+    nutrition: recipeData.totalNutritionPerServing,
     mealSources: recipeData.mealSources,
     scale: amountToAdd,
     servingTime: targetTime,
@@ -363,7 +369,7 @@ exports.updateRecipeInMenu = async ({
     // Cập nhật tổng dinh dưỡng
     const nutrients = ["calories", "protein", "fat", "carbs"];
     nutrients.forEach((field) => {
-      const unitValue = targetRecipe.totalNutrition[field] || 0;
+      const unitValue = targetRecipe.nutrition[field] || 0;
       dailyMenu.totalNutrition[field] += unitValue * scaleDiff;
     });
 
@@ -404,11 +410,10 @@ exports.deleteRecipeInMenu = async ({ userId, dailyMenuId, recipeItemId }) => {
     throw new Error("Món ăn không tồn tại trong thực đơn!");
 
   const targetRecipe = dailyMenu.recipes[recipeIndex];
-
   const nutrients = ["calories", "protein", "fat", "carbs"];
   nutrients.forEach((field) => {
     const totalToRemove =
-      (targetRecipe.totalNutrition[field] || 0) * targetRecipe.scale;
+      (targetRecipe.nutrition[field] || 0) * targetRecipe.scale;
     dailyMenu.totalNutrition[field] -= totalToRemove;
 
     // Đảm bảo không bị âm do sai số dấu phẩy động (floating point)
@@ -420,6 +425,29 @@ exports.deleteRecipeInMenu = async ({ userId, dailyMenuId, recipeItemId }) => {
 
   return await dailyMenu.save();
 };
+
+exports.getDailyMenuByDate = async ({ userId, date }) => {
+  const normalizedDate = toDateOnly("2025-02-13");
+
+  return await DailyMenu.findOne({
+    userId,
+    date: normalizedDate,
+  }).lean();
+};
+exports.getDailyMenusByRange = async ({ userId, startDate, endDate }) => {
+  const normalizedStartDate = toDateOnly(startDate);
+  const normalizedEndDate = toDateOnly(endDate);
+
+  return await DailyMenu.find({
+    userId,
+    date: {
+      $gte: normalizedStartDate,
+      $lte: normalizedEndDate,
+    },
+  })
+    .lean()
+    .sort({ date: 1 });
+};
 exports.createDailyMenu = async (data) => {
   try {
     let { userId, date, recipes, status } = data;
@@ -427,7 +455,6 @@ exports.createDailyMenu = async (data) => {
     if (!userId || !date) {
       throw new Error("Thiếu userId hoặc date.");
     }
-
     // Normalize date TRƯỚC KHI tìm existing để đảm bảo match đúng
     date = normalizeDate(date);
     // Tìm existing menu - nếu có nhiều, lấy cái mới nhất (tránh trùng rác cũ)
@@ -439,20 +466,10 @@ exports.createDailyMenu = async (data) => {
       (recipes || []).map(async (r) => {
         const recipeItem = {
           recipeId: r.recipeId,
-          portion: r.portion || 1,
-          note: r.note || "",
+          scale: r.scale || 1,
           status: r.status || "suggested",
           servingTime: r.servingTime || "other",
         };
-
-        //  Tạo snapshot nếu status = "eaten"
-        // if (recipeItem.status === "eaten") {
-        //   const snapshot = await createRecipeSnapshot(r.recipeId);
-        //   if (snapshot) {
-        //     recipeItem.recipeSnapshot = snapshot;
-        //   }
-        // }
-
         return recipeItem;
       }),
     );

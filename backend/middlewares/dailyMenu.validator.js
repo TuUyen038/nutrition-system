@@ -41,6 +41,10 @@ const schemas = {
       )
       .required(),
   }),
+
+  create: Joi.object({
+    date: Joi.string().isoDate().required(),
+  }),
 };
 
 // Hàm middleware dùng chung
@@ -68,4 +72,5 @@ module.exports = {
   validateUpdateRecipe: validate(schemas.updateRecipe),
   validateDeleteRecipe: validate(schemas.deleteRecipe),
   validateUpdateStatus: validate(schemas.updateStatus),
+  validateCreateDailyMenu: validate(schemas.create),
 };
