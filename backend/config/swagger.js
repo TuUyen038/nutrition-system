@@ -744,18 +744,6 @@ const options = {
             updatedAt: { type: "string", format: "date-time" },
           },
         },
-        Nutrition: {
-          type: "object",
-          properties: {
-            calories: { type: "number", example: 500 },
-            protein: { type: "number", example: 30 },
-            fat: { type: "number", example: 20 },
-            carbs: { type: "number", example: 50 },
-            fiber: { type: "number", example: 5 },
-            sugar: { type: "number", example: 10 },
-            sodium: { type: "number", example: 300 },
-          },
-        },
         CreateDailyMenuRequest: {
           type: "object",
           required: ["date"],
@@ -885,49 +873,244 @@ const options = {
         },
 
         // ==================== MEAL PLAN SCHEMAS ====================
-        MealPlan: {
+
+        // ==================== SCHEMAS ====================
+
+        // ─── MealPlan (summary, dùng trong list) ─────────────────────────────────────
+        MealPlanSummary: {
           type: "object",
+          description:
+            "MealPlan rút gọn (dùng trong danh sách), dailyMenuIds chỉ có date + totalNutrition + status",
           properties: {
-            _id: {
-              type: "string",
-              format: "ObjectId",
-            },
-            userId: {
-              type: "string",
-              format: "ObjectId",
-            },
+            _id: { type: "string", example: "664f1a2b3c4d5e6f7a8b9c0d" },
+            userId: { type: "string", example: "663e1a2b3c4d5e6f7a8b9c0a" },
             startDate: {
               type: "string",
               format: "date",
-              example: "2025-02-13",
+              example: "2026-04-28",
             },
-            endDate: {
-              type: "string",
-              format: "date",
-              example: "2025-02-19",
-            },
-            dailyMenuIds: {
-              type: "array",
-              items: { type: "string", format: "ObjectId" },
-            },
+            endDate: { type: "string", format: "date", example: "2026-05-04" },
             source: {
               type: "string",
               enum: ["ai", "user"],
+              description: "ai = do hệ thống gợi ý, user = tự tạo",
+              example: "ai",
             },
             generatedBy: {
               type: "string",
-              example: "nutrition_ai_v1",
+              description: "Tên engine tạo plan (chỉ có khi source = ai)",
+              example: "nutrition_ai_v2",
             },
             status: {
               type: "string",
-              enum: ["suggested", "planned", "completed", "cancelled"],
+              enum: [
+                "manual",
+                "suggested",
+                "selected",
+                "completed",
+                "deleted",
+                "expired",
+              ],
+              example: "suggested",
             },
-            createdAt: {
+            dailyMenuIds: {
+              type: "array",
+              description:
+                "Danh sách DailyMenu rút gọn (chỉ date, totalNutrition, status)",
+              items: { $ref: "#/components/schemas/DailyMenuSummary" },
+            },
+            createdAt: { type: "string", format: "date-time" },
+            updatedAt: { type: "string", format: "date-time" },
+          },
+        },
+
+        // ─── MealPlan (full, dùng trong detail) ──────────────────────────────────────
+        MealPlan: {
+          type: "object",
+          description: "MealPlan đầy đủ (không populate recipe)",
+          properties: {
+            _id: { type: "string", example: "664f1a2b3c4d5e6f7a8b9c0d" },
+            userId: { type: "string", example: "663e1a2b3c4d5e6f7a8b9c0a" },
+            startDate: {
               type: "string",
-              format: "date-time",
+              format: "date",
+              example: "2026-04-28",
+            },
+            endDate: { type: "string", format: "date", example: "2026-05-04" },
+            source: { type: "string", enum: ["ai", "user"], example: "user" },
+            generatedBy: { type: "string", example: "nutrition_ai_v2" },
+            status: {
+              type: "string",
+              enum: [
+                "manual",
+                "suggested",
+                "selected",
+                "completed",
+                "deleted",
+                "expired",
+              ],
+              example: "manual",
+            },
+            dailyMenuIds: {
+              type: "array",
+              items: { type: "string" },
+              description: "Mảng ObjectId của DailyMenu",
+              example: ["664f1a2b3c4d5e6f7a8b9c01", "664f1a2b3c4d5e6f7a8b9c02"],
+            },
+            createdAt: { type: "string", format: "date-time" },
+            updatedAt: { type: "string", format: "date-time" },
+          },
+        },
+
+        // ─── MealPlanDetail (populate đầy đủ) ────────────────────────────────────────
+        MealPlanDetail: {
+          type: "object",
+          description: "MealPlan với DailyMenu và Recipe populate đầy đủ",
+          properties: {
+            _id: { type: "string", example: "664f1a2b3c4d5e6f7a8b9c0d" },
+            userId: { type: "string", example: "663e1a2b3c4d5e6f7a8b9c0a" },
+            startDate: {
+              type: "string",
+              format: "date",
+              example: "2026-04-28",
+            },
+            endDate: { type: "string", format: "date", example: "2026-05-04" },
+            source: { type: "string", enum: ["ai", "user"], example: "ai" },
+            generatedBy: { type: "string", example: "nutrition_ai_v2" },
+            status: {
+              type: "string",
+              enum: [
+                "manual",
+                "suggested",
+                "selected",
+                "completed",
+                "deleted",
+                "expired",
+              ],
+              example: "suggested",
+            },
+            dailyMenuIds: {
+              type: "array",
+              description: "DailyMenu đã populate đầy đủ Recipe",
+              items: { $ref: "#/components/schemas/DailyMenuDetail" },
+            },
+            createdAt: { type: "string", format: "date-time" },
+            updatedAt: { type: "string", format: "date-time" },
+          },
+        },
+
+        // ─── DailyMenuSummary (dùng trong MealPlanSummary) ───────────────────────────
+        DailyMenuSummary: {
+          type: "object",
+          properties: {
+            _id: { type: "string", example: "664f1a2b3c4d5e6f7a8b9c01" },
+            date: { type: "string", format: "date", example: "2026-04-28" },
+            status: {
+              type: "string",
+              enum: [
+                "manual",
+                "suggested",
+                "selected",
+                "completed",
+                "deleted",
+                "expired",
+              ],
+              example: "suggested",
+            },
+            totalNutrition: { $ref: "#/components/schemas/Nutrition" },
+          },
+        },
+
+        // ─── DailyMenuDetail (populate recipe, dùng trong MealPlanDetail) ────────────
+        DailyMenuDetail: {
+          type: "object",
+          properties: {
+            _id: { type: "string", example: "664f1a2b3c4d5e6f7a8b9c01" },
+            date: { type: "string", format: "date", example: "2026-04-28" },
+            status: {
+              type: "string",
+              enum: [
+                "manual",
+                "suggested",
+                "selected",
+                "completed",
+                "deleted",
+                "expired",
+              ],
+              example: "suggested",
+            },
+            totalNutrition: { $ref: "#/components/schemas/Nutrition" },
+            targetNutrition: { $ref: "#/components/schemas/Nutrition" },
+            recipes: {
+              type: "array",
+              items: { $ref: "#/components/schemas/RecipeItem" },
+            },
+            feedback: {
+              type: "string",
+              example: "Ổn, nhưng muốn đổi bữa sáng",
             },
           },
         },
+
+        // ─── RecipeItem (1 món trong DailyMenu) ──────────────────────────────────────
+        RecipeItem: {
+          type: "object",
+          properties: {
+            _id: { type: "string", example: "664f1a2b3c4d5e6f7a8b9c11" },
+            recipeId: {
+              type: "object",
+              description:
+                "Recipe đã populate (hoặc chỉ là ObjectId nếu không populate)",
+              properties: {
+                _id: { type: "string" },
+                name: { type: "string", example: "Bún bò Huế" },
+                imageUrl: { type: "string", example: "https://..." },
+                description: { type: "string" },
+                totalNutrition: { $ref: "#/components/schemas/Nutrition" },
+              },
+            },
+            name: { type: "string", example: "Bún bò Huế" },
+            imageUrl: { type: "string", example: "https://..." },
+            scale: {
+              type: "number",
+              description: "Hệ số khẩu phần (1 = 1 serving, 0.5 = nửa phần)",
+              example: 1,
+            },
+            servingTime: {
+              type: "string",
+              enum: ["breakfast", "lunch", "dinner", "snack", "other"],
+              description: "Bữa ăn mà món này thuộc về",
+              example: "breakfast",
+            },
+            nutrition: { $ref: "#/components/schemas/Nutrition" },
+            isChecked: {
+              type: "boolean",
+              description: "User đã ăn món này chưa (dùng để tạo MealLog)",
+              example: false,
+            },
+            status: {
+              type: "string",
+              enum: ["planned", "completed", "skipped"],
+              example: "planned",
+            },
+          },
+        },
+
+        // ─── Nutrition ────────────────────────────────────────────────────────────────
+        Nutrition: {
+          type: "object",
+          properties: {
+            calories: { type: "number", example: 450.5 },
+            protein: { type: "number", example: 35.2 },
+            fat: { type: "number", example: 12.1 },
+            carbs: { type: "number", example: 55.8 },
+            fiber: { type: "number", example: 4.5 },
+            sugar: { type: "number", example: 8.2 },
+            sodium: { type: "number", example: 620 },
+          },
+        },
+
+        // ─── Request schemas ──────────────────────────────────────────────────────────
         CreateMealPlanRequest: {
           type: "object",
           required: ["startDate"],
@@ -935,21 +1118,119 @@ const options = {
             startDate: {
               type: "string",
               format: "date",
-              example: "2025-02-13",
+              description: "Ngày bắt đầu plan (YYYY-MM-DD)",
+              example: "2026-04-28",
+            },
+            period: {
+              type: "string",
+              enum: ["week"],
+              default: "week",
+              description: "Hiện tại chỉ hỗ trợ 'week' (7 ngày)",
+              example: "week",
+            },
+          },
+        },
+
+        RecommendWeekRequest: {
+          type: "object",
+          properties: {
+            startDate: {
+              type: "string",
+              format: "date",
+              description:
+                "Ngày bắt đầu gợi ý (YYYY-MM-DD). Mặc định là hôm nay.",
+              example: "2026-04-28",
+            },
+            days: {
+              type: "integer",
+              minimum: 1,
+              maximum: 14,
+              default: 7,
+              description: "Số ngày cần gợi ý (1–14, mặc định 7)",
+              example: 7,
+            },
+            saveToDB: {
+              type: "boolean",
+              default: true,
+              description: `Có lưu kết quả vào DB không.
+- \`true\` (mặc định): Tạo DailyMenu + MealPlan, trả về data + planId để frontend dùng tiếp
+- \`false\`: Chỉ tính toán, không lưu — dùng để preview trước khi confirm`,
+              example: true,
+            },
+          },
+        },
+
+        // ─── WeekRecommendationResult ─────────────────────────────────────────────────
+        WeekRecommendationResult: {
+          type: "object",
+          description: "Kết quả gợi ý thực đơn tuần từ AI",
+          properties: {
+            startDate: {
+              type: "string",
+              format: "date-time",
+              example: "2026-04-28T00:00:00.000Z",
             },
             endDate: {
               type: "string",
-              format: "date",
-              example: "2025-02-19",
+              format: "date-time",
+              example: "2026-05-04T00:00:00.000Z",
             },
-            dailyMenuIds: {
-              type: "array",
-              items: { type: "string" },
-            },
-            source: {
+            goal: {
               type: "string",
-              enum: ["ai", "user"],
+              description: "Mục tiêu dinh dưỡng của user",
+              example: "maintain_weight",
             },
+            tdee: {
+              type: "number",
+              description: "Tổng năng lượng tiêu hao hàng ngày (kcal)",
+              example: 2396,
+            },
+            dailyTarget: {
+              $ref: "#/components/schemas/Nutrition",
+            },
+            weekPlan: {
+              type: "array",
+              items: { $ref: "#/components/schemas/DayPlan" },
+            },
+            weeklyTotal: { $ref: "#/components/schemas/NutritionSimple" },
+            weeklyAverage: { $ref: "#/components/schemas/NutritionSimple" },
+          },
+        },
+
+        // ─── DayPlan (1 ngày trong WeekRecommendationResult) ─────────────────────────
+        DayPlan: {
+          type: "object",
+          properties: {
+            dayIndex: {
+              type: "integer",
+              description: "Thứ tự ngày (1–7)",
+              example: 1,
+            },
+            date: {
+              type: "string",
+              format: "date-time",
+              example: "2026-04-28T00:00:00.000Z",
+            },
+            recipes: {
+              type: "array",
+              description:
+                "Danh sách món ăn flat, phân biệt bữa qua servingTime",
+              items: { $ref: "#/components/schemas/RecipeItem" },
+            },
+            totalNutrition: { $ref: "#/components/schemas/NutritionSimple" },
+            targetNutrition: { $ref: "#/components/schemas/Nutrition" },
+          },
+        },
+
+        // ─── NutritionSimple (calories/protein/fat/carbs only) ───────────────────────
+        NutritionSimple: {
+          type: "object",
+          description: "Dinh dưỡng cơ bản (4 chỉ số chính)",
+          properties: {
+            calories: { type: "number", example: 2400 },
+            protein: { type: "number", example: 184.1 },
+            fat: { type: "number", example: 58.1 },
+            carbs: { type: "number", example: 310.6 },
           },
         },
 
@@ -2560,163 +2841,298 @@ const options = {
       "/meal-plans": {
         get: {
           tags: ["Meal Plans"],
-          summary: "Lấy danh sách kế hoạch bữa ăn",
-          description: "Lấy tất cả kế hoạch bữa ăn của người dùng",
+          summary: "Lấy danh sách MealPlan của user",
+          description: `Trả về tất cả MealPlan của user đang đăng nhập, sắp xếp theo startDate mới nhất.
+Mỗi plan bao gồm danh sách DailyMenu (chỉ có date, totalNutrition, status — không populate recipe chi tiết).
+ 
+**Dùng khi:** Hiển thị lịch sử / danh sách các tuần đã tạo plan.
+ 
+**Filter theo status (query param):**
+- \`suggested\` — plan do AI gợi ý, chưa được user chọn
+- \`selected\` — plan đang được áp dụng
+- \`completed\` — plan đã hoàn thành
+- \`manual\` — plan user tự tạo
+- \`deleted\` — đã xóa mềm
+- \`expired\` — bị expire khi user chọn plan khác cùng thời gian`,
           security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              in: "query",
+              name: "status",
+              schema: {
+                type: "string",
+                enum: [
+                  "manual",
+                  "suggested",
+                  "selected",
+                  "completed",
+                  "deleted",
+                  "expired",
+                ],
+              },
+              required: false,
+              description:
+                "Lọc theo trạng thái plan. Không truyền = lấy tất cả.",
+              example: "selected",
+            },
+          ],
           responses: {
             200: {
-              description: "Danh sách kế hoạch bữa ăn",
+              description: "Danh sách MealPlan",
               content: {
                 "application/json": {
                   schema: {
-                    type: "array",
-                    items: { $ref: "#/components/schemas/MealPlan" },
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean", example: true },
+                      data: {
+                        type: "array",
+                        items: { $ref: "#/components/schemas/MealPlanSummary" },
+                      },
+                    },
                   },
                 },
               },
             },
+            401: {},
           },
         },
+
+        // ─── POST /mealplans ────────────────────────────────────────────────────────
         post: {
           tags: ["Meal Plans"],
-          summary: "Tạo kế hoạch bữa ăn mới",
-          description: "Tạo kế hoạch bữa ăn (có thể từ AI hoặc user tự tạo)",
+          summary: "Tạo MealPlan thủ công",
+          description: `Tạo 1 MealPlan do user tự lên lịch (không dùng AI).
+ 
+**Logic xử lý:**
+- Sinh danh sách ngày từ \`startDate\` theo \`period\` (mặc định 7 ngày)
+- Mỗi ngày: nếu đã có DailyMenu (status là selected hoặc manual) → reuse; chưa có → tạo DailyMenu rỗng
+- Trả về MealPlan với \`source: "user"\`, \`status: "manual"\`
+ 
+**Sau khi tạo xong**, dùng API của DailyMenu (\`POST /dailymenus/add-recipe\`) để thêm món vào từng ngày.`,
           security: [{ bearerAuth: [] }],
           requestBody: {
             required: true,
             content: {
               "application/json": {
                 schema: { $ref: "#/components/schemas/CreateMealPlanRequest" },
+                example: {
+                  startDate: "2026-04-28",
+                  period: "week",
+                },
               },
             },
           },
           responses: {
             201: {
-              description: "Kế hoạch đã được tạo",
-              content: {
-                "application/json": {
-                  schema: { $ref: "#/components/schemas/MealPlan" },
-                },
-              },
-            },
-          },
-        },
-      },
-      "/meal-plans/{planId}": {
-        get: {
-          tags: ["Meal Plans"],
-          summary: "Lấy chi tiết kế hoạch bữa ăn",
-          description: "Lấy thông tin đầy đủ của một kế hoạch cụ thể",
-          security: [{ bearerAuth: [] }],
-          parameters: [
-            {
-              in: "path",
-              name: "planId",
-              required: true,
-              schema: { type: "string", format: "ObjectId" },
-            },
-          ],
-          responses: {
-            200: {
-              description: "Chi tiết kế hoạch bữa ăn",
-              content: {
-                "application/json": {
-                  schema: { $ref: "#/components/schemas/MealPlan" },
-                },
-              },
-            },
-            404: {
-              description: "Kế hoạch không tồn tại",
-            },
-          },
-        },
-        delete: {
-          tags: ["Meal Plans"],
-          summary: "Xóa kế hoạch bữa ăn",
-          description:
-            "Xóa kế hoạch (chỉ có thể xóa kế hoạch ở trạng thái 'suggested')",
-          security: [{ bearerAuth: [] }],
-          parameters: [
-            {
-              in: "path",
-              name: "planId",
-              required: true,
-              schema: { type: "string", format: "ObjectId" },
-            },
-          ],
-          responses: {
-            200: {
-              description: "Kế hoạch đã được xóa",
-            },
-            404: {
-              description: "Kế hoạch không tồn tại",
-            },
-          },
-        },
-      },
-      "/meal-plans/by-startdate": {
-        get: {
-          tags: ["Meal Plans"],
-          summary: "Lấy kế hoạch theo ngày bắt đầu",
-          description: "Tìm kế hoạch dựa trên ngày bắt đầu",
-          security: [{ bearerAuth: [] }],
-          parameters: [
-            {
-              in: "query",
-              name: "startDate",
-              required: true,
-              schema: { type: "string", format: "date" },
-            },
-          ],
-          responses: {
-            200: {
-              description: "Kế hoạch bữa ăn",
-              content: {
-                "application/json": {
-                  schema: { $ref: "#/components/schemas/MealPlan" },
-                },
-              },
-            },
-          },
-        },
-      },
-      "/meal-plans/status": {
-        get: {
-          tags: ["Meal Plans"],
-          summary: "Lấy trạng thái tuần",
-          description: "Lấy trạng thái của tất cả kế hoạch trong tuần",
-          security: [{ bearerAuth: [] }],
-          responses: {
-            200: {
-              description: "Trạng thái tuần",
+              description: "MealPlan đã được tạo thành công",
               content: {
                 "application/json": {
                   schema: {
                     type: "object",
                     properties: {
-                      week: { type: "string" },
-                      status: { type: "string" },
+                      success: { type: "boolean", example: true },
+                      data: { $ref: "#/components/schemas/MealPlan" },
                     },
                   },
                 },
               },
             },
+            400: {},
+            401: {},
           },
         },
       },
-      "/meal-plans/{planId}/status": {
-        patch: {
+
+      // ─── GET /mealplans/by-startdate ─────────────────────────────────────────────
+      "/meal-plans/by-startdate": {
+        get: {
           tags: ["Meal Plans"],
-          summary: "Cập nhật trạng thái kế hoạch",
-          description:
-            "Thay đổi trạng thái kế hoạch (suggested, planned, completed, cancelled)",
+          summary: "Lấy MealPlan theo ngày bắt đầu",
+          description: `Tìm MealPlan của user theo \`startDate\`. Trả về plan đầu tiên khớp (populate đầy đủ DailyMenu + Recipe chi tiết).
+ 
+**Dùng khi:** User mở màn hình xem thực đơn tuần, frontend biết startDate của tuần hiện tại.
+ 
+> ⚠️ Nếu không tìm thấy plan → trả về 404. Frontend nên gọi \`GET /mealplans/status\` trước để check.`,
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              in: "query",
+              name: "startDate",
+              schema: { type: "string", format: "date" },
+              required: true,
+              description: "Ngày bắt đầu của plan (YYYY-MM-DD)",
+              example: "2026-04-28",
+            },
+          ],
+          responses: {
+            200: {
+              description: "MealPlan với đầy đủ DailyMenu và Recipe",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean", example: true },
+                      data: { $ref: "#/components/schemas/MealPlanDetail" },
+                    },
+                  },
+                },
+              },
+            },
+            400: {},
+            401: {},
+            404: {},
+          },
+        },
+      },
+
+      // ─── GET /mealplans/status ───────────────────────────────────────────────────
+      "/meal-plans/status": {
+        get: {
+          tags: ["Meal Plans"],
+          summary: "Kiểm tra tuần đã có DailyMenu chưa",
+          description: `Kiểm tra xem trong khoảng N ngày từ \`startDate\`, ngày nào đã có DailyMenu tồn tại.
+ 
+**Dùng khi:** Trước khi gọi AI gợi ý tuần (\`POST /mealplans/recommendations/week\`), frontend nên gọi API này để:
+- Nếu \`hasExisting: false\` → gọi AI luôn
+- Nếu \`hasExisting: true\` → hiển thị cảnh báo "Một số ngày đã có thực đơn, bạn có muốn tạo mới không?"
+ 
+> ℹ️ API gợi ý AI sẽ **luôn tạo DailyMenu mới** (không reuse), nên cần confirm với user trước.`,
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              in: "query",
+              name: "startDate",
+              schema: { type: "string", format: "date" },
+              required: true,
+              description: "Ngày bắt đầu kiểm tra (YYYY-MM-DD)",
+              example: "2026-04-28",
+            },
+            {
+              in: "query",
+              name: "days",
+              schema: { type: "integer", default: 7, minimum: 1, maximum: 14 },
+              required: false,
+              description: "Số ngày cần kiểm tra (mặc định 7)",
+              example: 7,
+            },
+          ],
+          responses: {
+            200: {
+              description: "Kết quả kiểm tra",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean", example: true },
+                      data: {
+                        type: "object",
+                        properties: {
+                          hasExisting: {
+                            type: "boolean",
+                            description:
+                              "true nếu có ít nhất 1 ngày đã có DailyMenu",
+                            example: true,
+                          },
+                          existingDates: {
+                            type: "array",
+                            items: { type: "string", format: "date" },
+                            description: "Danh sách ngày đã có DailyMenu",
+                            example: ["2026-04-28", "2026-04-29"],
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            400: {},
+            401: {},
+          },
+        },
+      },
+
+      // ─── GET /mealplans/:planId ──────────────────────────────────────────────────
+      "/meal-plans/{planId}": {
+        get: {
+          tags: ["Meal Plans"],
+          summary: "Lấy chi tiết MealPlan theo ID",
+          description: `Trả về đầy đủ thông tin MealPlan: populate tất cả DailyMenu và Recipe trong từng ngày.
+ 
+**Dùng khi:** Xem chi tiết 1 plan cụ thể (ví dụ sau khi AI gợi ý xong, hiển thị để user review trước khi chọn).`,
           security: [{ bearerAuth: [] }],
           parameters: [
             {
               in: "path",
               name: "planId",
+              schema: { type: "string" },
               required: true,
-              schema: { type: "string", format: "ObjectId" },
+              description: "MongoDB ObjectId của MealPlan",
+              example: "664f1a2b3c4d5e6f7a8b9c0d",
+            },
+          ],
+          responses: {
+            200: {
+              description: "Chi tiết MealPlan",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean", example: true },
+                      data: { $ref: "#/components/schemas/MealPlanDetail" },
+                    },
+                  },
+                },
+              },
+            },
+            400: {},
+            401: {},
+            404: {},
+          },
+        },
+
+      },
+
+      // ─── PATCH /mealplans/:planId/status ─────────────────────────────────────────
+      "/meal-plans/{planId}/status": {
+        patch: {
+          tags: ["Meal Plans"],
+          summary: "Cập nhật trạng thái MealPlan",
+          description: `Cập nhật status của MealPlan.
+ 
+**Luồng status thông thường:**
+\`\`\`
+suggested → selected → completed
+manual    → selected → completed
+\`\`\`
+ 
+**Ràng buộc quan trọng:**
+- Không thể cập nhật plan đã ở trạng thái \`completed\` hoặc \`deleted\`
+- Khi chuyển sang \`selected\`: các plan \`suggested\` khác của cùng user bị **overlap thời gian** sẽ tự động chuyển sang \`expired\`
+ 
+**Các giá trị status hợp lệ:**
+ 
+| Status | Ý nghĩa |
+|--------|---------|
+| \`manual\` | Plan thủ công, chưa hoàn thiện |
+| \`suggested\` | AI vừa gợi ý, chờ user xem xét |
+| \`selected\` | User đã chọn plan này để thực hiện |
+| \`completed\` | Đã hoàn thành toàn bộ plan |
+| \`deleted\` | Đã xóa mềm (dùng DELETE thay vì PATCH) |
+| \`expired\` | Hết hạn do user chọn plan khác |`,
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              in: "path",
+              name: "planId",
+              schema: { type: "string" },
+              required: true,
+              description: "MongoDB ObjectId của MealPlan",
+              example: "664f1a2b3c4d5e6f7a8b9c0d",
             },
           ],
           requestBody: {
@@ -2725,10 +3141,19 @@ const options = {
               "application/json": {
                 schema: {
                   type: "object",
+                  required: ["status"],
                   properties: {
                     status: {
                       type: "string",
-                      enum: ["suggested", "planned", "completed", "cancelled"],
+                      enum: [
+                        "manual",
+                        "suggested",
+                        "selected",
+                        "completed",
+                        "expired",
+                      ],
+                      description: "Trạng thái mới muốn cập nhật",
+                      example: "selected",
                     },
                   },
                 },
@@ -2737,46 +3162,80 @@ const options = {
           },
           responses: {
             200: {
-              description: "Trạng thái đã được cập nhật",
+              description: "Cập nhật thành công",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/MealPlan" },
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean", example: true },
+                      data: { $ref: "#/components/schemas/MealPlan" },
+                    },
+                  },
                 },
               },
             },
+            400: {},
+            401: {},
+            404: {},
           },
         },
       },
-      "/meal-plans/suggest": {
+
+      // ─── POST /mealplans/recommendations/week ────────────────────────────────────
+      "/meal-plans/recommendations/week": {
         post: {
           tags: ["Meal Plans"],
-          summary: "Gợi ý kế hoạch bữa ăn theo tuần (AI)",
-          description:
-            "Sử dụng AI để gợi ý toàn bộ kế hoạch bữa ăn cho một tuần",
+          summary: "AI gợi ý thực đơn cả tuần",
+          description: `Gọi engine AI (nutrition_ai_v2) để tạo thực đơn tối ưu cho N ngày liên tiếp.
+ 
+**Thuật toán:**
+- Dựa trên TDEE, mục tiêu dinh dưỡng (NutritionGoal active) và lịch sử ăn uống của user
+- Tính \`adaptiveTarget\` bù trừ dư/thiếu từ các ngày trước để cân bằng dinh dưỡng cả tuần
+- Tránh lặp món trong 7 ngày gần nhất, ưu tiên món user yêu thích
+- Mỗi ngày gồm 3 bữa: breakfast (~25% calories), lunch (~35%), dinner (~30%)
+ 
+**Điều kiện tiên quyết:**
+- User phải có \`NutritionGoal\` với \`status: "active"\`
+ 
+**Lưu ý:**
+- API này **luôn tạo DailyMenu mới** cho mỗi ngày (upsert theo userId + date)
+- Nên gọi \`GET /mealplans/status\` trước để cảnh báo user nếu đã có thực đơn
+- Tạo 1 MealPlan với \`source: "ai"\`, \`status: "suggested"\`
+- Sau khi xem kết quả, user gọi \`PATCH /mealplans/:planId/status\` với \`status: "selected"\` để xác nhận`,
           security: [{ bearerAuth: [] }],
           requestBody: {
-            required: true,
+            required: false,
             content: {
               "application/json": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    startDate: { type: "string", format: "date" },
-                    endDate: { type: "string", format: "date" },
-                  },
+                schema: { $ref: "#/components/schemas/RecommendWeekRequest" },
+                example: {
+                  startDate: "2026-04-28",
+                  days: 7,
+                  saveToDB: true,
                 },
               },
             },
           },
           responses: {
             200: {
-              description: "Kế hoạch được gợi ý",
+              description: "Kết quả gợi ý thực đơn tuần",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/MealPlan" },
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean", example: true },
+                      data: {
+                        $ref: "#/components/schemas/WeekRecommendationResult",
+                      },
+                    },
+                  },
                 },
               },
             },
+            400: {},
+            401: {},
           },
         },
       },

@@ -1037,7 +1037,7 @@ async function recommendWeekPlan(userId, options = {}) {
     target: dailyTarget,
   } = await getUserNutritionProfile(userId);
 
-  // 2. Load data + FIX-3/OPT-1: tính adaptive targets cho cả tuần 1 lần
+  // 2. Load data + tính adaptive targets cho cả tuần 1 lần
   const dates = Array.from({ length: numDays }, (_, i) => {
     const d = new Date(startDate);
     d.setDate(d.getDate() + i);
@@ -1046,36 +1046,35 @@ async function recommendWeekPlan(userId, options = {}) {
 
   const [rawRecipes, recentNames, favouriteIds, user, adaptiveTargetsMap] =
     await Promise.all([
-      Recipe.find({}).lean(),
+      Recipe.find({ deleted: { $ne: true } }).lean(),
       mealLogService.getRecentlyEatenMap(userId),
       getFavouriteIds(userId),
       User.findById(userId).select("allergies").lean(),
-      getAllAdaptiveTargets(userId, dailyTarget, dates), // FIX-3 + OPT-1
+      getAllAdaptiveTargets(userId, dailyTarget, dates),
     ]);
 
   const recipes = normalizeRecipes(rawRecipes, user?.allergies || []);
-  const poolCache = buildPoolCache(recipes); // OPT-4
+  const poolCache = buildPoolCache(recipes);
 
   // 3. Weekly shared context
   const weekContext = {
-    usedNames: new Set(), // tích lũy cả tuần → tránh lặp
+    usedNames: new Set(),
     favouriteIds,
     recentEatenMap: recentNames,
   };
 
   const weekPlan = [];
-  const logPromises = [];
 
+  // 4. Build từng ngày — thu thập kết quả trước, saveToDB sau
   for (let i = 0; i < numDays; i++) {
     const dayDate = dates[i];
     const adaptiveTarget =
       adaptiveTargetsMap.get(toDateOnly(dayDate).toISOString()) || dailyTarget;
 
-    // Per-day context: protein/category diversity reset hàng ngày
     const dayContext = {
-      usedNames: weekContext.usedNames, // shared → tránh lặp cả tuần
-      usedMealSources: new Map(), // reset mỗi ngày
-      usedCategories: new Map(), // reset mỗi ngày
+      usedNames: weekContext.usedNames,     // shared cả tuần → tránh lặp món
+      usedMealSources: new Map(),           // reset mỗi ngày
+      usedCategories: new Map(),            // reset mỗi ngày
       favouriteIds,
       recentEatenMap: weekContext.recentEatenMap,
     };
@@ -1087,40 +1086,66 @@ async function recommendWeekPlan(userId, options = {}) {
       dayContext,
     );
 
+    // Flatten meals -> recipes flat array (align với DailyMenu schema)
+    const recipesPlanned = meals.flatMap((meal) => meal.items);
+
     weekPlan.push({
       dayIndex: i + 1,
       date: toDateOnly(dayDate),
-      meals,
-      dailyTotal,
+      recipes: recipesPlanned,
+      totalNutrition: dailyTotal,
+      targetNutrition: adaptiveTarget,
+      _adaptiveTarget: adaptiveTarget,
     });
-
-    if (saveToDB) {
-      const logDate = toDateOnly(dayDate);
-      logPromises.push(
-        MealPlan.findOneAndUpdate(
-          { userId, date: logDate },
-          {
-            userId,
-            date: logDate,
-            meals,
-            dailyTotalNutrition: dailyTotal,
-            dailyTargetNutrition: adaptiveTarget,
-            source: "recommended",
-          },
-          { upsert: true, new: true, setDefaultsOnInsert: true },
-        ),
-      );
-    }
   }
 
-  if (saveToDB) await Promise.all(logPromises);
+  // 5. saveToDB: tạo tất cả DailyMenu song song, rồi mới tạo MealPlan
+  if (saveToDB) {
+    const dailyMenuDocs = await Promise.all(
+      weekPlan.map((day) => {
+        const dateStr = day.date.toISOString().split("T")[0]; // "YYYY-MM-DD"
+        return DailyMenu.findOneAndUpdate(
+          { userId, date: dateStr },
+          {
+            userId,
+            date: dateStr,
+            recipes: day.recipes,
+            totalNutrition: day.totalNutrition,
+            targetNutrition: day._adaptiveTarget,
+            status: "suggested",
+          },
+          { upsert: true, new: true, setDefaultsOnInsert: true },
+        );
+      }),
+    );
 
+    const dailyMenuIds = dailyMenuDocs.map((dm) => dm._id);
+    const startDateStr = toDateOnly(dates[0]).toISOString().split("T")[0];
+    const endDateStr = toDateOnly(dates[numDays - 1]).toISOString().split("T")[0];
+
+    await MealPlan.create({
+      userId,
+      startDate: startDateStr,
+      endDate: endDateStr,
+      dailyMenuIds,
+      source: "ai",
+      generatedBy: "nutrition_ai_v2",
+      status: "suggested",
+    });
+  }
+
+  // 6. Cleanup internal fields trước khi return
+  weekPlan.forEach((day) => {
+    delete day._adaptiveTarget;
+  });
+
+  // 7. Tổng hợp weekly stats
   const weeklyTotal = weekPlan.reduce(
     (acc, day) => {
-      acc.calories += day.dailyTotal.calories;
-      acc.protein += day.dailyTotal.protein;
-      acc.fat += day.dailyTotal.fat;
-      acc.carbs += day.dailyTotal.carbs;
+      acc.calories += day.totalNutrition.calories;
+      acc.protein += day.totalNutrition.protein;
+      acc.fat += day.totalNutrition.fat;
+      acc.carbs += day.totalNutrition.carbs;
       return acc;
     },
     { calories: 0, protein: 0, fat: 0, carbs: 0 },
@@ -1134,10 +1159,8 @@ async function recommendWeekPlan(userId, options = {}) {
   return {
     startDate: toDateOnly(startDate),
     endDate: toDateOnly(endDate),
-    goal,
-    tdee: parseFloat(tdee.toFixed(0)),
     dailyTarget,
-    weekPlan,
+    dailyMenu:weekPlan,
     weeklyTotal,
     weeklyAverage: {
       calories: parseFloat((weeklyTotal.calories / numDays).toFixed(1)),

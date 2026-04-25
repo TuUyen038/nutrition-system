@@ -276,6 +276,25 @@ exports.updateDailyMenuStatus = async ({ userId, dailyMenuId, newStatus }) => {
   const dailyMenu = await DailyMenu.findOne({ _id: dailyMenuId, userId });
   if (!dailyMenu) throw new Error("Không tìm thấy thực đơn ngày này!");
 
+  if (dailyMenu.status === "completed" || dailyMenu.status === "deleted") {
+    throw new Error(
+      `Không thể cập nhật DailyMenu đang ở trạng thái "${dailyMenu.status}".`,
+    );
+  }
+
+  // Khi user chọn 1 dailyMenu -> expire các dispatch suggested khác bị trùng thời gian
+  if (newStatus === "selected") {
+    await DailyMenu.updateMany(
+      {
+        userId,
+        _id: { $ne: dailyMenuId },
+        status: "suggested",
+        date: dailyMenu.date,
+      },
+      { $set: { status: "expired" } },
+    );
+  }
+
   dailyMenu.status = newStatus;
   return await dailyMenu.save();
 };
@@ -427,11 +446,12 @@ exports.deleteRecipeInMenu = async ({ userId, dailyMenuId, recipeItemId }) => {
 };
 
 exports.getDailyMenuByDate = async ({ userId, date }) => {
-  const normalizedDate = toDateOnly("2025-02-13");
+  const normalizedDate = toDateOnly(date);
 
   return await DailyMenu.findOne({
     userId,
     date: normalizedDate,
+    status: { $in: ["manual", "selected"] },
   }).lean();
 };
 exports.getDailyMenusByRange = async ({ userId, startDate, endDate }) => {
@@ -444,10 +464,13 @@ exports.getDailyMenusByRange = async ({ userId, startDate, endDate }) => {
       $gte: normalizedStartDate,
       $lte: normalizedEndDate,
     },
+    status: { $in: ["manual", "selected"] },
   })
     .lean()
     .sort({ date: 1 });
 };
+
+//TODO: neu ham nay sua nay van k dung thi co the xoa
 exports.createDailyMenu = async (data) => {
   try {
     let { userId, date, recipes, status } = data;

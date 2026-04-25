@@ -50,7 +50,7 @@ async function recommendDay(req, res) {
 async function recommendWeek(req, res) {
     try {
         const userId = req.user._id;
-        const { startDate, days = 7, saveToDB = false } = req.body;
+        const { startDate, days = 7, saveToDB = true } = req.body;
 
         const result = await recommendWeekPlan(userId, {
             startDate: startDate ? new Date(startDate) : new Date(),

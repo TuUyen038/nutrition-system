@@ -182,7 +182,7 @@ exports.suggestRecipesForMeal = async (req, res) => {
     }
 
     // Lấy nutrition đã gọi trong ngày (nếu có)
-    const existing = await DailyMenu.findOne({ userId, date }).lean();
+    const existing = await DailyMenu.findOne({ userId, date, status: { $in: ["manual", "selected"] } }).lean();
 
     const currentDayNutrition = existing?.totalNutrition || {
       calories: 0,
@@ -220,64 +220,3 @@ exports.suggestRecipesForMeal = async (req, res) => {
     return res.status(500).json({ message: err.message });
   }
 };
-// exports.suggestDailyMenu = async (req, res) => {
-//   try {
-//     const userId = req.user._id; // Lấy từ authenticated user
-//     const { date } = req.body;
-
-//     if (!date) {
-//       return res.status(400).json({ message: "date là bắt buộc" });
-//     }
-
-//     const dailyMenu = await dailyMenuService.suggestDailyMenu({
-//       userId,
-//       dateStr: date,
-//     });
-//     await dailyMenu.populate({
-//       path: "recipes.recipeId",
-//       model: "Recipe",
-//     });
-//     return res.status(201).json(dailyMenu);
-//   } catch (err) {
-//     console.error("Error suggestDailyMenu:", err);
-//     return res.status(500).json({ message: "Internal server error" });
-//   }
-// };
-
-// exports.getDailyMenuById = async (req, res) => {
-//   try {
-//     const { id } = req.params;
-//     const detail = await dailyMenuService.getMealDetail(userId, id);
-//     res.status(200).json(detail);
-//   } catch (error) {
-//     console.error(error);
-//     res.status(500).json({ message: "Error retrieving meal detail" });
-//   }
-// };
-// exports.getAllDailyMenu = async (req, res) => {
-//   try {
-//     const detail = await dailyMenuService.getAllMeal(userId);
-//     res.status(200).json(detail);
-//   } catch (error) {
-//     console.error(error);
-//     res.status(500).json({ message: "Error retrieving meal detail" });
-//   }
-// };
-
-// exports.getRecipesByDateAndStatus = async (req, res) => {
-//   try {
-//     const userId = req.user._id.toString();
-
-//     const { startDate, endDate, status } = req.query;
-
-//     const data = await dailyMenuService.getRecipesByDateAndStatus({
-//       userId,
-//       startDate,
-//       endDate,
-//       status,
-//     });
-//     res.status(200).json(data);
-//   } catch (error) {
-//     res.status(500).json({ message: error.message });
-//   }
-// };

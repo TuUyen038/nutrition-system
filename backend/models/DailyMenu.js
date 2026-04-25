@@ -41,9 +41,10 @@ const dailyMenuSchema = new mongoose.Schema(
       sugar: Number,
       sodium: Number,
     },
-    //suggested: danh sách được AI gợi ý (chưa được user chọn)
-    //selected: dailtmenu được user chọn -> dại diện cho menu được gợi ý ban đầu chưa được người dùng chỉnh sửa
-    //edited: dailymenu từ AI đã được người dùng chọn và chỉnh sửa
+    //suggested: danh sách được gợi ý TUY NHIÊN chưa đc user chọn
+    //selected: suggested được người dùng chọn
+    //expired: suggested nhưng hết hạn
+    //hiện tại, các status sẽ được hiển thị khi dùng hàm get dailymenu chính là manual và selected
     status: {
       type: String,
       enum: [
@@ -54,6 +55,7 @@ const dailyMenuSchema = new mongoose.Schema(
         "deleted",
         "expired",
       ],
+      default: "manual",
     },
     feedback: String,
   },

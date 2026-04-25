@@ -1,13 +1,80 @@
-const mealPlanService = require('../services/mealPlan.service');
+const mealPlanService = require("../services/mealPlan.service");
+const {
+  recommendWeekPlan,
+} = require("../services/mealRecommendation.service");
 
-
-async function getWeekStatus (req, res) {
+/**
+ * POST /api/v1/mealplans/recommendations/week
+ * Body: { startDate?: "YYYY-MM-DD", days?: number, saveToDB?: boolean }
+ */
+exports.recommendWeek = async (req, res) => {
   try {
-    const userId = req.user._id; // Lấy từ authenticated user
+    const userId = req.user._id;
+    const { startDate, days = 7, saveToDB = true } = req.body;
+ 
+    const result = await recommendWeekPlan(userId, {
+      startDate: startDate ? new Date(startDate) : new Date(),
+      days: Number(days),
+      saveToDB,
+    });
+ 
+    return res.status(200).json({ success: true, data: result });
+  } catch (err) {
+    return res.status(400).json({ success: false, message: err.message });
+  }
+};
+
+/**
+ * POST /api/v1/mealplans
+ * Tạo MealPlan thủ công (user tự tạo, không AI).
+ * Body: { startDate: "YYYY-MM-DD", period?: "week" }
+ */
+exports.createMealPlan = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const plan = await mealPlanService.createPlan(userId, req.body);
+    return res.status(201).json({ success: true, data: plan });
+  } catch (err) {
+    return res.status(400).json({ success: false, message: err.message });
+  }
+};
+
+/**
+ * GET /api/v1/mealplans/by-startdate?startDate=YYYY-MM-DD
+ * Lấy MealPlan theo ngày bắt đầu (có populate DailyMenu + Recipe).
+ */
+exports.getMealPlanByStartDate = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { startDate } = req.query;
+
+    if (!startDate) {
+      return res.status(400).json({ success: false, message: "Thiếu tham số startDate." });
+    }
+
+    const plan = await mealPlanService.getPlanByStartDate(userId, startDate);
+    if (!plan) {
+      return res.status(404).json({ success: false, message: "Không tìm thấy MealPlan." });
+    }
+
+    return res.status(200).json({ success: true, data: plan });
+  } catch (err) {
+    return res.status(400).json({ success: false, message: err.message });
+  }
+};
+
+/**
+ * GET /api/v1/mealplans/status?startDate=YYYY-MM-DD&days=7
+ * Kiểm tra các ngày trong tuần đã có DailyMenu chưa.
+ * Dùng trước khi gọi AI suggest để hỏi user có muốn ghi đè không.
+ */
+exports.getWeekStatus = async (req, res) => {
+  try {
+    const userId = req.user._id;
     const { startDate, days } = req.query;
 
     if (!startDate) {
-      return res.status(400).json({ message: "startDate là bắt buộc" });
+      return res.status(400).json({ success: false, message: "Thiếu tham số startDate." });
     }
 
     const result = await mealPlanService.checkWeekDailyMenus({
@@ -16,162 +83,82 @@ async function getWeekStatus (req, res) {
       days: days ? Number(days) : 7,
     });
 
-    return res.json(result);
+    return res.status(200).json({ success: true, data: result });
   } catch (err) {
-    console.error("getWeekStatus error:", err);
-    return res.status(500).json({ message: "Internal server error" });
+    return res.status(400).json({ success: false, message: err.message });
   }
 };
-
 
 /**
- * POST /api/meal-plans/week/suggest
- * body: { userId, startDate, days? }
+ * GET /api/v1/mealplans/:planId
+ * Lấy chi tiết 1 MealPlan (có populate DailyMenu + Recipe).
  */
-async function suggestWeekPlan(req, res) {
+exports.getMealPlanDetail = async (req, res) => {
   try {
-    const userId = req.user._id; // Lấy từ authenticated user
-    const { startDate, days, mode } = req.body;
-    // mode: "reuse" | "overwrite"
-
-    if (!startDate) {
-      return res.status(400).json({ message: "startDate là bắt buộc" });
+    const plan = await mealPlanService.getPlanById(req.params.planId);
+    if (!plan) {
+      return res.status(404).json({ success: false, message: "Không tìm thấy MealPlan." });
     }
 
-    const mealPlan = await mealPlanService.suggestWeekPlan({
-      userId,
-      startDateStr: startDate,
-      days: days || 7,
-      mode: mode === "overwrite" ? "overwrite" : "reuse",
-    });
-
-    await mealPlan.populate({
-      path: "dailyMenuIds",
-      populate: {
-        path: "recipes.recipeId",
-        model: "Recipe",
-      },
-    });
-    return res.status(201).json(mealPlan);
+    return res.status(200).json({ success: true, data: plan });
   } catch (err) {
-    console.error("Error suggestWeekPlan:", err);
-    return res.status(500).json({ message: "Internal server error" });
+    return res.status(400).json({ success: false, message: err.message });
   }
-}
-
-
-const getMealPlanByStartDate = async (req, res) => {
-    try {
-        const userId = req.user._id; // Lấy từ middleware auth
-        const { startDate } = req.query;
-        if (!startDate) {
-            return res.status(400).json({ error: "startDate là bắt buộc." });
-        }
-
-        const plan = await mealPlanService.getPlanByStartDate(userId, startDate);
-        if (!plan) {
-            return res.status(404).json({ error: "Không tìm thấy MealPlan cho ngày bắt đầu này." });
-        }
-
-        return res.status(200).json({ data: plan });
-    } catch (error) {
-        console.error("Lỗi khi lấy MealPlan theo startDate:", error);
-        return res.status(500).json({ error: "Lỗi server nội bộ." });
-    }
 };
 
-const createMealPlan = async (req, res) => {
-    try {
-        const userId = req.user._id; // Lấy từ middleware Auth
-        const planData = req.body;
+/**
+ * GET /api/v1/mealplans?status=suggested
+ * Lấy danh sách MealPlan của user, hỗ trợ filter theo status.
+ */
+exports.getMealPlans = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { status } = req.query;
 
-        if ( !planData.startDate) {
-            return res.status(400).json({ error: "startDate là bắt buộc." });
-        }
+    const filter = {};
+    if (status) filter.status = status;
 
-        const newPlan = await mealPlanService.createPlan(userId, planData);
-        return res.status(201).json({
-            message: "MealPlan đã được tạo thành công.",
-            data: newPlan,
-        });
-    } catch (error) {
-        console.error("Lỗi khi tạo MealPlan:", error.message);
-        return res.status(500).json({ error: error.message || "Lỗi server nội bộ." });
-    }
+    const plans = await mealPlanService.getPlansByUserId(userId, filter);
+    return res.status(200).json({ success: true, data: plans });
+  } catch (err) {
+    return res.status(400).json({ success: false, message: err.message });
+  }
 };
 
-const getMealPlans = async (req, res) => {
-    try {
-        const userId = req.user._id;
-        const plans = await mealPlanService.getPlansByUserId({ ...req.query, userId });
-        return res.status(200).json({ data: plans });
-    } catch (error) {
-        console.error("Lỗi khi lấy danh sách MealPlan:", error.message);
-        return res.status(500).json({ error: "Lỗi server nội bộ." });
+/**
+ * PATCH /api/v1/mealplans/:planId/status
+ * Cập nhật trạng thái MealPlan.
+ * Body: { status: "selected" | "completed" | "deleted" | "expired" | ... }
+ */
+exports.updatePlanStatus = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { planId } = req.params;
+    const { status } = req.body;
+
+    if (!status) {
+      return res.status(400).json({ success: false, message: "Thiếu trường status." });
     }
+
+    const updated = await mealPlanService.updatePlanStatus(userId, planId, status);
+    return res.status(200).json({ success: true, data: updated });
+  } catch (err) {
+    return res.status(400).json({ success: false, message: err.message });
+  }
 };
 
-const getMealPlanDetail = async (req, res) => {
-    try {
-        const { planId } = req.params;
-        const plan = await mealPlanService.getPlanById(planId);
+/**
+ * DELETE /api/v1/mealplans/:planId
+ * Xóa mềm MealPlan (status -> "deleted").
+ */
+exports.deleteMealPlan = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { planId } = req.params;
 
-        if (!plan || plan.userId.toString() !== req.user._id.toString()) {
-            return res.status(404).json({ error: "Không tìm thấy MealPlan." });
-        }
-
-        return res.status(200).json({ data: plan });
-    } catch (error) {
-        console.error("Lỗi khi lấy chi tiết MealPlan:", error.message);
-        return res.status(500).json({ error: error.message || "Lỗi server nội bộ." });
-    }
-};
-
-const updatePlanStatus = async (req, res) => {
-    try {
-        const { planId } = req.params;
-        const { newStatus } = req.body;
-        const userId = req.user._id;
-
-        if (!newStatus) return res.status(400).json({ error: "newStatus là bắt buộc." });
-
-        const updatedPlan = await mealPlanService.updatePlanStatus(userId, planId, newStatus);
-        return res.status(200).json({
-            message: `Đã cập nhật trạng thái Plan thành ${newStatus}.`,
-            data: updatedPlan,
-        });
-    } catch (error) {
-        console.error("Lỗi khi cập nhật trạng thái Plan:", error.message);
-        if (error.message.includes("không hợp lệ") || error.message.includes("Không thể cập nhật")) {
-            return res.status(400).json({ error: error.message });
-        }
-        return res.status(500).json({ error: "Lỗi server nội bộ." });
-    }
-};
-
-const deleteMealPlan = async (req, res) => {
-    try {
-        const { planId } = req.params;
-        const userId = req.user._id;
-
-        await mealPlanService.deletePlan(userId, planId);
-        return res.status(200).json({ message: "MealPlan đã được xóa thành công." });
-    } catch (error) {
-        console.error("Lỗi khi xóa MealPlan:", error.message);
-        if (error.message.includes("Không thể xóa Plan đã được chọn")) {
-            return res.status(400).json({ error: error.message });
-        }
-        return res.status(500).json({ error: "Lỗi server nội bộ." });
-    }
-};
-
-module.exports = {
-    getMealPlanByStartDate,
-    createMealPlan,
-    getMealPlans,
-    getMealPlanDetail,
-    updatePlanStatus,
-    deleteMealPlan,
-    suggestWeekPlan,
-    getWeekStatus
+    const deleted = await mealPlanService.deletePlan(userId, planId);
+    return res.status(200).json({ success: true, data: deleted });
+  } catch (err) {
+    return res.status(400).json({ success: false, message: err.message });
+  }
 };
