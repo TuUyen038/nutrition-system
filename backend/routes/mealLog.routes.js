@@ -36,7 +36,7 @@ router.use(authenticate);
  * GET /api/meal-logs/history?days=7&page=1&limit=20
  * Lấy lịch sử ăn uống với pagination
  */
-router.get("/history", getMealHistoryController);
+router.get("/", getMealHistoryController);
 
 /**
  * GET /api/meal-logs/stats?days=7

@@ -617,6 +617,119 @@ const options = {
             },
           },
         },
+        SubstituteIngredient: {
+          type: "object",
+          properties: {
+            _id: {
+              type: "string",
+              format: "ObjectId",
+            },
+            name: {
+              type: "string",
+              example: "Thịt gà",
+              description: "Tên nguyên liệu thay thế",
+            },
+            description: {
+              type: "string",
+              example: "Có thể thay thế bằng thịt heo",
+              description: "Mô tả về sự thay thế",
+            },
+            nutritionDiff: {
+              type: "object",
+              description: "Chênh lệch dinh dưỡng so với nguyên liệu gốc",
+              properties: {
+                calories: { type: "number" },
+                protein: { type: "number" },
+                carbs: { type: "number" },
+                fat: { type: "number" },
+              },
+            },
+          },
+        },
+        NutritionInfo: {
+          type: "object",
+          properties: {
+            calories: { type: "number", example: 500 },
+            protein: { type: "number", example: 30 },
+            carbs: { type: "number", example: 50 },
+            fat: { type: "number", example: 20 },
+            fiber: { type: "number", example: 5 },
+            sugar: { type: "number", example: 10 },
+            sodium: { type: "number", example: 300 },
+          },
+        },
+        RecipeInput: {
+          type: "object",
+          required: ["name", "ingredients", "instructions"],
+          properties: {
+            name: {
+              type: "string",
+              example: "Cơm gà Hainanese",
+              description: "Tên công thức",
+            },
+            description: {
+              type: "string",
+              example: "Cơm gà kiểu Singapore",
+              description: "Mô tả công thức",
+            },
+            category: {
+              type: "string",
+              enum: ["main", "side", "dessert", "drink"],
+              example: "main",
+              description: "Loại món ăn",
+            },
+            instructions: {
+              type: "array",
+              items: { type: "string" },
+              example: ["Luộc gà", "Xào cơm", "Dựng lên đĩa"],
+              description: "Danh sách các bước nấu",
+            },
+            ingredients: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  ingredientId: {
+                    type: "string",
+                    format: "ObjectId",
+                    description: "ID nguyên liệu",
+                  },
+                  name: {
+                    type: "string",
+                    description: "Tên nguyên liệu",
+                  },
+                  quantity: {
+                    type: "object",
+                    properties: {
+                      amount: {
+                        type: "number",
+                        example: 200,
+                        description: "Số lượng",
+                      },
+                      unit: {
+                        type: "string",
+                        enum: ["g", "kg", "l", "ml", "cup", "tbsp", "tsp", "unit"],
+                        example: "g",
+                        description: "Đơn vị",
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            servings: {
+              type: "number",
+              example: 2,
+              description: "Số khẩu phần",
+            },
+            imageUrl: {
+              type: "string",
+              format: "uri",
+              example: "https://example.com/image.jpg",
+              description: "URL hình ảnh món ăn",
+            },
+          },
+        },
 
         // ==================== NUTRITION GOAL SCHEMAS ====================
         NutritionGoal: {
@@ -2181,9 +2294,9 @@ const options = {
       "/recipes": {
         get: {
           tags: ["Recipes"],
-          summary: "Lấy danh sách công thức nấu ăn",
+          summary: "Lấy danh sách tất cả các món ăn với đầy đủ thông tin",
           description:
-            "Trả về danh sách công thức với hỗ trợ search, filter, sort và pagination",
+            "Trả về danh sách công thức với hỗ trợ search, filter, sort và pagination (công khai)",
           parameters: [
             {
               in: "query",
@@ -2230,6 +2343,7 @@ const options = {
               description: "Danh sách công thức",
               content: {
                 "application/json": {
+                  schema: { $ref: "#/components/schemas/Recipe" },
                   schema: { $ref: "#/components/schemas/PaginationResponse" },
                 },
               },
@@ -2238,8 +2352,9 @@ const options = {
         },
         post: {
           tags: ["Recipes"],
-          summary: "Tạo công thức nấu ăn mới",
-          description: "Thêm công thức nấu ăn mới vào hệ thống",
+          summary: "Tạo công thức nấu ăn mới (Admin only)",
+          description: "Thêm công thức nấu ăn mới vào hệ thống (yêu cầu quyền Admin)",
+          security: [{ bearerAuth: [] }],
           requestBody: {
             required: true,
             content: {
@@ -2260,25 +2375,29 @@ const options = {
             400: {
               description: "Dữ liệu không hợp lệ",
             },
+            401: { description: "Chưa xác thực" },
+            403: { description: "Không có quyền Admin" },
           },
         },
       },
-      "/recipes/{id}": {
+
+      // ==================== RECIPE AUTHENTICATED ENDPOINTS ====================
         get: {
           tags: ["Recipes"],
-          summary: "Lấy chi tiết công thức",
+          summary: "Lấy thông tin một món ăn theo tên",
+          description: "Tìm kiếm công thức theo tên món ăn (công khai)",
           parameters: [
             {
               in: "path",
-              name: "id",
+              name: "foodName",
               required: true,
               schema: { type: "string" },
-              description: "Tên công thức",
+              description: "Tên món ăn",
             },
           ],
           responses: {
             200: {
-              description: "Chi tiết công thức",
+              description: "Chi tiết món ăn",
               content: {
                 "application/json": {
                   schema: { $ref: "#/components/schemas/Recipe" },
@@ -2292,13 +2411,16 @@ const options = {
         },
         put: {
           tags: ["Recipes"],
-          summary: "Cập nhật công thức",
+          summary: "Cập nhật món ăn (Admin only)",
+          description: "Cập nhật thông tin công thức (yêu cầu quyền Admin)",
+          security: [{ bearerAuth: [] }],
           parameters: [
             {
               in: "path",
               name: "id",
               required: true,
               schema: { type: "string", format: "ObjectId" },
+              description: "ID của công thức",
             },
           ],
           requestBody: {
@@ -2318,6 +2440,8 @@ const options = {
                 },
               },
             },
+            401: { description: "Chưa xác thực" },
+            403: { description: "Không có quyền Admin" },
             404: {
               description: "Công thức không tồn tại",
             },
@@ -2325,19 +2449,24 @@ const options = {
         },
         delete: {
           tags: ["Recipes"],
-          summary: "Xóa công thức",
+          summary: "Xóa công thức (Admin only)",
+          description: "Xóa một công thức (yêu cầu quyền Admin)",
+          security: [{ bearerAuth: [] }],
           parameters: [
             {
               in: "path",
               name: "id",
               required: true,
               schema: { type: "string", format: "ObjectId" },
+              description: "ID của công thức",
             },
           ],
           responses: {
             200: {
               description: "Công thức đã được xóa",
             },
+            401: { description: "Chưa xác thực" },
+            403: { description: "Không có quyền Admin" },
             404: {
               description: "Công thức không tồn tại",
             },
@@ -2457,6 +2586,340 @@ const options = {
                 },
               },
             },
+          },
+        },
+      },
+
+      // ==================== RECIPE AUTHENTICATED ENDPOINTS ====================
+      "/recipes/id/{id}": {
+        get: {
+          tags: ["Recipes"],
+          summary: "Lấy thông tin một món ăn theo ID",
+          description: "Trả về thông tin chi tiết của một món ăn dựa trên ID (cần đăng nhập)",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              in: "path",
+              name: "id",
+              required: true,
+              schema: { type: "string", format: "ObjectId" },
+              description: "ID của món ăn",
+            },
+          ],
+          responses: {
+            200: {
+              description: "Chi tiết món ăn",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Recipe" },
+                },
+              },
+            },
+            401: { description: "Chưa xác thực" },
+            404: { description: "Công thức không tồn tại" },
+          },
+        },
+      },
+
+      "/recipes/rcm/{foodName}": {
+        get: {
+          tags: ["Recipes"],
+          summary: "Tìm nguyên liệu và hướng dẫn bằng AI",
+          description: "Sử dụng AI để tìm nguyên liệu thay thế và hướng dẫn chi tiết cho một món ăn (cần đăng nhập)",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              in: "path",
+              name: "foodName",
+              required: true,
+              schema: { type: "string" },
+              description: "Tên món ăn",
+            },
+          ],
+          responses: {
+            200: {
+              description: "Thông tin nguyên liệu và hướng dẫn",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      ingredients: { type: "array", items: { type: "string" } },
+                      instructions: { type: "array", items: { type: "string" } },
+                    },
+                  },
+                },
+              },
+            },
+            401: { description: "Chưa xác thực" },
+          },
+        },
+      },
+
+      "/recipes/substitutions": {
+        post: {
+          tags: ["Recipes"],
+          summary: "Tìm nguyên liệu thay thế",
+          description: "Tìm các nguyên liệu thay thế cho một nguyên liệu cụ thể (cần đăng nhập)",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["ingredientName"],
+                  properties: {
+                    ingredientName: {
+                      type: "string",
+                      description: "Tên nguyên liệu cần tìm thay thế",
+                      example: "thịt bò",
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            200: {
+              description: "Danh sách nguyên liệu thay thế",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "array",
+                    items: { $ref: "#/components/schemas/SubstituteIngredient" },
+                  },
+                },
+              },
+            },
+            401: { description: "Chưa xác thực" },
+          },
+        },
+      },
+
+      "/recipes/ingredients": {
+        post: {
+          tags: ["Recipes"],
+          summary: "Tìm nguyên liệu bằng AI",
+          description: "Sử dụng AI để phân tích và tìm thông tin nguyên liệu (cần đăng nhập)",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["prompt"],
+                  properties: {
+                    prompt: {
+                      type: "string",
+                      description: "Câu hỏi về nguyên liệu",
+                      example: "Thịt gà có những loại dinh dưỡng gì?",
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            200: {
+              description: "Thông tin nguyên liệu",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      result: { type: "string" },
+                    },
+                  },
+                },
+              },
+            },
+            401: { description: "Chưa xác thực" },
+          },
+        },
+      },
+
+      "/recipes/detect": {
+        post: {
+          tags: ["Recipes"],
+          summary: "Nhận diện món ăn từ hình ảnh",
+          description: "Sử dụng AI để nhận diện món ăn từ hình ảnh (cần đăng nhập)",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "multipart/form-data": {
+                schema: {
+                  type: "object",
+                  required: ["foodImage"],
+                  properties: {
+                    foodImage: {
+                      type: "string",
+                      format: "binary",
+                      description: "Hình ảnh món ăn",
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            200: {
+              description: "Thông tin món ăn nhận diện được",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      foodName: { type: "string" },
+                      ingredients: { type: "array", items: { type: "string" } },
+                    },
+                  },
+                },
+              },
+            },
+            401: { description: "Chưa xác thực" },
+          },
+        },
+      },
+
+      "/recipes/back-up-nutrition": {
+        post: {
+          tags: ["Recipes"],
+          summary: "Lấy thông tin dinh dưỡng dự phòng",
+          description: "Lấy thông tin dinh dưỡng từ nguồn dự phòng (cần đăng nhập)",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["recipeName"],
+                  properties: {
+                    recipeName: {
+                      type: "string",
+                      description: "Tên công thức",
+                      example: "Cơm gà",
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            200: {
+              description: "Thông tin dinh dưỡng",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/NutritionInfo" },
+                },
+              },
+            },
+            401: { description: "Chưa xác thực" },
+          },
+        },
+      },
+
+      // ==================== RECIPE ADMIN ENDPOINTS ====================
+      "/recipes": {
+        post: {
+          tags: ["Recipes"],
+          summary: "Tạo mới công thức (Admin only)",
+          description: "Tạo một công thức mới (yêu cầu quyền Admin)",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/RecipeInput" },
+              },
+            },
+          },
+          responses: {
+            201: {
+              description: "Công thức được tạo",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Recipe" },
+                },
+              },
+            },
+            401: { description: "Chưa xác thực" },
+            403: { description: "Không có quyền Admin" },
+          },
+        },
+      },
+
+      "/recipes/{id}": {
+        put: {
+          tags: ["Recipes"],
+          summary: "Cập nhật công thức (Admin only)",
+          description: "Cập nhật thông tin công thức (yêu cầu quyền Admin)",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              in: "path",
+              name: "id",
+              required: true,
+              schema: { type: "string", format: "ObjectId" },
+              description: "ID của công thức",
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/RecipeInput" },
+              },
+            },
+          },
+          responses: {
+            200: {
+              description: "Công thức được cập nhật",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Recipe" },
+                },
+              },
+            },
+            401: { description: "Chưa xác thực" },
+            403: { description: "Không có quyền Admin" },
+            404: { description: "Công thức không tồn tại" },
+          },
+        },
+        delete: {
+          tags: ["Recipes"],
+          summary: "Xóa công thức (Admin only)",
+          description: "Xóa một công thức (yêu cầu quyền Admin)",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              in: "path",
+              name: "id",
+              required: true,
+              schema: { type: "string", format: "ObjectId" },
+              description: "ID của công thức",
+            },
+          ],
+          responses: {
+            200: {
+              description: "Xóa thành công",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      message: { type: "string" },
+                    },
+                  },
+                },
+              },
+            },
+            401: { description: "Chưa xác thực" },
+            403: { description: "Không có quyền Admin" },
+            404: { description: "Công thức không tồn tại" },
           },
         },
       },
@@ -3506,7 +3969,6 @@ manual    → selected → completed
         },
       },
     },
-  },
   apis: [],
 };
 

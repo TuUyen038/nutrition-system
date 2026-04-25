@@ -239,6 +239,7 @@ const searchByImage = async (req, res, next) => {
   }
 };
 const getRecipeById = async (req, res) => {
+  const userId = req.user?._id; // Có thể undefined nếu route không yêu cầu auth
   const { id } = req.params;
 
   if (!mongoose.Types.ObjectId.isValid(id)) {

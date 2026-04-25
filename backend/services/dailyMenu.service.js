@@ -366,10 +366,10 @@ exports.updateRecipeInMenu = async ({
   newScale,
   checked,
 }) => {
+
   // 1. Tìm menu
   const dailyMenu = await DailyMenu.findOne({ _id: dailyMenuId, userId });
   if (!dailyMenu) throw new Error("Không tìm thấy thực đơn ngày này!");
-
   // 2. Tìm món ăn trong mảng bằng recipeItemId
   const recipeIndex = dailyMenu.recipes.findIndex(
     (item) => item._id.toString() === recipeItemId.toString(),

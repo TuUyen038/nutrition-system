@@ -209,7 +209,7 @@ async function getMealHistory(userId, options = {}) {
         .populate({
           path: "recipe.recipeId",
           model: "Recipe",
-          select: "name category imageUrl",
+          select: "name imageUrl description scale nutrition",
         })
         .lean(),
       MealLog.countDocuments({

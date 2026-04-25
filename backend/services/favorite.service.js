@@ -39,7 +39,7 @@ exports.addFavorite = async (userId, recipeId) => {
   user.favoriteRecipes.push(recipeId);
   await user.save();
 
-  return user;
+  return user.favoriteRecipes;
 };
 
 // Xóa món ăn khỏi danh sách yêu thích
