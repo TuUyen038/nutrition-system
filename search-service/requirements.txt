@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+pymongo
+sentence-transformers
+faiss-cpu
+joblib
+python-dotenv
+numpy
+
+# python3 -m pip install -r requirements.txt
