@@ -767,7 +767,6 @@ function AnalyzeRecipe() {
       return;
     }
 
-    console.log("db ne: ", db);
     setIsClick(true);
     let totalNutrition = {
       calories: 0,
