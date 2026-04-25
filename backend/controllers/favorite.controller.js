@@ -9,10 +9,11 @@ exports.addFavorite = async (req, res) => {
     const userId = req.user._id.toString();
     const { recipeId } = req.params;
 
-    await favoriteService.addFavorite(userId, recipeId);
+    const result = await favoriteService.addFavorite(userId, recipeId);
 
     res.json({
       success: true,
+      data: result,
       message: "Đã thêm vào danh sách yêu thích",
     });
   } catch (error) {
