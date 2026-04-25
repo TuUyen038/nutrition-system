@@ -44,8 +44,7 @@ const searchByIngredientName = async (req, res) => {
 const getAllRecipe = async (req, res) => {
   try {
     const {
-      search,
-      category,
+      name,
       page = 1,
       limit = 20,
       sortBy = "createdAt",
@@ -53,11 +52,11 @@ const getAllRecipe = async (req, res) => {
     } = req.query;
 
     const query = {};
-
-    if (search && search.trim()) {
+    console.log("Query params:", req.query); // Log query params for debugging
+    if (name && name.trim()) {
       query.$or = [
-        { name: { $regex: search.trim(), $options: "i" } },
-        { description: { $regex: search.trim(), $options: "i" } },
+        { name: { $regex: name.trim(), $options: "i" } },
+        { description: { $regex: name.trim(), $options: "i" } },
       ];
     }
 

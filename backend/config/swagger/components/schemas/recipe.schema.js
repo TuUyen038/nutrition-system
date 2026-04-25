@@ -1,236 +1,214 @@
 module.exports = {
   Recipe: {
     type: "object",
+    required: [
+      "_id",
+      "name",
+      "category",
+      "servings",
+      "totalNutritionPerServing",
+      "createdAt",
+      "updatedAt",
+    ],
     properties: {
       _id: {
         type: "string",
-        format: "ObjectId",
+        example: "69c8300f76b416232d5078cd",
       },
+
       name: {
         type: "string",
-        example: "Cơm gà Hainanese",
-        description: "Tên công thức",
+        example: "Phở bò tái lăn",
       },
+
       description: {
         type: "string",
-        example: "Cơm gà kiểu Singapore...",
+        nullable: true,
       },
+
       category: {
         type: "string",
-        enum: ["main", "side", "dessert", "drink"],
-        example: "main",
+        enum: ["one_dish_meal", "main_dish", "side_dish", "dessert", "drink"],
+        example: "one_dish_meal",
       },
-      instructions: {
-        type: "array",
-        items: { type: "string" },
-        example: ["Luộc gà", "Xào cơm", "Dựng lên đĩa"],
-        description: "Danh sách các bước nấu",
+
+      source: {
+        type: "string",
+        enum: ["viendinhduong", "AI_GENERATED", "USER_CREATED", "SYSTEM"],
+        example: "viendinhduong",
       },
+
+      sourceMetadata: {
+        type: "object",
+        nullable: true,
+        properties: {
+          code: { type: "string", example: "VPF-000274" },
+          id: { type: "string", example: "6948c3968d1550cdae0bdcd5" },
+        },
+      },
+
+      version: {
+        type: "number",
+        example: 2,
+      },
+
+      servings: {
+        type: "number",
+        example: 1,
+      },
+
+      totalWeight: {
+        type: "number",
+        nullable: true,
+      },
+
+      imageUrl: {
+        type: "string",
+        example: "https://viendinhduong.vn/.../image.webp",
+      },
+
+      /* ======================
+         INGREDIENTS & STEPS
+      ====================== */
+
       ingredients: {
         type: "array",
         items: {
           type: "object",
           properties: {
-            ingredientId: {
-              type: "string",
-              format: "ObjectId",
-            },
             name: { type: "string" },
-            quantity: {
-              type: "object",
-              properties: {
-                amount: { type: "number" },
-                unit: {
-                  type: "string",
-                  enum: ["g", "kg", "l", "ml", "cup", "tbsp", "tsp", "unit"],
-                },
-              },
-            },
+            quantity: { type: "string" },
           },
         },
       },
-      servings: {
-        type: "number",
-        example: 2,
-        description: "Số khẩu phần",
+
+      instructions: {
+        type: "array",
+        items: {
+          type: "string",
+        },
       },
-      totalNutrition: {
+
+      /* ======================
+         NUTRITION
+      ====================== */
+
+      totalNutritionPerServing: {
         $ref: "#/components/schemas/Nutrition",
       },
-      imageUrl: {
-        type: "string",
-        format: "uri",
+
+      nutritionVector: {
+        type: "array",
+        description: "Vector dùng cho search/AI embedding",
+        items: {
+          type: "number",
+        },
+        example: [0.93, 2.736, 0.7754, 0.8273, 0.072],
       },
-      createdBy: {
-        type: "string",
-        enum: ["admin", "user", "ai"],
+
+      /* ======================
+         TAGS & FLAGS
+      ====================== */
+
+      allergy_tags: {
+        type: "array",
+        items: {
+          type: "string",
+        },
+        example: ["beef"],
       },
+
       verified: {
         type: "boolean",
+        example: true,
       },
+
+      deleted: {
+        type: "boolean",
+        example: false,
+      },
+
+      /* ======================
+         SYSTEM
+      ====================== */
+
+      createdBy: {
+        type: "string",
+        example: "admin",
+      },
+
       createdAt: {
+        type: "string",
+        format: "date-time",
+      },
+
+      updatedAt: {
         type: "string",
         format: "date-time",
       },
     },
   },
+
+
+  RecipeListResponse: {
+    type: "object",
+    properties: {
+      recipes: {
+        type: "array",
+        items: {
+          $ref: "#/components/schemas/Recipe",
+        },
+      },
+      pagination: {
+        $ref: "#/components/schemas/PaginationResponse/properties/pagination",
+      },
+    },
+  },
+
+  RecipeDetailResponse: {
+    type: "object",
+    properties: {
+      recipe: {
+        $ref: "#/components/schemas/Recipe",
+      },
+    },
+  },
+
   CreateRecipeRequest: {
     type: "object",
     required: ["name", "ingredients", "instructions"],
     properties: {
       name: { type: "string" },
       description: { type: "string" },
-      category: {
-        type: "string",
-        enum: ["main", "side", "dessert", "drink"],
-      },
-      instructions: { type: "array", items: { type: "string" } },
+      imageUrl: { type: "string" },
+      cookingTime: { type: "number" },
+      servings: { type: "number" },
       ingredients: {
         type: "array",
         items: {
           type: "object",
           properties: {
-            ingredientId: { type: "string" },
             name: { type: "string" },
-            quantity: {
-              type: "object",
-              properties: {
-                amount: { type: "number" },
-                unit: { type: "string" },
-              },
-            },
+            quantity: { type: "string" },
           },
         },
-      },
-      servings: { type: "number" },
-    },
-  },
-  RecipeStats: {
-    type: "object",
-    properties: {
-      totalRecipes: { type: "number" },
-      byCategory: {
-        type: "object",
-        properties: {
-          main: { type: "number" },
-          side: { type: "number" },
-          dessert: { type: "number" },
-          drink: { type: "number" },
-        },
-      },
-    },
-  },
-  SubstituteIngredient: {
-    type: "object",
-    properties: {
-      _id: {
-        type: "string",
-        format: "ObjectId",
-      },
-      name: {
-        type: "string",
-        example: "Thịt gà",
-        description: "Tên nguyên liệu thay thế",
-      },
-      description: {
-        type: "string",
-        example: "Có thể thay thế bằng thịt heo",
-        description: "Mô tả về sự thay thế",
-      },
-      nutritionDiff: {
-        type: "object",
-        description: "Chênh lệch dinh dưỡng so với nguyên liệu gốc",
-        properties: {
-          calories: { type: "number" },
-          protein: { type: "number" },
-          carbs: { type: "number" },
-          fat: { type: "number" },
-        },
-      },
-    },
-  },
-  NutritionInfo: {
-    type: "object",
-    properties: {
-      calories: { type: "number", example: 500 },
-      protein: { type: "number", example: 30 },
-      carbs: { type: "number", example: 50 },
-      fat: { type: "number", example: 20 },
-      fiber: { type: "number", example: 5 },
-      sugar: { type: "number", example: 10 },
-      sodium: { type: "number", example: 300 },
-    },
-  },
-  RecipeInput: {
-    type: "object",
-    required: ["name", "ingredients", "instructions"],
-    properties: {
-      name: {
-        type: "string",
-        example: "Cơm gà Hainanese",
-        description: "Tên công thức",
-      },
-      description: {
-        type: "string",
-        example: "Cơm gà kiểu Singapore",
-        description: "Mô tả công thức",
-      },
-      category: {
-        type: "string",
-        enum: ["main", "side", "dessert", "drink"],
-        example: "main",
-        description: "Loại món ăn",
       },
       instructions: {
         type: "array",
         items: { type: "string" },
-        example: ["Luộc gà", "Xào cơm", "Dựng lên đĩa"],
-        description: "Danh sách các bước nấu",
       },
-      ingredients: {
+      tags: {
         type: "array",
-        items: {
-          type: "object",
-          properties: {
-            ingredientId: {
-              type: "string",
-              format: "ObjectId",
-              description: "ID nguyên liệu",
-            },
-            name: {
-              type: "string",
-              description: "Tên nguyên liệu",
-            },
-            quantity: {
-              type: "object",
-              properties: {
-                amount: {
-                  type: "number",
-                  example: 200,
-                  description: "Số lượng",
-                },
-                unit: {
-                  type: "string",
-                  enum: ["g", "kg", "l", "ml", "cup", "tbsp", "tsp", "unit"],
-                  example: "g",
-                  description: "Đơn vị",
-                },
-              },
-            },
-          },
-        },
-      },
-      servings: {
-        type: "number",
-        example: 2,
-        description: "Số khẩu phần",
-      },
-      imageUrl: {
-        type: "string",
-        format: "uri",
-        example: "https://example.com/image.jpg",
-        description: "URL hình ảnh món ăn",
+        items: { type: "string" },
       },
     },
+  },
+
+  UpdateRecipeRequest: {
+    allOf: [
+      {
+        $ref: "#/components/schemas/CreateRecipeRequest",
+      },
+    ],
   },
 };

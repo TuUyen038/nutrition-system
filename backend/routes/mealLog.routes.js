@@ -1,17 +1,3 @@
-/**
- * mealLog.routes.js
- *
- * Routes cho MealLog API.
- * Base path: /api/meal-logs
- *
- * API endpoints:
- * - GET  /api/meal-logs/history       → getMealHistory (pagination)
- * - GET  /api/meal-logs/stats         → getMealStats (thống kê)
- * - GET  /api/meal-logs/day/:date     → getDayMeals (meals của ngày)
- * - DELETE /api/meal-logs/:recipeName/:date → deleteMealLog
- * - DELETE /api/meal-logs/date/:date  → deleteMealLogsByDate
- */
-
 const express = require("express");
 const router = express.Router();
 const { authenticate } = require('../middlewares/auth');
