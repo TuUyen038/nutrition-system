@@ -20,6 +20,9 @@ const recipeItemSchema = new mongoose.Schema(
         "egg",
         "tofu",
         "other",
+        "pho",
+        "bun",
+        "mi",
         "none",
       ],
       default: "none",
@@ -35,7 +38,6 @@ const recipeItemSchema = new mongoose.Schema(
       sodium: { type: Number, default: 0 },
     },
   },
-  { _id: false },
 );
 
 module.exports = recipeItemSchema;

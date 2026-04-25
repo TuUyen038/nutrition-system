@@ -27,10 +27,6 @@ router.patch('/:planId/status', mealPlanController.updatePlanStatus);
 router.delete('/:planId', mealPlanController.deleteMealPlan);
 
 // gợi ý tuần
-router.post("/suggest", mealPlanController.suggestWeekPlan);
-
-router.post("/recommendations/week", rcmController.recommendWeek);
-
+router.post("/recommendations/week", mealPlanController.recommendWeek);
 
 module.exports = router;
-//authMiddleware,
