@@ -3,7 +3,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Dict
+from typing import List, Dict, Any
 import os
 import numpy as np
 from pymongo import MongoClient
@@ -16,13 +16,11 @@ load_dotenv()
 MONGO_URI = os.getenv("MONGO_URI")
 MONGO_DB = os.getenv("MONGO_DB", "smart_nutrition")
 MONGO_COLL = os.getenv("MONGO_COLL", "ingredients")
-
 TOP_K = int(os.getenv("TOP_K", "5"))
 
-DERIVED_PREFIXES = [
-    "nước", "siro", "mứt", "bánh", "kẹo", "sữa", "bột"
-]
+DERIVED_PREFIXES = ["nước", "siro", "mứt", "bánh", "kẹo", "sữa", "bột"]
 
+# ================== UTILS ==================
 def normalize_text(s: str):
     return s.strip().lower()
 
@@ -30,27 +28,91 @@ def is_exact_match(query, name):
     return normalize_text(query) == normalize_text(name)
 
 def is_derived_food(name: str):
-    name = normalize_text(name)
-    return any(name.startswith(p) for p in DERIVED_PREFIXES)
+    return any(normalize_text(name).startswith(p) for p in DERIVED_PREFIXES)
 
-# ================== LOAD DATA FROM MONGODB ==================
+# ================== SCHEMAS ==================
+class Nutrition(BaseModel):
+    calories: float | int | None = None
+    protein: float | int | None = None
+    fat: float | int | None = None
+    carbs: float | int | None = None
+    fiber: float | int | None = None
+    sugar: float | int | None = None
+    sodium: float | int | None = None
+
+class IngredientResult(BaseModel):
+    id: str
+    mongo_id: str
+    name: str
+    name_vi: str
+    name_en: str
+    category: str
+    unit: str
+    nutrition: Dict[str, Any]
+
+    score: float
+    final_score: float
+
+    matched_variant: str
+    matched_source: str
+
+    exact_alias_match: bool
+    exact_match: bool
+    is_derived: bool
+
+class BatchItemResponse(BaseModel):
+    input: str
+    results: List[IngredientResult]
+
+class BatchResponse(BaseModel):
+    results: List[BatchItemResponse]
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "results": [
+                    {
+                        "input": "thịt bò",
+                        "results": [
+                            {
+                                "id": "abc123",
+                                "mongo_id": "abc123",
+                                "name": "thịt bò",
+                                "name_vi": "thịt bò",
+                                "name_en": "Beef",
+                                "category": "other",
+                                "unit": "g",
+                                "nutrition": {"calories": 182},
+                                "score": 0.92,
+                                "final_score": 0.92,
+                                "matched_variant": "thịt bò",
+                                "matched_source": "alias",
+                                "exact_alias_match": True,
+                                "exact_match": False,
+                                "is_derived": False
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+
+class QueryItem(BaseModel):
+    name: str
+
+class BatchQueryRequest(BaseModel):
+    ingredients: List[QueryItem]
+    top_k: int = TOP_K
+
+# ================== LOAD DATA ==================
 def load_ingredients_from_mongo():
-    """Load ingredients from MongoDB."""
-    if not MONGO_URI:
-        raise ValueError("MONGO_URI environment variable is required")
-    
-    try:
-        client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
-        client.admin.command('ping')
-        print("✅ Connected to MongoDB")
-    except Exception as e:
-        print(f"❌ Failed to connect to MongoDB: {e}")
-        raise
-    
+    client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
+    client.admin.command('ping')
+    print("✅ Connected to MongoDB")
+
     coll = client[MONGO_DB][MONGO_COLL]
     docs = list(coll.find({}))
-    
-    # Create lookup map: mongo_id -> full ingredient data
+
     ingredients_map = {}
     for doc in docs:
         mongo_id = str(doc['_id'])
@@ -63,179 +125,110 @@ def load_ingredients_from_mongo():
             'nutrition': doc.get('nutrition', {}),
             'aliases': doc.get('aliases', [])
         }
-    
-    print(f"📊 Loaded {len(ingredients_map)} ingredients from MongoDB")
+
+    print(f"📊 Loaded {len(ingredients_map)} ingredients")
     return ingredients_map, client
 
-
 # ================== SEARCH ==================
-def search_ingredients(
-    query: str,
-    mapper: IngredientMapper,
-    ingredients_map: Dict,
-    top_k: int = TOP_K
-) -> List[Dict]:
-    """Search ingredients using IngredientMapper."""
-    if not query or not query.strip():
-        return []
-    
-    try:
-        # Use IngredientMapper to search (đã có logic exact alias match)
-        mapper_results = mapper._search_once(query.strip(), top_k=top_k)
-        
-        # Map với MongoDB data để lấy nutrition
-        results = []
-        for mapper_result in mapper_results:
-            mongo_id = mapper_result.get("id")
-            if not mongo_id:
-                continue
-            
-            # Get full ingredient data from MongoDB
-            ing_data = ingredients_map.get(mongo_id)
-            if not ing_data:
-                continue
-            
-            # Format nutrition data
-            nutrition = ing_data.get("nutrition", {})
-            nutrition_clean = {}
-            for key, value in nutrition.items():
-                if isinstance(value, (np.integer, np.int64)):
-                    nutrition_clean[key] = int(value)
-                elif isinstance(value, (np.floating, np.float64)):
-                    nutrition_clean[key] = float(value)
-                else:
-                    nutrition_clean[key] = value
-            
-            exact_alias_match = mapper_result.get('exact_alias_match', False)
-            score = mapper_result.get('score', 0.0)
-            
-            name = ing_data.get('name', '')
+def search_ingredients(query, mapper, ingredients_map, top_k):
+    mapper_results = mapper._search_once(query.strip(), top_k=top_k)
 
-            exact_match = is_exact_match(query, name)
-            derived = is_derived_food(name)
+    results = []
+    for m in mapper_results:
+        mongo_id = m.get("id")
+        ing = ingredients_map.get(mongo_id)
+        if not ing:
+            continue
 
-            penalty = 0.1 if derived else 0
-            final_score = score - penalty
+        nutrition_clean = {
+            k: float(v) if isinstance(v, (np.floating, np.float64)) else int(v) if isinstance(v, (np.integer, np.int64)) else v
+            for k, v in ing.get("nutrition", {}).items()
+        }
 
-            results.append({
-                'id': mongo_id,
-                'mongo_id': mongo_id,
-                'name': name,
-                'name_vi': name,
-                'name_en': ing_data.get('name_en', ''),
-                'category': ing_data.get('category', 'other'),
-                'unit': ing_data.get('unit', 'g'),
-                'nutrition': nutrition_clean,
+        score = m.get("score", 0.0)
+        name = ing["name"]
 
-                'score': score,
-                'final_score': final_score,
+        derived = is_derived_food(name)
+        final_score = score - (0.1 if derived else 0)
 
-                'matched_variant': mapper_result.get('matched_variant', ''),
-                'matched_source': mapper_result.get('matched_source', ''),
+        results.append({
+            "id": mongo_id,
+            "mongo_id": mongo_id,
+            "name": name,
+            "name_vi": name,
+            "name_en": ing.get("name_en", ""),
+            "category": ing.get("category", "other"),
+            "unit": ing.get("unit", "g"),
+            "nutrition": nutrition_clean,
+            "score": score,
+            "final_score": final_score,
+            "matched_variant": m.get("matched_variant", ""),
+            "matched_source": m.get("matched_source", ""),
+            "exact_alias_match": m.get("exact_alias_match", False),
+            "exact_match": is_exact_match(query, name),
+            "is_derived": derived
+        })
 
-                'exact_alias_match': exact_alias_match,
-                'exact_match': exact_match,
-                'is_derived': derived
-            })
-        
-        # Sort: exact_alias_match trước, rồi mới đến score
-        results.sort(
-            key=lambda x: (
-                not x.get('exact_alias_match', False),  # ưu tiên alias
-                not x.get('exact_match', False),        # rồi đến exact name
-                x.get('is_derived', False),             # phạt đồ chế biến
-                -x.get('final_score', 0.0)              # cuối cùng mới dùng embedding
-            )
-        )
-        
-        return results
-        
-    except Exception as e:
-        print(f"❌ Search error: {e}")
-        return []
+    results.sort(key=lambda x: (
+        not x["exact_alias_match"],
+        not x["exact_match"],
+        x["is_derived"],
+        -x["final_score"]
+    ))
 
-# ================== FASTAPI ==================
-app = FastAPI(title="Ingredient Batch Search API with Nutrition")
+    return results
 
-origins = [
-    "http://localhost:3000",
-    "http://localhost:3001",
-    "http://localhost:5173",
-    "http://localhost"
-]
+# ================== APP ==================
+app = FastAPI(
+    title="AI Ingredient Search API",
+    description="FAISS + Embedding + Nutrition mapping",
+    version="1.0.0"
+)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-class QueryItem(BaseModel):
-    name: str
-
-class BatchQueryRequest(BaseModel):
-    ingredients: List[QueryItem]
-    top_k: int = TOP_K
-
-# ================== GLOBAL STATE ==================
 mapper = None
 ingredients_map = None
 mongo_client = None
 
 # ================== STARTUP ==================
 @app.on_event("startup")
-def startup_event():
+def startup():
     global mapper, ingredients_map, mongo_client
-    
+
     print("🚀 Starting server...")
-    
-    # Load IngredientMapper (sử dụng index đã build từ build_index.py)
-    print("📥 Loading IngredientMapper...")
-    mapper = IngredientMapper()
-    print("✅ IngredientMapper loaded")
-    
-    # Load ingredients from MongoDB
+
+    mapper = IngredientMapper()  # chỉ load index, không build
     ingredients_map, mongo_client = load_ingredients_from_mongo()
-    
+
     print("✅ Server ready!")
+    print("👉 http://localhost:8000/docs")
 
-# ================== SHUTDOWN ==================
-@app.on_event("shutdown")
-def shutdown_event():
-    """Cleanup on shutdown."""
-    global mongo_client
-    if mongo_client:
-        mongo_client.close()
-        print("🔒 MongoDB connection closed")
-
-# ================== ENDPOINTS ==================
-@app.post("/search_batch")
+# ================== ENDPOINT ==================
+@app.post("/search_batch", response_model=BatchResponse)
 def search_batch(req: BatchQueryRequest):
-    global mapper, ingredients_map
-    
-    if not mapper:
-        return {"error": "IngredientMapper not loaded. Please check server status."}
-    
-    if not ingredients_map:
-        return {"error": "Ingredients data not loaded. Please check server status."}
-    
     output = []
+
     for item in req.ingredients:
         res = search_ingredients(
-            query=item.name,
-            mapper=mapper,
-            ingredients_map=ingredients_map,
-            top_k=req.top_k
+            item.name,
+            mapper,
+            ingredients_map,
+            req.top_k
         )
         output.append({
-            'input': item.name,
-            'results': res
+            "input": item.name,
+            "results": res
         })
-    return {'results': output}
+
+    return {"results": output}
 
 @app.get("/")
 def root():
-    return {"message": "Ingredient Batch Search API with Nutrition is running"}
-
+    return {"message": "API is running"}
