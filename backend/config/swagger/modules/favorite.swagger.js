@@ -88,7 +88,8 @@ module.exports = {
               schema: {
                 type: "object",
                 properties: {
-                  isFavorite: { type: "boolean" },
+                  "success": { type: "boolean" },
+                  "isFavorite": { type: "boolean" },
                 },
               },
             },

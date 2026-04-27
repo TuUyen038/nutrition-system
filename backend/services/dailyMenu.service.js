@@ -276,7 +276,7 @@ exports.updateDailyMenuStatus = async ({ userId, dailyMenuId, newStatus }) => {
   const dailyMenu = await DailyMenu.findOne({ _id: dailyMenuId, userId });
   if (!dailyMenu) throw new Error("Không tìm thấy thực đơn ngày này!");
 
-  if (dailyMenu.status === "completed" || dailyMenu.status === "deleted") {
+  if (dailyMenu.status === "deleted") {
     throw new Error(
       `Không thể cập nhật DailyMenu đang ở trạng thái "${dailyMenu.status}".`,
     );
@@ -328,7 +328,6 @@ exports.addRecipeToMenu = async ({
   const recipeData = await Recipe.findById(recipeId)
     .select("name imageUrl description totalNutritionPerServing mealSources")
     .lean();
-  console.log("Recipe data:", recipeData);
   if (!recipeData) throw new Error("Món ăn không tồn tại!");
 
   // 3. CẬP NHẬT TOTAL NUTRITION CỦA DAILY MENU (Cộng dồn vào tổng hiện tại)
