@@ -47,6 +47,14 @@ module.exports = {
         type: "array",
         items: { type: "string" },
       },
+      favoriteRecipes: {
+        type: "array",
+        items: { type: "string", format: "ObjectId" },
+        description: "Danh sách ID công thức yêu thích",
+      },
+      resetPasswordOTPVerified: {
+        type: "boolean",
+      },
       isEmailVerified: {
         type: "boolean",
       },

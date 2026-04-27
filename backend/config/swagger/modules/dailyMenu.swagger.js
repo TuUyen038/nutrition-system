@@ -3,7 +3,7 @@ module.exports = {
     post: {
       tags: ["Daily Menu"],
       summary: "Thêm công thức vào thực đơn hàng ngày",
-      description: "Thêm một công thức vào thực đơn hàng ngày của người dùng",
+      description: "Thêm một công thức vào thực đơn hàng ngày của người dùng. Nếu chưa có dailymenu của ngày đó thì tự động tạo dailymenu rồi add món ăn vào, sau đó tự cập nhật nutrition mới.",
       security: [{ bearerAuth: [] }],
       requestBody: {
         required: true,
@@ -43,9 +43,9 @@ module.exports = {
   "/daily-menu/update-status": {
     patch: {
       tags: ["Daily Menu"],
-      summary: "Cập nhật trạng thái thực đơn",
+      summary: "Cập nhật trạng thái dailymenu",
       description:
-        "Cập nhật trạng thái của thực đơn hàng ngày (manual, suggested, selected, completed, deleted, expired)",
+        "Cập nhật trạng thái của thực đơn hàng ngày (manual, suggested, selected, completed, deleted, expired). KHÔNG thể cập nhật các dailymenu đang có trạng thái là deleted",
       security: [{ bearerAuth: [] }],
       requestBody: {
         required: true,
@@ -87,7 +87,7 @@ module.exports = {
       tags: ["Daily Menu"],
       summary: "Cập nhật món ăn trong thực đơn",
       description:
-        "Cập nhật thông tin món ăn (số khẩu phần, trạng thái checked) trong thực đơn hàng ngày",
+        "Cập nhật thông tin món ăn (scale: tỉ lệ so với khẩu phần 1 người chuẩn, trạng thái checked) trong thực đơn hàng ngày",
       security: [{ bearerAuth: [] }],
       requestBody: {
         required: true,
@@ -262,9 +262,9 @@ module.exports = {
   "/daily-menu/by-range": {
     get: {
       tags: ["Daily Menu"],
-      summary: "Lấy danh sách thực đơn (chỉ lấy các thực đơn có status là \"manual\" hoặc \"selected\") theo khoảng ngày",
+      summary: "Lấy danh sách thực đơn theo khoảng ngày",
       description:
-        "Lấy danh sách thực đơn của người dùng trong một khoảng thời gian",
+        "Lấy danh sách thực đơn của người dùng trong khoảng ngày (chỉ lấy các dailymenu có status là \"manual\" hoặc \"selected\") ",
       security: [{ bearerAuth: [] }],
       parameters: [
         {
