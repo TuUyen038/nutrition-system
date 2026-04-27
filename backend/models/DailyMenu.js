@@ -1,54 +1,67 @@
 const mongoose = require("mongoose");
+const recipeItemSchema = require("./subSchemas/RecipeItem");
 
-const dailyMenuSchema = new mongoose.Schema({
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: false },
-  date: { type: String, required: true },
-
-  recipes: [
-    {
-      recipeId: { type: mongoose.Schema.Types.ObjectId, ref: "Recipe" },
-      portion: Number,
-      note: String,
-      servingTime: {
-        type: String,
-        enum: ["breakfast", "lunch", "dinner", "other"],
-        default: "other",
-      },
-      status: {
-        type: String,
-        enum: ["planned", "eaten", "deleted"],
-        default: "planned",
-      },
+const dailyMenuSchema = new mongoose.Schema(
+  {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: false,
     },
-  ],
+    date: { type: Date, required: true },
 
-  totalNutrition: {
-    calories: Number,
-    protein: Number,
-    fat: Number,
-    carbs: Number,
-    fiber: Number,
-    sugar: Number,
-    sodium: Number,
+    recipes: [
+      {
+        ...recipeItemSchema.obj,
+        servingTime: {
+          type: String,
+          enum: ["breakfast", "lunch", "dinner", "snack", "other"],
+          default: "other",
+        },
+        isChecked: Boolean,
+      },
+    ],
+
+    totalNutrition: {
+      calories: Number,
+      protein: Number,
+      fat: Number,
+      carbs: Number,
+      fiber: Number,
+      sugar: Number,
+      sodium: Number,
+    },
+
+    targetNutrition: {
+      calories: Number,
+      protein: Number,
+      fat: Number,
+      carbs: Number,
+      fiber: Number,
+      sugar: Number,
+      sodium: Number,
+    },
+    //suggested: danh sách được gợi ý TUY NHIÊN chưa đc user chọn
+    //selected: suggested được người dùng chọn
+    //expired: suggested nhưng hết hạn
+    //hiện tại, các status sẽ được hiển thị khi dùng hàm get dailymenu chính là manual và selected
+    status: {
+      type: String,
+      enum: [
+        "manual",
+        "suggested",
+        "selected",
+        "completed",
+        "deleted",
+        "expired",
+      ],
+      default: "manual",
+    },
+    feedback: String,
   },
-  //suggested: danh sách được AI gợi ý (chưa được user chọn)
-  //selected: dailtmenu được user chọn -> dại diện cho menu được gợi ý ban đầu chưa được người dùng chỉnh sửa
-  //edited: dailymenu từ AI đã được người dùng chọn và chỉnh sửa
-  status: {
-    type: String,
-    enum: ["planned", "selected", "suggested", "completed", "deleted", "edited"],
-    default: "planned",
-  },
-  originalMealId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "DailyMenu",
-    required: false,
-  },
-  feedback: String,
-}, { timestamps: true });
+  { timestamps: true },
+);
 
-
-
-dailyMenuSchema.index({ userId: 1, date: -1 });
+dailyMenuSchema.index({ userId: 1, status: 1, date: -1 });
 
 module.exports = mongoose.model("DailyMenu", dailyMenuSchema);

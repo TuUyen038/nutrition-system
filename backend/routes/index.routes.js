@@ -16,6 +16,7 @@ const dashboardRoutes = require("./dashboard.routes");
 const exerciseRoutes = require("./exercise.routes");
 const workoutSessionRoutes = require("./workoutSession.routes");
 const workoutRoutes = require("./workout.routes");
+const mealLogRoutes = require("./mealLog.routes");
 
 // Public routes (không cần authentication)
 router.use("/auth", authRoutes);
@@ -28,6 +29,7 @@ router.use("/ingredients", ingredientRoutes);
 router.use("/nutrition-goals", nutritionGoalRoutes);
 router.use("/daily-menu", dailyMenuRoutes);
 router.use("/meal-plans", mealPlanRoutes);
+router.use("/meal-logs", mealLogRoutes);
 router.use("/recipes", recipeRoutes);
 router.use("/upload-image", uploadImageRoutes);
 router.use("/favorites", favoriteRoutes);

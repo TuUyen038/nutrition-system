@@ -23,26 +23,42 @@ const {
 
 const { authenticate, authorize } = require("../middlewares/auth");
 
-router.get("/search-by-ingredient", searchByIngredientName);
+/* =====================================================
+   PUBLIC ROUTES
+===================================================== */
+
+// search & filter
+router.get("/search", getAllRecipe); // thay cho "/"
+router.get("/search/by-ingredient", searchByIngredientName);
+router.get("/search/by-name", findRecipeByName);
+
+// stats
 router.get("/stats", getRecipeStats);
-router.get("/check-duplicate", checkDuplicateName);
-router.get("/", getAllRecipe);
-router.get("/:foodName", findRecipeByName);
+
+// validate
+router.get("/validate/duplicate-name", checkDuplicateName);
+
+// detail
+router.get("/:id", getRecipeById); // chuẩn REST
 
 
 /* =====================================================
-   AUTHENTICATED ROUTES (Require Login)
+   AUTHENTICATED ROUTES
 ===================================================== */
 
 router.use(authenticate);
 
-router.post("/search-by-image", upload.single("foodImage"), searchByImage);
-router.post("/ingredients", findIngredientsByAi);
-router.post("/detect", upload.single("foodImage"), detectImage);
-router.post("/substitutions", getIngredientSubstitutions);
-router.get("/id/:id", getRecipeById);
-router.get("/rcm/:foodName", findIngrAndInstrByAi);
-router.post("/back-up-nutrition", getBackUpNutrition);
+// AI / image
+router.post("/ai/search-by-image", upload.single("foodImage"), searchByImage);
+router.post("/ai/detect-food", upload.single("foodImage"), detectImage);
+router.post("/ai/extract-ingredients", findIngredientsByAi);
+router.get("/ai/recommendations/:foodName", findIngrAndInstrByAi);
+
+// nutrition
+router.post("/nutrition/fallback", getBackUpNutrition);
+
+// ingredient utils
+router.post("/ingredients/substitutions", getIngredientSubstitutions);
 
 
 /* =====================================================

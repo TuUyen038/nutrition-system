@@ -60,6 +60,8 @@ const recipeSchema = new mongoose.Schema(
         note: String,
         name: { type: String, required: true, trim: true },
         rawName: String,
+        absorptionRate: Number, //optional override cho tỉ lệ hấp thu
+        role: String
       },
     ],
 
