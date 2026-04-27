@@ -15,6 +15,7 @@ const favoriteRoutes = require("./favorite.routes");
 const dashboardRoutes = require("./dashboard.routes");
 const exerciseRoutes = require("./exercise.routes");
 const mealLogRoutes = require("./mealLog.routes");
+const chatRoutes = require("./chat.routes");
 
 // Public routes (không cần authentication)
 router.use("/auth", authRoutes);
@@ -35,6 +36,9 @@ router.use("/favorites", favoriteRoutes);
 // Admin only routes
 router.use("/audit-logs", auditLogRoutes);
 router.use("/admin/dashboard", dashboardRoutes);
+
+// Chat routes
+router.use("/chat", chatRoutes);
 
 // Export router tổng
 module.exports = router;
