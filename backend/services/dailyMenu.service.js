@@ -402,12 +402,13 @@ exports.updateRecipeInMenu = async ({
   // 4. Cập nhật Trạng thái Checked
   if (checked !== undefined && checked !== null) {
     targetRecipe.isChecked = checked;
-
     // Xử lý MealLog
     if (checked === true) {
+      console.log("Tạo MealLog");
       await createMealLog(userId, targetRecipe, dailyMenu.date, dailyMenu._id);
     } else {
-      await deleteMealLog(userId, targetRecipe, dailyMenu.date, dailyMenu._id);
+      console.log("Xóa MealLog");
+      await deleteMealLog(userId, targetRecipe.recipeId, dailyMenu.date, dailyMenu._id);
     }
   }
 
@@ -440,17 +441,29 @@ exports.deleteRecipeInMenu = async ({ userId, dailyMenuId, recipeItemId }) => {
   });
 
   dailyMenu.recipes.splice(recipeIndex, 1);
+  
+  console.log("Xóa MealLog vì xoá món ăn");
+  await deleteMealLog(userId, targetRecipe.recipeId, dailyMenu.date, dailyMenu._id);
+
 
   return await dailyMenu.save();
 };
 
 exports.getDailyMenuByDate = async ({ userId, date }) => {
-  const normalizedDate = toDateOnly(date);
+  console.log("userId:", userId);
+  const start = new Date(date);
+  start.setUTCHours(0, 0, 0, 0);
+
+  const end = new Date(date);
+  end.setUTCHours(23, 59, 59, 999);
 
   return await DailyMenu.findOne({
     userId,
-    date: normalizedDate,
-    status: { $in: ["manual", "selected"] },
+    date: {
+      $gte: start,
+      $lte: end,
+    },
+    status: { $in: ["manual", "selected", "suggested"] },
   }).lean();
 };
 exports.getDailyMenusByRange = async ({ userId, startDate, endDate }) => {

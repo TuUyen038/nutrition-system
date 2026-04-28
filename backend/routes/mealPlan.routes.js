@@ -23,7 +23,7 @@ router.get('/', mealPlanController.getMealPlans);
 // PATCH /api/v1/mealplans/:planId/status - Cập nhật trạng thái Plan
 router.patch('/:planId/status', mealPlanController.updatePlanStatus);
 
-// DELETE /api/v1/mealplans/:planId - Xóa Plan (Chỉ cho phép xóa Plan ở trạng thái 'suggested')
+// DELETE /api/v1/mealplans/:planId - Xóa Plan (status -> "deleted")
 router.delete('/:planId', mealPlanController.deleteMealPlan);
 
 // gợi ý tuần

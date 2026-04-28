@@ -8,6 +8,7 @@
 
 const MealLog = require("../models/MealLog");
 const Recipe = require("../models/Recipe");
+const mongoose = require("mongoose");
 
 // ─────────────────────────────────────────────────────────────
 // UTILITY
@@ -35,18 +36,26 @@ function toDateOnly(d) {
  */
 async function createMealLog(userId, recipeItem, date, dailyMenuId = null) {
   try {
-    // Idempotent check: nếu đã tồn tại với cùng recipe + date → skip
-    const eatenAt = toDateOnly(new Date(date));
-    const existed = await MealLog.findOne({
+    const start = new Date(date);
+    start.setHours(0, 0, 0, 0);
+
+    const end = new Date(date);
+    end.setHours(23, 59, 59, 999);
+
+    const query = {
       userId,
-      $expr: {
-        $eq: [
-          { $dateToString: { format: "%Y-%m-%d", date: "$eatenAt" } },
-          eatenAt.toISOString().slice(0, 10),
-        ],
+      "recipe.recipeId": recipeItem.recipeId, // 🔥 dùng id
+      eatenAt: {
+        $gte: start,
+        $lte: end,
       },
-      "recipe.name": recipeItem.name,
-    });
+    };
+
+    if (dailyMenuId) {
+      query.dailyMenuId = dailyMenuId;
+    }
+
+    const existed = await MealLog.findOne(query);
 
     if (existed) {
       console.log(
@@ -57,7 +66,7 @@ async function createMealLog(userId, recipeItem, date, dailyMenuId = null) {
 
     const mealLog = await MealLog.create({
       userId,
-      eatenAt,
+      eatenAt: start, // hoặc toDateOnly cũng được
       dailyMenuId: dailyMenuId || null,
       recipe: {
         recipeId: recipeItem.recipeId,
@@ -83,6 +92,7 @@ async function createMealLog(userId, recipeItem, date, dailyMenuId = null) {
       mealLog._id,
       dailyMenuId ? `for DailyMenu: ${dailyMenuId}` : ""
     );
+
     return mealLog;
   } catch (err) {
     console.error("[createMealLog] Error:", err);
@@ -99,39 +109,40 @@ async function createMealLog(userId, recipeItem, date, dailyMenuId = null) {
  * @param {string|ObjectId} dailyMenuId - (optional) ID của DailyMenu để xóa chính xác
  * @returns {Object}                - { deletedCount: number }
  */
-async function deleteMealLog(userId, recipeName, date, dailyMenuId = null) {
+async function deleteMealLog(userId, recipeId, date, dailyMenuId = null) {
   try {
-    const eatenAt = toDateOnly(new Date(date));
+    const start = new Date(date);
+    start.setHours(0, 0, 0, 0);
+
+    const end = new Date(date);
+    end.setHours(23, 59, 59, 999);
 
     const query = {
-      userId,
-      $expr: {
-        $eq: [
-          { $dateToString: { format: "%Y-%m-%d", date: "$eatenAt" } },
-          eatenAt.toISOString().slice(0, 10),
-        ],
+      userId: new mongoose.Types.ObjectId(userId), // 🔥 fix
+      "recipe.recipeId": new mongoose.Types.ObjectId(recipeId), // 🔥 fix
+      eatenAt: {
+        $gte: start,
+        $lte: end,
       },
-      "recipe.name": recipeName,
     };
 
-    // Nếu có dailyMenuId, thêm vào query để xóa chính xác
     if (dailyMenuId) {
-      query.dailyMenuId = dailyMenuId;
+      query.dailyMenuId = new mongoose.Types.ObjectId(dailyMenuId); // 🔥 fix
     }
 
-    const result = await MealLog.deleteMany(query);
+    console.log("DELETE QUERY:", query);
 
-    console.log(
-      `[deleteMealLog] Deleted ${result.deletedCount} logs for ${recipeName}${
-        dailyMenuId ? ` (DailyMenu: ${dailyMenuId})` : ""
-      }`
-    );
+    const result = await MealLog.deleteOne(query);
+
+    console.log(`[deleteMealLog] Deleted ${result.deletedCount}`);
+
     return result;
   } catch (err) {
     console.error("[deleteMealLog] Error:", err);
     throw err;
   }
 }
+
 
 /**
  * Xóa tất cả meal log của user trong ngày nhất định.

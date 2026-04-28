@@ -22,12 +22,15 @@ const recipeService = require("../services/recipe.service");
 
 const searchByIngredientName = async (req, res) => {
   try {
+    console.log("hiiii")
+
     const { keyword, page, limit } = req.query;
     const result = await searchRecipesByIngredientName(keyword, {
       page,
       limit,
     });
-
+    console.log("hellooooo")
+    console.log(">>data trước search:", result[1]);
     return res.json({
       success: true,
       data: result,
@@ -88,7 +91,6 @@ const getAllRecipe = async (req, res) => {
       Recipe.find(query).sort(sort).skip(skip).limit(limitNum).lean(),
       Recipe.countDocuments(query),
     ]);
-
     res.status(200).json({
       success: true,
       data: recipes,
