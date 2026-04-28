@@ -143,9 +143,24 @@ async function getExerciseById(exerciseId) {
   return Exercise.findOne({ exerciseId }).lean();
 }
 
+/**
+ * Batch fetch exercises by IDs
+ * Optimized: single DB query with $in operator
+ * @param {number[]} ids - Array of exercise IDs
+ * @returns {Promise<Array>} Array of exercises
+ */
+async function getExercisesByIds(ids) {
+  if (!ids || ids.length === 0) {
+    return [];
+  }
+
+  return Exercise.find({ exerciseId: { $in: ids } }).lean();
+}
+
 module.exports = {
   importExercisesFromWger,
   findExercises,
   getAllExercises,
   getExerciseById,
+  getExercisesByIds,
 };

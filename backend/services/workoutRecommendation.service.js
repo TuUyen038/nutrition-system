@@ -70,6 +70,8 @@ function getTargetCalories(goal) {
   return GOAL_CALORIES_TARGET[goal] || 200;
 }
 
+const TOTAL_DAYS = 30;
+
 /**
  * Get workout days and split for the level
  */
@@ -77,12 +79,13 @@ function getWorkoutPlanStructure(level) {
   const daysPerWeek = WORKOUT_DAYS_BY_LEVEL[level];
   const split = WORKOUT_SPLITS[level];
 
-  // Create 7-day structure
+  // Create 30-day structure
   const plan = [];
   let splitIndex = 0;
 
-  for (let day = 1; day <= 7; day++) {
-    const isWorkoutDay = day <= daysPerWeek;
+  for (let day = 1; day <= TOTAL_DAYS; day++) {
+    const dayOfWeek = ((day - 1) % 7) + 1;
+    const isWorkoutDay = dayOfWeek <= daysPerWeek;
 
     if (isWorkoutDay) {
       const muscleGroup = split[splitIndex % split.length];
@@ -203,7 +206,7 @@ async function generateDayExercises(muscleGroup, level, userWeight, targetCalori
 }
 
 /**
- * Generate complete 7-day workout plan
+ * Generate complete workout plan
  */
 async function generateWorkoutPlan(userId) {
   // Get user data

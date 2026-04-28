@@ -6,4 +6,7 @@ router.post("/import", exerciseController.importExercises);
 router.get("/", exerciseController.getExercises); // filter by categoryId, muscleIds, equipmentIds via query params
 router.get("/:id", exerciseController.getExerciseById);
 
+// Batch endpoint - must be before /:id to avoid conflict
+router.post("/batch", exerciseController.getExercisesBatch);
+
 module.exports = router;
