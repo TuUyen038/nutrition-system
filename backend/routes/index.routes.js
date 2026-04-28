@@ -14,6 +14,9 @@ const auditLogRoutes = require("./auditLog.routes");
 const favoriteRoutes = require("./favorite.routes");
 const dashboardRoutes = require("./dashboard.routes");
 const exerciseRoutes = require("./exercise.routes");
+const workoutSessionRoutes = require("./workoutSession.routes");
+const workoutRoutes = require("./workout.routes");
+const workoutPlanRoutes = require("./workoutPlan.routes");
 const mealLogRoutes = require("./mealLog.routes");
 const chatRoutes = require("./chat.routes");
 
@@ -32,6 +35,9 @@ router.use("/meal-logs", mealLogRoutes);
 router.use("/recipes", recipeRoutes);
 router.use("/upload-image", uploadImageRoutes);
 router.use("/favorites", favoriteRoutes);
+router.use("/workout-session", workoutSessionRoutes);
+router.use("/workout", workoutRoutes);
+router.use("/workout-plan", workoutPlanRoutes);
 
 // Admin only routes
 router.use("/audit-logs", auditLogRoutes);

@@ -128,7 +128,7 @@ exports.updateUser = async (req, res) => {
     }
 
     // Detect body changes BEFORE save
-    const bodyFields = ["age", "gender", "height", "weight", "goal"];
+    const bodyFields = ["age", "gender", "height", "weight", "goal", "fitnessLevel"];
 
     const bodyChanged = bodyFields.some(
       (field) =>

@@ -18,6 +18,11 @@ const userSchema = new mongoose.Schema(
       type: String,
       enum: ["lose_weight", "maintain_weight", "gain_weight"],
     },
+    fitnessLevel: {
+      type: String,
+      enum: ["sedentary", "beginner", "intermediate", "advanced", "athlete"],
+      default: "sedentary",
+    },
     allergies: [String],
     favoriteRecipes: [
       {

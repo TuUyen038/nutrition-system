@@ -1,5 +1,4 @@
 const mongoose = require("mongoose");
-const { act } = require("react");
 
 const nutritionGoalSchema = new mongoose.Schema(
   {
