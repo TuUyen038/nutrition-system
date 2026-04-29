@@ -985,8 +985,11 @@ async function recommendDayPlan(userId, options = {}) {
     dayContext,
   );
   const mealToRecipe = meals.flatMap((meal) => {
-    // Map qua các items bên trong meal
-    return meal.items;
+    // Map các items bên trong meal và gán _id cho từng item
+  return meal.items.map(item => ({
+    _id: new mongoose.Types.ObjectId(), // Gán ID mới cho mỗi item trong menu ngày
+    ...item, // Giữ lại các trường khác
+  }));
   });
   // 6. Optionally save
   let dailyMenuId = null;
@@ -1004,7 +1007,6 @@ async function recommendDayPlan(userId, options = {}) {
       { upsert: true, new: true, setDefaultsOnInsert: true },
     );
     dailyMenuId = logDoc._id;
-
   return {
     date: toDateOnly(date),
     recipes: mealToRecipe,
