@@ -22,15 +22,11 @@ const recipeService = require("../services/recipe.service");
 
 const searchByIngredientName = async (req, res) => {
   try {
-    console.log("hiiii")
-
     const { keyword, page, limit } = req.query;
     const result = await searchRecipesByIngredientName(keyword, {
       page,
       limit,
     });
-    console.log("hellooooo")
-    console.log(">>data trước search:", result[1]);
     return res.json({
       success: true,
       data: result,
@@ -55,16 +51,12 @@ const getAllRecipe = async (req, res) => {
     } = req.query;
 
     const query = {};
-    console.log("Query params:", req.query); // Log query params for debugging
+    console.log("Query params:", name); // Log query params for debugging
     if (name && name.trim()) {
       query.$or = [
         { name: { $regex: name.trim(), $options: "i" } },
         { description: { $regex: name.trim(), $options: "i" } },
       ];
-    }
-
-    if (category && category !== "all") {
-      query.category = category;
     }
 
     // Build sort
@@ -354,7 +346,7 @@ const createNewRecipe = async (req, res) => {
 
 const findIngrAndInstrByAi = async (req, res, next) => {
   const foodName = req.params.foodName || req.body?.foodName;
-
+  console.log("foodName:", foodName);
   if (!foodName) {
     return res
       .status(400)
