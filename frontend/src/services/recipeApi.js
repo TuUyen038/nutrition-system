@@ -287,7 +287,7 @@ export const getIngredientsAndInstructionsInAi = async (foodName) => {
       throw new Error("Không có token xác thực. Vui lòng đăng nhập.");
     }
 
-    const response = await fetch(`${API_BASE_URL}/rcm/${encodeURIComponent(foodName)}`, {
+    const response = await fetch(`${API_BASE_URL}/ai/recommendations/${encodeURIComponent(foodName)}`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },

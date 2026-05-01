@@ -48,7 +48,7 @@ GENERIC_PREFIX_TOKENS = {
 
 DERIVED_PREFIX_TOKENS = {
   "kẹo","bánh","mứt","siro","nước","trà","cà","phê",
-  "ruốc","mắm","xúc","dăm","bột","sữa"
+  "ruốc","mắm","xúc","dăm","bột","sữa","rang"
 }
 def strip_diacritics(s: str) -> str:
     s = unicodedata.normalize("NFD", s)
