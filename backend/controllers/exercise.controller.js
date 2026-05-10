@@ -1,4 +1,5 @@
 const exerciseService = require("../services/exercise.service");
+const exerciseMetadataService = require("../services/exerciseMetadata.service");
 
 /**
  * ============================================
@@ -10,11 +11,15 @@ const exerciseService = require("../services/exercise.service");
 
 async function importExercises(req, res) {
   try {
+    // STEP 1: Import exercises from wger API
     const result = await exerciseService.importExercisesFromWger();
+
+    // STEP 2: Enrich exercise metadata (difficulty, type, impact, fatigue)
+    await exerciseMetadataService.enrichExerciseMetadata();
 
     return res.status(201).json({
       success: true,
-      message: "Exercises imported successfully",
+      message: "Exercises imported and metadata enriched successfully",
       data: result,
     });
   } catch (error) {
