@@ -17,19 +17,19 @@ router.use(authenticate);
 // GET /workout-plan/current - Get current weekly plan (lightweight)
 router.get("/current", workoutPlanController.getCurrentPlan);
 
-// GET /workout-plan/current/detailed - Get current plan with full exercise details
-router.get("/current/detailed", workoutPlanController.getDetailedPlan);
-
 // POST /workout-plan/generate - Manually generate plan
-router.post("/generate", workoutPlanController.generatePlan);
+router.post("/generate", workoutPlanController.generateWeeklyPlan);
 
-// POST /workout-plan/regenerate - Regenerate plan
-router.post("/regenerate", workoutPlanController.regeneratePlan);
+// COMPLETE day
+router.patch("/complete", workoutPlanController.completeWorkoutDay);
 
-// PATCH /workout-plan/day/:day/complete - Mark day as completed
-router.patch("/day/:day/complete", workoutPlanController.markDayCompleted);
+// PATCH /workout-plan/day/:day/skip - Skip day
+router.patch("/skip", workoutPlanController.skipWorkoutDay);
+
+// NEXT week
+router.post("/next-week", workoutPlanController.generateNextWeek);
 
 // GET /workout-plan/stats - Get workout statistics
-router.get("/stats", workoutPlanController.getStats);
+router.get("/stats", workoutPlanController.getPlanStats);
 
 module.exports = router;
