@@ -1,89 +1,308 @@
 const WorkoutSession = require("../models/WorkoutSession");
+const WorkoutPlan = require("../models/WorkoutPlan");
 const User = require("../models/User");
 const Exercise = require("../models/Exercise");
 const ActivityMet = require("../models/ActivityMet");
+const UserExerciseStats = require("../models/UserExerciseStats");
 
-const startWorkout = async ({ userId, exerciseId, intensity }) => {
-  // Check if user already has active session
-  const activeSession = await WorkoutSession.findOne({ userId, endTime: null });
-  if (activeSession) {
-    throw new Error("User already has an active workout session");
+function calculatePerformanceScore({
+  completedSets,
+  targetSets,
+  perceivedDifficulty,
+}) {
+  let score =
+    (completedSets / targetSets) * 10;
+
+  if (perceivedDifficulty >= 8) {
+    score -= 2;
   }
 
-  // Create new session
+  return Math.max(
+    1,
+    Math.min(10, Math.round(score))
+  );
+}
+
+function calculateFatigue({
+  intensity,
+  duration,
+  perceivedDifficulty,
+}) {
+  let fatigue = 0;
+
+  if (intensity === "vigorous") {
+    fatigue += 3;
+  }
+
+  if (intensity === "moderate") {
+    fatigue += 2;
+  }
+
+  fatigue += duration / 20;
+
+  fatigue += perceivedDifficulty / 2;
+
+  return Math.min(10, Math.round(fatigue));
+}
+
+async function updateExerciseStats({
+  userId,
+  exerciseId,
+  performanceScore,
+  perceivedDifficulty,
+}) {
+  let stats =
+    await UserExerciseStats.findOne({
+      userId,
+      exerciseId,
+    });
+
+  if (!stats) {
+    stats = new UserExerciseStats({
+      userId,
+      exerciseId,
+    });
+  }
+
+  stats.totalSessions += 1;
+
+  stats.completedSessions += 1;
+
+  stats.avgPerformanceScore =
+    (stats.avgPerformanceScore +
+      performanceScore) /
+    2;
+
+  stats.avgDifficulty =
+    (stats.avgDifficulty +
+      perceivedDifficulty) /
+    2;
+
+  stats.preferenceScore =
+    stats.avgPerformanceScore -
+    stats.avgDifficulty / 2;
+
+  stats.lastPerformedAt = new Date();
+
+  await stats.save();
+}
+
+async function startWorkout({
+  userId,
+  planId,
+  day,
+  exerciseId,
+}) {
+  const active =
+    await WorkoutSession.findOne({
+      userId,
+      endTime: null,
+    });
+
+  if (active) {
+    throw new Error(
+      "Workout session already active"
+    );
+  }
+
+  const plan =
+    await WorkoutPlan.findById(planId);
+
+  if (!plan) {
+    throw new Error("Plan not found");
+  }
+
+  const dayData = plan.days.find(
+    (d) => d.day === day
+  );
+
+  const exerciseData =
+    dayData.exerciseDetails.find(
+      (e) => e.exerciseId === exerciseId
+    );
+
+  const exercise =
+    await Exercise.findOne({
+      exerciseId,
+    });
+
   const session = new WorkoutSession({
     userId,
+
+    planId,
+
+    day,
+
+    focus: dayData.focus,
+
     exerciseId,
-    intensity,
+
+    exerciseName:
+      exerciseData.name,
+
+    intensity:
+      exerciseData.intensity,
+
+    targetSets:
+      exerciseData.sets,
+
+    targetReps:
+      exerciseData.reps,
+
+    targetCalories:
+      exerciseData.calories,
+
+    muscleGroups:
+      exercise?.muscles?.map(
+        (m) => m.name_en
+      ) || [],
+
     startTime: new Date(),
   });
 
   await session.save();
-  return session;
-};
 
-const stopWorkout = async (sessionId) => {
-  const session = await WorkoutSession.findById(sessionId);
+  return session;
+}
+
+async function stopWorkout({
+  sessionId,
+  completedSets,
+  completedReps,
+  perceivedDifficulty,
+}) {
+  const session =
+    await WorkoutSession.findById(
+      sessionId
+    );
+
   if (!session || session.endTime) {
-    throw new Error("Session not found or already ended");
+    throw new Error("Session invalid");
   }
 
   const endTime = new Date();
-  const durationMs = endTime - session.startTime;
-  const durationMinutes = durationMs / 1000 / 60;
 
-  if (durationMinutes < 0) {
-    throw new Error("Invalid duration");
-  }
+  const durationMinutes =
+    (endTime - session.startTime) /
+    1000 /
+    60;
 
-  // Fetch user
-  const user = await User.findById(session.userId);
-  if (!user) {
-    throw new Error("User not found");
-  }
+  const user = await User.findById(
+    session.userId
+  );
 
-  // Fetch exercise
-  const exercise = await Exercise.findOne({ exerciseId: session.exerciseId });
-  if (!exercise) {
-    throw new Error("Exercise not found");
-  }
+  const exercise =
+    await Exercise.findOne({
+      exerciseId:
+        session.exerciseId,
+    });
 
-  // Query ActivityMET
-  const metData = await ActivityMet.findOne({
-    activityType: exercise.activityType,
-    intensity: session.intensity,
-  });
+  const metData =
+    await ActivityMet.findOne({
+      activityType:
+        exercise.activityType,
+    });
+
   if (!metData) {
-    throw new Error("MET data not found");
+    throw new Error(
+      `MET data not found for ${exercise.activityType}`
+    );
   }
 
-  // Calculate kcal
-  const kcalBurned = metData.met * user.weight * (durationMinutes / 60);
+  const met =
+    metData.mets?.[
+      session.intensity
+    ];
 
-  // Update session
+  if (!met) {
+    throw new Error(
+      `MET intensity not found for ${session.intensity}`
+    );
+  }
+
+  const kcalBurned =
+    met *
+    user.weight *
+    (durationMinutes / 60);
+
+  const performanceScore =
+    calculatePerformanceScore({
+      completedSets,
+      targetSets:
+        session.targetSets,
+      perceivedDifficulty,
+    });
+
+  const fatigueImpact =
+    calculateFatigue({
+      intensity: session.intensity,
+      duration: durationMinutes,
+      perceivedDifficulty,
+    });
+
   session.endTime = endTime;
-  session.durationMinutes = durationMinutes;
-  session.kcalBurned = kcalBurned;
+
+  session.durationMinutes =
+    Math.round(durationMinutes);
+
+  session.actualCalories =
+    Math.round(kcalBurned);
+
+  session.completedSets =
+    completedSets;
+
+  session.completedReps =
+    completedReps;
+
+  session.perceivedDifficulty =
+    perceivedDifficulty;
+
+  session.performanceScore =
+    performanceScore;
+
+  session.fatigueImpact =
+    fatigueImpact;
+
+  session.completed = true;
 
   await session.save();
-  return session;
-};
 
-const getTodayKcal = async (userId) => {
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
-
-  const sessions = await WorkoutSession.find({
-    userId,
-    startTime: { $gte: startOfDay },
+  await updateExerciseStats({
+    userId: session.userId,
+    exerciseId:
+      session.exerciseId,
+    performanceScore,
+    perceivedDifficulty,
   });
 
-  const totalKcal = sessions.reduce((sum, session) => sum + (session.kcalBurned || 0), 0);
+  return session;
+}
+
+async function getTodayKcal(userId) {
+  const start = new Date();
+
+  start.setHours(0, 0, 0, 0);
+
+  const sessions =
+    await WorkoutSession.find({
+      userId,
+      startTime: {
+        $gte: start,
+      },
+    });
+
+  const totalKcal =
+    sessions.reduce(
+      (sum, s) =>
+        sum + (s.actualCalories || 0),
+      0
+    );
 
   return {
-    totalKcal,
+    totalKcal:
+      Math.round(totalKcal),
   };
-};
+}
 
 module.exports = {
   startWorkout,

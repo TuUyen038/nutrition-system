@@ -2,6 +2,8 @@ const Exercise = require("../models/Exercise");
 const User = require("../models/User");
 const WorkoutPlan = require("../models/WorkoutPlan");
 const ActivityMet = require("../models/ActivityMet");
+const {calculateUserPerformance} = require("./workoutAnalytics.service");
+const UserExerciseStats = require("../models/UserExerciseStats");
 
 // ====================
 // MAPPING CONSTANTS
@@ -70,54 +72,33 @@ function getWorkoutLevel(fitnessLevel) {
 // =====================================
 
 async function analyzeUserState(userId) {
-  const existingPlan = await WorkoutPlan.findOne({
-    userId,
-    isActive: true,
-  });
+  const analytics =
+    await calculateUserPerformance(
+      userId
+    );
 
-  if (!existingPlan) {
-    return {
-      fatigueScore: 0,
-      progressionScore: 1,
-      readinessScore: 8,
-      recommendedIntensity: "moderate",
-    };
-  }
+  let recommendedIntensity =
+    "moderate";
 
-   const completedDays = existingPlan.days.filter(
-    (d) => d.completed
-  ).length;
-
-  const skippedDays = existingPlan.days.filter(
-    (d) => d.skipped
-  ).length;
-
-  let fatigueScore = 0;
-
-  fatigueScore += skippedDays * 0.5;
-
-  if (completedDays >= 5) {
-    fatigueScore += 2;
-  }
-
-  fatigueScore = Math.min(fatigueScore, 10);
-
-  const readinessScore = Math.max(1, 10 - fatigueScore);
-
-  let recommendedIntensity = "moderate";
-
-  if (readinessScore <= 4) {
+  if (analytics.recoveryScore <= 4) {
     recommendedIntensity = "light";
   }
 
-   if (readinessScore >= 8) {
-    recommendedIntensity = "vigorous";
+  if (analytics.recoveryScore >= 8) {
+    recommendedIntensity =
+      "vigorous";
   }
 
   return {
-    fatigueScore,
-    progressionScore: completedDays,
-    readinessScore,
+    fatigueScore:
+      analytics.fatigueScore,
+
+    progressionScore:
+      analytics.progressionScore,
+
+    readinessScore:
+      analytics.recoveryScore,
+
     recommendedIntensity,
   };
 }
@@ -175,11 +156,14 @@ async function calculateCalories(
   try {
     const metData = await ActivityMet.findOne({
       activityType: exercise.activityType,
-      intensity,
     });
 
-    if (metData) {
-      met = metData.met;
+    if (
+      metData &&
+      metData.mets &&
+      metData.mets[intensity]
+    ) {
+      met = metData.mets[intensity];
     }
   } catch (err) {}
 
@@ -191,6 +175,8 @@ async function calculateCalories(
 // =====================================
 
 async function generateDayExercises({
+  userId,
+  fatigueScore,
   focus,
   level,
   weight,
@@ -199,7 +185,55 @@ async function generateDayExercises({
 }) {
   const exercises = await getExercisesByFocus(focus);
 
-  const shuffled = exercises.sort(() => 0.5 - Math.random());
+  const stats =
+    await UserExerciseStats.find({
+      userId,
+    });
+
+  const statsMap = {};
+
+  stats.forEach((s) => {
+    statsMap[s.exerciseId] = s;
+  });
+
+  const shuffled = exercises
+    .map((exercise) => {
+      let score = 0;
+
+      const stat =
+        statsMap[exercise.exerciseId];
+
+      if (stat) {
+        score +=
+          stat.preferenceScore || 0;
+
+        const daysSinceLast =
+          stat.lastPerformedAt
+            ? (
+                Date.now() -
+                new Date(
+                  stat.lastPerformedAt
+                ).getTime()
+              ) /
+              (1000 * 60 * 60 * 24)
+            : 999;
+
+        if (daysSinceLast <= 2) {
+          score -= 5;
+        }
+      }
+
+      if (fatigueScore >= 7) {
+        score -= 2;
+      }
+
+      return {
+        exercise,
+        score,
+      };
+    })
+    .sort((a, b) => b.score - a.score)
+    .map((s) => s.exercise);
 
   const config = SETS_REPS_BY_LEVEL[level];
 
@@ -354,6 +388,8 @@ async function generateAdaptiveWorkoutPlan(userId) {
     }
 
     const generated = await generateDayExercises({
+      userId,
+      fatigueScore: state.fatigueScore,
       focus: item.focus,
       level: workoutLevel,
       weight: user.weight,

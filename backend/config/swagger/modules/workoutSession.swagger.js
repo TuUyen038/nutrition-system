@@ -2,55 +2,61 @@ module.exports = {
   "/workout-session/start": {
     post: {
       tags: ["Workout Session"],
+
       summary: "Bắt đầu buổi tập",
-      description: "Tạo session workout mới",
+
+      description:
+        "Tạo workout session mới từ adaptive workout plan",
+
       security: [{ bearerAuth: [] }],
+
       requestBody: {
         required: true,
+
         content: {
           "application/json": {
             schema: {
-              type: "object",
-              required: ["userId", "exerciseId", "intensity"],
-              properties: {
-                userId: { type: "string", example: "507f1f77bcf86cd799439011" },
-                exerciseId: { type: "string", example: "101" },
-                intensity: { type: "string", enum: ["low", "medium", "high"], example: "medium" },
-              },
+              $ref:
+                "#/components/schemas/StartWorkoutRequest",
             },
           },
         },
       },
+
       responses: {
         200: {
-          description: "Bắt đầu workout thành công",
+          description:
+            "Bắt đầu workout thành công",
+
           content: {
             "application/json": {
               schema: {
                 type: "object",
+
                 properties: {
-                  success: { type: "boolean", example: true },
+                  success: {
+                    type: "boolean",
+                    example: true,
+                  },
+
                   data: {
-                    type: "object",
-                    properties: {
-                      _id: { type: "string", example: "session123" },
-                      userId: { type: "string" },
-                      exerciseId: { type: "string" },
-                      startTime: { type: "string", format: "date-time" },
-                      intensity: { type: "string" },
-                      status: { type: "string", example: "in_progress" },
-                    },
+                    $ref:
+                      "#/components/schemas/WorkoutSession",
                   },
                 },
               },
             },
           },
         },
+
         400: {
-          description: "Dữ liệu không hợp lệ",
+          description:
+            "Dữ liệu không hợp lệ",
         },
+
         401: {
-          description: "Unauthorized - Token không hợp lệ",
+          description:
+            "Unauthorized - Token không hợp lệ",
         },
       },
     },
@@ -59,58 +65,141 @@ module.exports = {
   "/workout-session/stop": {
     post: {
       tags: ["Workout Session"],
+
       summary: "Kết thúc buổi tập",
-      description: "Stop workout session và tính toán calories",
+
+      description:
+        "Stop workout session và tính toán calories, fatigue, performance",
+
       security: [{ bearerAuth: [] }],
+
       requestBody: {
         required: true,
+
         content: {
           "application/json": {
             schema: {
-              type: "object",
-              required: ["sessionId"],
-              properties: {
-                sessionId: { type: "string", example: "507f1f77bcf86cd799439011" },
-              },
+              $ref:
+                "#/components/schemas/StopWorkoutRequest",
             },
           },
         },
       },
+
       responses: {
         200: {
-          description: "Kết thúc workout thành công",
+          description:
+            "Kết thúc workout thành công",
+
           content: {
             "application/json": {
               schema: {
                 type: "object",
+
                 properties: {
-                  success: { type: "boolean", example: true },
+                  success: {
+                    type: "boolean",
+                    example: true,
+                  },
+
+                  message: {
+                    type: "string",
+                    example:
+                      "Workout completed successfully",
+                  },
+
                   data: {
-                    type: "object",
-                    properties: {
-                      _id: { type: "string" },
-                      userId: { type: "string" },
-                      exerciseId: { type: "string" },
-                      startTime: { type: "string", format: "date-time" },
-                      endTime: { type: "string", format: "date-time" },
-                      duration: { type: "number", description: "Thời gian tập (phút)" },
-                      caloriesBurned: { type: "number", description: "Calories đốt cháy" },
-                      status: { type: "string", example: "completed" },
-                    },
+                    $ref:
+                      "#/components/schemas/WorkoutSession",
                   },
                 },
               },
             },
           },
         },
+
         400: {
-          description: "Session không hợp lệ",
+          description:
+            "Session không hợp lệ",
         },
+
         401: {
-          description: "Unauthorized - Token không hợp lệ",
+          description:
+            "Unauthorized - Token không hợp lệ",
         },
+
         404: {
-          description: "Không tìm thấy session",
+          description:
+            "Không tìm thấy session",
+        },
+      },
+    },
+  },
+
+  "/workout-session/complete": {
+    post: {
+      tags: ["Workout Session"],
+
+      summary: "Hoàn thành workout",
+
+      description:
+        "Alias của stop workout session",
+
+      security: [{ bearerAuth: [] }],
+
+      requestBody: {
+        required: true,
+
+        content: {
+          "application/json": {
+            schema: {
+              $ref:
+                "#/components/schemas/StopWorkoutRequest",
+            },
+          },
+        },
+      },
+
+      responses: {
+        200: {
+          description:
+            "Workout completed successfully",
+
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+
+                properties: {
+                  success: {
+                    type: "boolean",
+                    example: true,
+                  },
+
+                  message: {
+                    type: "string",
+                    example:
+                      "Workout completed successfully",
+                  },
+
+                  data: {
+                    $ref:
+                      "#/components/schemas/WorkoutSession",
+                  },
+                },
+              },
+            },
+          },
+        },
+
+        400: {
+          description:
+            "Session không hợp lệ",
+        },
+
+        401: {
+          description:
+            "Unauthorized - Token không hợp lệ",
         },
       },
     },
@@ -119,46 +208,66 @@ module.exports = {
   "/workout-session/today-kcal": {
     get: {
       tags: ["Workout Session"],
-      summary: "Lấy lượng calories hôm nay",
-      description: "Tổng kcal user đã đốt trong ngày",
+
+      summary:
+        "Lấy lượng calories hôm nay",
+
+      description:
+        "Tổng calories user đã đốt trong ngày",
+
       security: [{ bearerAuth: [] }],
+
       parameters: [
         {
           in: "query",
+
           name: "userId",
+
           required: true,
+
           schema: {
             type: "string",
           },
-          example: "507f1f77bcf86cd799439011",
+
+          example:
+            "507f1f77bcf86cd799439011",
         },
       ],
+
       responses: {
         200: {
-          description: "Lấy kcal thành công",
+          description:
+            "Lấy calories thành công",
+
           content: {
             "application/json": {
               schema: {
                 type: "object",
+
                 properties: {
-                  success: { type: "boolean", example: true },
+                  success: {
+                    type: "boolean",
+                    example: true,
+                  },
+
                   data: {
-                    type: "object",
-                    properties: {
-                      totalKcal: { type: "number", example: 350 },
-                      sessions: { type: "array", items: { type: "object" } },
-                    },
+                    $ref:
+                      "#/components/schemas/TodayKcalResponse",
                   },
                 },
               },
             },
           },
         },
+
         401: {
-          description: "Unauthorized - Token không hợp lệ",
+          description:
+            "Unauthorized - Token không hợp lệ",
         },
+
         500: {
-          description: "Lỗi server",
+          description:
+            "Lỗi server",
         },
       },
     },
