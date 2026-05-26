@@ -16,12 +16,53 @@ const mealRecommendationService = require("./mealRecommendation.service");
 const Ingredient = require("../models/Ingredient");
 const { findExercises, getExerciseById } = require("./exercise.service");
 const favoriteService = require("./favorite.service");
+const ingredientService = require("./ingredient.service");
+const { CHAT_TOOLS } = require("./chatTools.definition");
 
 // Helper: lấy ngày hôm nay dạng YYYY-MM-DD theo giờ VN
 function getTodayVN() {
   return new Date().toLocaleDateString("sv-SE", {
     timeZone: "Asia/Ho_Chi_Minh",
   });
+}
+
+/**
+ * Generic helper: format user selection prompt cho search tools
+ * Dùng cho bất kỳ search tool nào có userSelection config
+ *
+ * @param {string} toolName - tên tool (e.g., 'search_ingredients')
+ * @param {Array} data - danh sách kết quả từ tool
+ * @param {Object} selectionConfig - config từ tool definition
+ * @returns {Object} { itemsList, instruction } - danh sách + instruction để hiển thị
+ */
+function formatUserSelectionPrompt(toolName, data, selectionConfig) {
+  if (!Array.isArray(data) || data.length === 0) {
+    return { itemsList: "", instruction: "" };
+  }
+
+  const { displayField } = selectionConfig;
+
+  // Tạo numbered list
+  const itemsList = data
+    .map((item, idx) => `${idx + 1}) ${item[displayField]}`)
+    .join("\n");
+
+  const instruction =
+    `📋 Danh sách kết quả:\n${itemsList}\n\n` +
+    `${selectionConfig.selectionPrompt}\n` +
+    `(Bạn có thể nói số thứ tự hoặc tên của mục muốn xem chi tiết)`;
+
+  return { itemsList, instruction };
+}
+
+/**
+ * Helper: lấy tool config từ CHAT_TOOLS
+ *
+ * @param {string} toolName - tên tool
+ * @returns {Object|null} - tool config hoặc null nếu không tìm thấy
+ */
+function getToolConfig(toolName) {
+  return CHAT_TOOLS.find((t) => t.name === toolName);
 }
 
 /**
@@ -49,6 +90,12 @@ async function executeTool(toolName, args, userId) {
 
       case "suggest_daily_menu":
         return await _suggestDailyMenu(args, userId);
+
+      case "update_recipe_in_menu":
+        return await _updateRecipeInMenu(args, userId);
+
+      case "delete_recipe_in_menu":
+        return await _deleteRecipeInMenu(args, userId);
 
       case "suggest_week_plan":
         return await _suggestWeekPlan(args, userId);
@@ -118,23 +165,47 @@ async function _searchRecipes(args, userId) {
     description: r.description?.substring(0, 100),
     imageUrl: r.imageUrl,
   }));
-console.log("result recipes:", result.recipes );
+  console.log("result recipes:", result.recipes);
+
+  // Check tool config để xem có userSelection không
+  const toolConfig = getToolConfig("search_recipes");
+  let summary =
+    simplified.length > 0
+      ? `Tìm thấy ${result.total} món với từ khoá "${keyword}". ` +
+        `Top ${simplified.length}: ${simplified.map((r) => r.name).join(", ")}.`
+      : `Không tìm thấy món nào với từ khoá "${keyword}".`;
+
+  // Nếu có nhiều kết quả (>1) và tool có userSelection enabled → format selection prompt
+  if (simplified.length > 1 && toolConfig?.userSelection?.enabled) {
+    const { itemsList, instruction } = formatUserSelectionPrompt(
+      "search_recipes",
+      simplified,
+      toolConfig.userSelection,
+    );
+    summary = instruction;
+  }
+
   return {
     success: true,
     data: simplified,
     total: result.total,
-    summary:
-      simplified.length > 0
-        ? `Tìm thấy ${result.total} món với từ khoá "${keyword}". ` +
-          `Top ${simplified.length}: ${simplified.map((r) => r.name).join(", ")}.`
-        : `Không tìm thấy món nào với từ khoá "${keyword}".`,
+    summary,
+    userSelection:
+      toolConfig?.userSelection?.enabled && simplified.length > 1
+        ? {
+            enabled: true,
+            toolName: "search_recipes",
+            detailToolName: toolConfig.userSelection.detailToolName,
+            paramName: toolConfig.userSelection.paramName,
+          }
+        : undefined,
   };
 }
 
 async function _getRecipeDetail(args) {
   const { recipe_id } = args;
   const recipe = await recipeService.getRecipeById(recipe_id);
-console.log("result recipe:", recipe );
+  console.log("result recipe:", recipe);
 
   if (!recipe) {
     return {
@@ -177,8 +248,9 @@ async function _getDailyMenu(args, userId) {
     };
   }
 
-  // Chỉ trả về summary dinh dưỡng + danh sách tên món
   const recipeSummary = menu.recipes.map((r) => ({
+    recipeItemId: r._id, // ← subdoc _id, dùng cho update/delete
+    recipeId: r.recipeId,
     name: r.name,
     servingTime: r.servingTime,
     scale: r.scale,
@@ -230,6 +302,82 @@ async function _addRecipeToDailyMenu(args, userId) {
     summary:
       `Đã thêm "${addedRecipe?.name}" vào bữa ${serving_time} ngày ${date}. ` +
       `Tổng calo ngày đó hiện là ${result.totalNutrition?.calories || 0} kcal.`,
+  };
+}
+
+async function _updateRecipeInMenu(args, userId) {
+  const { daily_menu_id, recipe_item_id, new_scale, checked } = args;
+
+  if (new_scale === undefined && checked === undefined) {
+    return {
+      success: false,
+      error: "Thiếu thông tin cập nhật: cần new_scale hoặc checked",
+      summary: "Vui lòng cung cấp new_scale hoặc checked để cập nhật món ăn.",
+    };
+  }
+
+  const result = await dailyMenuService.updateRecipeInMenu({
+    userId,
+    dailyMenuId: daily_menu_id,
+    recipeItemId: recipe_item_id,
+    newScale: typeof new_scale === "number" ? new_scale : undefined,
+    checked,
+  });
+
+  // Item vẫn còn trong result nếu scale > 0
+  const updatedItem = result.recipes.find(
+    (r) => r._id?.toString() === recipe_item_id,
+  );
+
+  const changes = [];
+  if (typeof new_scale === "number") {
+    changes.push(
+      new_scale <= 0
+        ? "đã xoá món khỏi thực đơn"
+        : `đã cập nhật khẩu phần thành ${new_scale}`,
+    );
+  }
+  if (checked === true) changes.push("đã đánh dấu đã ăn");
+  if (checked === false) changes.push("đã bỏ đánh dấu đã ăn");
+
+  return {
+    success: true,
+    data: {
+      dailyMenuId: result._id,
+      updatedItem: updatedItem
+        ? {
+            name: updatedItem.name,
+            scale: updatedItem.scale,
+            isChecked: updatedItem.isChecked,
+          }
+        : null,
+      newTotalNutrition: result.totalNutrition,
+    },
+    summary:
+      `${changes.join(", ")}. ` +
+      `Tổng calo thực đơn: ${result.totalNutrition?.calories || 0} kcal.`,
+  };
+}
+
+async function _deleteRecipeInMenu(args, userId) {
+  const { daily_menu_id, recipe_item_id } = args;
+
+  const result = await dailyMenuService.deleteRecipeInMenu({
+    userId,
+    dailyMenuId: daily_menu_id,
+    recipeItemId: recipe_item_id,
+  });
+
+  return {
+    success: true,
+    data: {
+      dailyMenuId: result._id,
+      remainingCount: result.recipes.length,
+      newTotalNutrition: result.totalNutrition,
+    },
+    summary:
+      `Đã xoá món khỏi thực đơn. ` +
+      `Còn ${result.recipes.length} món, tổng ${result.totalNutrition?.calories || 0} kcal.`,
   };
 }
 
@@ -379,46 +527,48 @@ async function _getMealHistory(args, userId) {
 // ─── INGREDIENT ───────────────────────────────────────────────────────────────
 
 async function _searchIngredients(args) {
-  const { keyword, category } = args;
-
-  const query = {
-    $or: [
-      { name: { $regex: keyword, $options: "i" } },
-      { name_en: { $regex: keyword, $options: "i" } },
-      { aliases: { $elemMatch: { $regex: keyword, $options: "i" } } },
-    ],
-  };
-  if (category) query.category = category;
-
-  const ingredients = await Ingredient.find(query).limit(8).lean();
-
-  if (!ingredients.length) {
-    return {
-      success: true,
-      data: [],
-      summary: `Không tìm thấy nguyên liệu nào với từ khoá "${keyword}".`,
+  const { keyword } = args;
+  console.log("[_searchIngredients] Searching for:", keyword);
+  try {
+    const query = {
+      $or: [
+        { name: { $regex: keyword, $options: "i" } },
+        { name_en: { $regex: keyword, $options: "i" } },
+        { aliases: { $elemMatch: { $regex: keyword, $options: "i" } } },
+      ],
     };
-  }
 
-  const simplified = ingredients.map((i) => ({
-    _id: i._id,
-    name: i.name,
-    name_en: i.name_en,
-    category: i.category,
-    unit: i.unit,
-    nutrition: {
-      calories: i.nutrition?.calories,
-      protein: i.nutrition?.protein,
-      carbs: i.nutrition?.carbs,
-      fat: i.nutrition?.fat,
-      fiber: i.nutrition?.fiber,
-    },
-  }));
+    const ingredients = await Ingredient.find(query)
+      .select("name name_en unit nutrition")
+      .limit(10)
+      .lean();
+    if (!ingredients.length) {
+      return {
+        success: false, // <-- false để trigger fallback
+        notFound: true, // <-- flag mới
+        error: "NOT_IN_DB",
+        summary: `Không tìm thấy "${keyword}" trong CSDL. Hãy tự tổng hợp thông tin dinh dưỡng từ kiến thức chung và ghi rõ "[Tham khảo bên ngoài]".`,
+      };
+    }
 
-  return {
-    success: true,
-    data: simplified,
-    summary:
+    const simplified = ingredients.map((i) => ({
+      _id: i._id,
+      name: i.name,
+      name_en: i.name_en,
+      category: i.category,
+      unit: i.unit,
+      nutrition: {
+        calories: i.nutrition?.calories,
+        protein: i.nutrition?.protein,
+        carbs: i.nutrition?.carbs,
+        fat: i.nutrition?.fat,
+        fiber: i.nutrition?.fiber,
+      },
+    }));
+
+    // Check tool config để xem có userSelection không
+    const toolConfig = getToolConfig("search_ingredients");
+    let summary =
       `Tìm thấy ${ingredients.length} nguyên liệu cho "${keyword}": ` +
       simplified
         .map(
@@ -428,14 +578,46 @@ async function _searchIngredients(args) {
             `carbs: ${i.nutrition?.carbs || 0}g, ` +
             `fat: ${i.nutrition?.fat || 0}g)`,
         )
-        .join("; "),
-  };
+        .join("; ");
+
+    // Nếu có nhiều kết quả (>1) và tool có userSelection enabled → format selection prompt
+    if (simplified.length > 1 && toolConfig?.userSelection?.enabled) {
+      const { itemsList, instruction } = formatUserSelectionPrompt(
+        "search_ingredients",
+        simplified,
+        toolConfig.userSelection,
+      );
+      summary = instruction;
+    }
+
+    return {
+      success: true,
+      data: simplified,
+      summary,
+      userSelection:
+        toolConfig?.userSelection?.enabled && simplified.length > 1
+          ? {
+              enabled: true,
+              toolName: "search_ingredients",
+              detailToolName: toolConfig.userSelection.detailToolName,
+              paramName: toolConfig.userSelection.paramName,
+            }
+          : undefined,
+    };
+  } catch (err) {
+    // Search engine chưa chạy / lỗi kết nối
+    return {
+      success: false,
+      notFound: true,
+      error: "DB_UNAVAILABLE",
+      summary: `Không thể truy vấn CSDL cho "${keyword}". Hãy tự tổng hợp thông tin dinh dưỡng từ kiến thức chung và ghi rõ "[Tham khảo bên ngoài]".`,
+    };
+  }
 }
 
 async function _getIngredientDetail(args) {
   const { ingredient_id } = args;
   const ingredient = await Ingredient.findById(ingredient_id).lean();
-
   if (!ingredient) {
     return {
       success: false,
@@ -488,18 +670,41 @@ async function _searchExercises(args) {
     defaultIntensity: e.defaultIntensity,
   }));
 
+  // Check tool config để xem có userSelection không
+  const toolConfig = getToolConfig("search_exercises");
+  let summary =
+    `Tìm thấy ${exercises.length} bài tập, hiển thị ${limited.length}: ` +
+    simplified
+      .map(
+        (e) =>
+          `${e.name} (${e.category}, nhóm cơ: ${e.muscles?.join(", ") || "chung"})`,
+      )
+      .join("; ");
+
+  // Nếu có nhiều kết quả (>1) và tool có userSelection enabled → format selection prompt
+  if (simplified.length > 1 && toolConfig?.userSelection?.enabled) {
+    const { itemsList, instruction } = formatUserSelectionPrompt(
+      "search_exercises",
+      simplified,
+      toolConfig.userSelection,
+    );
+    summary = instruction;
+  }
+
   return {
     success: true,
     data: simplified,
     total: exercises.length,
-    summary:
-      `Tìm thấy ${exercises.length} bài tập, hiển thị ${limited.length}: ` +
-      simplified
-        .map(
-          (e) =>
-            `${e.name} (${e.category}, nhóm cơ: ${e.muscles?.join(", ") || "chung"})`,
-        )
-        .join("; "),
+    summary,
+    userSelection:
+      toolConfig?.userSelection?.enabled && simplified.length > 1
+        ? {
+            enabled: true,
+            toolName: "search_exercises",
+            detailToolName: toolConfig.userSelection.detailToolName,
+            paramName: toolConfig.userSelection.paramName,
+          }
+        : undefined,
   };
 }
 
@@ -562,14 +767,18 @@ async function _getFavoriteRecipes(args, userId) {
       r.totalNutritionPerServing?.calories || r.totalNutrition?.calories,
     imageUrl: r.imageUrl,
   }));
+  console.log(">>>>result favorite recipes:", result.recipes);
+  const recipeList = simplified
+    .map((r, idx) => `${idx + 1}. ${r.name} (id: ${r._id})`)
+    .join(", ");
 
   return {
     success: true,
     data: simplified,
     total: result.total,
     summary:
-      `User có ${result.total} món yêu thích. ` +
-      `Danh sách: ${simplified.map((r) => r.name).join(", ")}.`,
+      `User có ${result.total} món yêu thích: ${recipeList}. ` +
+      `Dùng _id tương ứng khi cần add/remove_favorite_recipe.`,
   };
 }
 

@@ -67,10 +67,10 @@ const chatSessionSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Chỉ giữ tối đa 50 messages gần nhất để tránh document quá lớn
+// Chỉ giữ tối đa 20 messages gần nhất để tránh document quá lớn
 chatSessionSchema.methods.trimMessages = function () {
-  if (this.messages.length > 50) {
-    this.messages = this.messages.slice(-50);
+  if (this.messages.length > 20) {
+    this.messages = this.messages.slice(-20);
   }
 };
 

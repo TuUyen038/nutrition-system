@@ -23,9 +23,6 @@ const upload = multer({
 // Tất cả route chat đều cần auth
 router.use(authenticate);
 
-// POST /api/chat/message — gửi tin nhắn text
-router.post("/message", chatController.sendMessage);
-
 // POST /api/chat/image — gửi ảnh nhận diện món ăn
 // ?calories=true để kèm ước tính calo
 router.post("/image", upload.single("foodImage"), chatController.analyzeImage);
