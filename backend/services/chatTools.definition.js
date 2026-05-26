@@ -43,6 +43,15 @@ const CHAT_TOOLS = [
       },
       required: ["keyword"],
     },
+    // Config cho user selection - tùy chọn, có thể dùng cho search tools khác
+    userSelection: {
+      enabled: true,
+      displayField: "name",
+      idField: "_id",
+      detailToolName: "get_ingredient_detail",
+      paramName: "ingredient_id",
+      selectionPrompt: "Bạn muốn tìm hiểu về nguyên liệu nào trong danh sách trên?",
+    },
   },
   {
     name: "get_ingredient_detail",
@@ -68,7 +77,7 @@ const CHAT_TOOLS = [
       "Tìm kiếm bài tập thể dục phù hợp với mục tiêu hoặc nhóm cơ. " +
       "Gọi khi user hỏi 'bài tập giảm cân', 'tập gì cho cơ bụng', " +
       "'bài tập cardio', 'exercise cho người mới bắt đầu', 'tập tay bằng gì'. " +
-      "KHÔNG gọi khi user chỉ hỏi về chế độ ăn uống thuần tuý.",
+      "KHÔNG gọi khi user chỉ hỏi về chế độ ăn uống thuần tuý. Nếu user muốn biết chi tiết thì gọi đến hàm get_exercise_detail.",
     parameters: {
       type: "object",
       properties: {
@@ -87,6 +96,14 @@ const CHAT_TOOLS = [
         },
       },
       required: [],
+    },
+    userSelection: {
+      enabled: true,
+      displayField: "name",
+      idField: "exerciseId",
+      detailToolName: "get_exercise_detail",
+      paramName: "exercise_id",
+      selectionPrompt: "Bạn muốn biết thêm về bài tập nào?",
     },
   },
   {
@@ -146,7 +163,7 @@ const CHAT_TOOLS = [
     description:
       "Xóa một công thức món ăn khỏi danh sách yêu thích của user. " +
       "Gọi khi user nói 'bỏ yêu thích', 'xóa khỏi danh sách', 'không thích món này nữa'. " +
-      "Chỉ gọi khi user có ý định rõ ràng muốn xóa.",
+      "Chỉ gọi khi user có ý định rõ ràng muốn xóa. Gọi get_favorite_recipes trước để biết món đó có trong danh sách yêu thích không và lấy recipe_id.",
     parameters: {
       type: "object",
       properties: {
@@ -182,6 +199,14 @@ const CHAT_TOOLS = [
         },
       },
       required: ["keyword"],
+    },
+    userSelection: {
+      enabled: true,
+      displayField: "name",
+      idField: "_id",
+      detailToolName: "get_recipe_detail",
+      paramName: "recipe_id",
+      selectionPrompt: "Bạn muốn xem thông tin chi tiết về món nào?",
     },
   },
   {
@@ -248,6 +273,60 @@ const CHAT_TOOLS = [
         },
       },
       required: ["recipe_id", "date"],
+    },
+  },
+  {
+    name: "update_recipe_in_menu",
+    description:
+      "Cập nhật một món ăn trong thực đơn ngày: thay đổi số lượng khẩu phần (scale) hoặc đánh dấu đã ăn. " +
+      "Gọi khi user nói 'tăng/giảm khẩu phần món X', 'đánh dấu đã ăn món X', " +
+      "'tôi đã ăn món này rồi', 'chưa ăn món đó'. " +
+      "Phải có dailyMenuId và recipeItemId — nếu chưa có, gọi get_daily_menu trước để lấy.",
+    parameters: {
+      type: "object",
+      properties: {
+        daily_menu_id: {
+          type: "string",
+          description: "MongoDB ObjectId của DailyMenu",
+        },
+        recipe_item_id: {
+          type: "string",
+          description: "_id của item trong mảng recipes (subdocument _id)",
+        },
+        new_scale: {
+          type: "number",
+          description:
+            "Số khẩu phần mới. Truyền 0 hoặc số âm sẽ xoá món khỏi thực đơn. Bỏ qua nếu chỉ muốn cập nhật trạng thái checked.",
+        },
+        checked: {
+          type: "boolean",
+          description:
+            "true = đánh dấu đã ăn (tạo MealLog), false = bỏ đánh dấu (xoá MealLog). Bỏ qua nếu chỉ muốn đổi scale.",
+        },
+      },
+      required: ["daily_menu_id", "recipe_item_id"],
+    },
+  },
+  {
+    name: "delete_recipe_in_menu",
+    description:
+      "Xoá hoàn toàn một món ăn khỏi thực đơn ngày. " +
+      "Gọi khi user nói 'xoá món X', 'bỏ món X ra khỏi thực đơn', 'không ăn món X nữa'. " +
+      "Phân biệt với update_recipe_in_menu (dùng khi chỉ đổi scale/checked). " +
+      "Phải có dailyMenuId và recipeItemId — nếu chưa có, gọi get_daily_menu trước.",
+    parameters: {
+      type: "object",
+      properties: {
+        daily_menu_id: {
+          type: "string",
+          description: "MongoDB ObjectId của DailyMenu",
+        },
+        recipe_item_id: {
+          type: "string",
+          description: "_id của item trong mảng recipes (subdocument _id)",
+        },
+      },
+      required: ["daily_menu_id", "recipe_item_id"],
     },
   },
   {
