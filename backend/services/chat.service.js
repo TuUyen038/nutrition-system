@@ -141,16 +141,12 @@ const isShortReply = (message = "") =>
  * Dùng để nhắc Gemini nhớ context khi user trả lời ngắn.
  */
 const extractLastTopic = (messages = []) => {
-  // Lấy message model cuối cùng
-  const lastModel = [...messages]
-    .reverse()
-    .find((m) => m.role === "model");
-
+  const lastModel = [...messages].reverse().find((m) => m.role === "model");
   if (!lastModel) return null;
-
-  // Cắt 200 ký tự đầu làm context hint — đủ để Gemini hiểu đang nói về gì
-  return lastModel.content.substring(0, 200);
+  // Trả về toàn bộ content (không cắt) để giữ pending_action tag
+  return lastModel.content;
 };
+
 
 // ─── GEMINI AGENTIC LOOP ──────────────────────────────────────────────────────
 
@@ -375,6 +371,7 @@ async function deleteSession(userId, sessionId) {
   );
   return !!result;
 }
+
 
 // ─── EXPORTS ──────────────────────────────────────────────────────────────────
 

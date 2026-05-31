@@ -14,9 +14,9 @@ const CHAT_TOOLS = [
       "Tìm kiếm nguyên liệu thực phẩm theo tên, xem thông tin dinh dưỡng chi tiết của một nguyên liệu. " +
       "Gọi khi user hỏi về nguyên liệu chưa qua chế biến: " +
       "'thịt gà có bao nhiêu protein', '100g gạo bao nhiêu calo', " +
-    "'trứng gà dinh dưỡng như thế nào', 'rau cải chứa gì'. " +
-    "CHỈ dùng khi X là NGUYÊN LIỆU ĐƠN LẺ (thịt, cá, rau, gạo...). " +
-    "KHÔNG dùng khi X là tên món ăn đã chế biến (phở, bánh, cơm tấm...) — dùng search_recipes thay thế.",
+      "'trứng gà dinh dưỡng như thế nào', 'rau cải chứa gì'. " +
+      "CHỈ dùng khi X là NGUYÊN LIỆU ĐƠN LẺ (thịt, cá, rau, gạo...). " +
+      "KHÔNG dùng khi X là tên món ăn đã chế biến (phở, bánh, cơm tấm...) — dùng search_recipes thay thế.",
     parameters: {
       type: "object",
       properties: {
@@ -50,7 +50,8 @@ const CHAT_TOOLS = [
       idField: "_id",
       detailToolName: "get_ingredient_detail",
       paramName: "ingredient_id",
-      selectionPrompt: "Bạn muốn tìm hiểu về nguyên liệu nào trong danh sách trên?",
+      selectionPrompt:
+        "Bạn muốn tìm hiểu về nguyên liệu nào trong danh sách trên?",
     },
   },
   {
@@ -181,11 +182,11 @@ const CHAT_TOOLS = [
     description:
       "Tìm kiếm công thức món ăn theo tên hoặc theo tên nguyên liệu có trong món ăn đó. " +
       "Gọi khi user hỏi về một MÓN ĂN CỤ THỂ: 'dinh dưỡng của món X', " +
-    "'bánh bò bông bao nhiêu calo', 'phở bò có bao nhiêu protein', " +
-    "'tìm món X', 'công thức X'," +
+      "'bánh bò bông bao nhiêu calo', 'phở bò có bao nhiêu protein', " +
+      "'tìm món X', 'công thức X'," +
       "KHÔNG gọi khi user chỉ hỏi tư vấn chung về dinh dưỡng." +
       "Dùng tool này khi X là TÊN MÓN ĂN (phở, bánh, cơm, bún...). " +
-    "KHÔNG dùng khi X là nguyên liệu thô như thịt gà, gạo, trứng — dùng search_ingredients thay thế.",
+      "KHÔNG dùng khi X là nguyên liệu thô như thịt gà, gạo, trứng — dùng search_ingredients thay thế.",
     parameters: {
       type: "object",
       properties: {
@@ -230,9 +231,13 @@ const CHAT_TOOLS = [
   {
     name: "get_daily_menu",
     description:
-      "Lấy thực đơn (daily menu) của user theo ngày. " +
-      "Gọi khi user hỏi 'hôm nay ăn gì', 'thực đơn ngày X', 'kế hoạch ăn uống hôm nay'. " +
-      "Dùng date = today nếu user không nêu ngày cụ thể.",
+      "Lấy thực đơn ngày của user theo ngày và trạng thái. " +
+      "Gọi khi user hỏi 'hôm nay ăn gì', 'thực đơn ngày X', 'kế hoạch ăn uống hôm nay', " +
+      "'xem thực đơn gợi ý', 'thực đơn tôi đang dùng'. " +
+      "Dùng date = today nếu user không nêu ngày cụ thể. " +
+      "status_filter: " +
+      "'active' (mặc định) = manual + selected (thực đơn user đang dùng); " +
+      "'suggested' = thực đơn hệ thống gợi ý chưa được chọn; ",
     parameters: {
       type: "object",
       properties: {
@@ -241,8 +246,53 @@ const CHAT_TOOLS = [
           description:
             "Ngày cần lấy thực đơn, định dạng YYYY-MM-DD. Dùng ngày hôm nay nếu không được chỉ định.",
         },
+        status_filter: {
+          type: "string",
+          enum: ["active", "suggested"],
+          description:
+            "'active' = manual hoặc selected (mặc định, thực đơn user đang dùng); " +
+            "'suggested' = chỉ thực đơn hệ thống gợi ý; ",
+        },
       },
       required: ["date"],
+    },
+  },
+
+  {
+    name: "update_daily_menu_status",
+    description:
+      "Cập nhật trạng thái của thực đơn ngày (daily menu). " +
+      "Gọi khi user nói 'hoàn thành thực đơn', 'đánh dấu menu hôm nay đã xong', 'Chọn thực đơn này', 'hoàn thành',..." +
+      "PHẢI có daily_menu_id hợp lệ — nếu chưa có hoặc không chắc, " +
+      "gọi get_daily_menu trước để lấy ID hiện tại. ",
+    // "KHÔNG dùng ID từ lịch sử hội thoại cũ.",
+
+    parameters: {
+      type: "object",
+      properties: {
+        daily_menu_id: {
+          type: "string",
+          description: "MongoDB ObjectId của daily menu cần cập nhật",
+        },
+        new_status: {
+          type: "string",
+          enum: [
+            "manual",
+            "suggested",
+            "selected",
+            "completed",
+            "deleted",
+            "expired",
+          ],
+          description:
+            "Trạng thái mới của thực đơn: manual/completed/suggested/selected/deleted/expired." +
+            "Nếu user nói 'hoàn thành thực đơn', 'đánh dấu menu hôm nay đã xong' thì new_status = completed; " +
+            "Nếu user nói kiểu: 'Chọn thực đơn này' thì new_status = selected; " +
+            "Nếu user nói kiểu: 'hủy thực đơn này', 'xóa thực đơn này', 'không chọn thực đơn này nữa' thì new_status = deleted; " +
+            "Nếu user nói kiểu: 'đây là thực đơn tôi tự tạo' thì new_status = manual.",
+        },
+      },
+      required: ["daily_menu_id", "new_status"],
     },
   },
   {
@@ -281,7 +331,9 @@ const CHAT_TOOLS = [
       "Cập nhật một món ăn trong thực đơn ngày: thay đổi số lượng khẩu phần (scale) hoặc đánh dấu đã ăn. " +
       "Gọi khi user nói 'tăng/giảm khẩu phần món X', 'đánh dấu đã ăn món X', " +
       "'tôi đã ăn món này rồi', 'chưa ăn món đó'. " +
-      "Phải có dailyMenuId và recipeItemId — nếu chưa có, gọi get_daily_menu trước để lấy.",
+      "PHẢI có daily_menu_id và recipe_item_id hợp lệ — " +
+      "nếu chưa có hoặc không chắc, gọi get_daily_menu trước để lấy.",
+
     parameters: {
       type: "object",
       properties: {
@@ -313,7 +365,8 @@ const CHAT_TOOLS = [
       "Xoá hoàn toàn một món ăn khỏi thực đơn ngày. " +
       "Gọi khi user nói 'xoá món X', 'bỏ món X ra khỏi thực đơn', 'không ăn món X nữa'. " +
       "Phân biệt với update_recipe_in_menu (dùng khi chỉ đổi scale/checked). " +
-      "Phải có dailyMenuId và recipeItemId — nếu chưa có, gọi get_daily_menu trước.",
+      "PHẢI có daily_menu_id hợp lệ — " +
+      "nếu chưa có hoặc không chắc, gọi get_daily_menu trước để lấy.",
     parameters: {
       type: "object",
       properties: {
@@ -332,7 +385,7 @@ const CHAT_TOOLS = [
   {
     name: "suggest_daily_menu",
     description:
-      "Yêu cầu AI gợi ý thực đơn tự động cho 1 ngày dựa trên mục tiêu dinh dưỡng của user. " +
+      "Yêu cầu hệ thống gợi ý thực đơn tự động cho 1 ngày dựa trên mục tiêu dinh dưỡng của user. " +
       "Gọi khi user hỏi 'gợi ý thực đơn hôm nay', 'lên thực đơn cho tôi', 'ăn gì tốt cho mục tiêu của tôi'. " +
       "KHÔNG gọi nếu user chỉ muốn xem thực đơn đã có — dùng get_daily_menu thay thế.",
     parameters: {
