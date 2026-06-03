@@ -24,19 +24,32 @@ const WorkoutPlanSchema = new mongoose.Schema(
 
     weekEndDate: Date,
 
-    adaptiveScore: {
-      type: Number,
-      default: 0,
-    },
-
     fatigueScore: {
       type: Number,
       default: 0,
+      min: 0,
+      max: 10,
     },
 
-    progressionScore: {
+    recoveryScore: {
       type: Number,
       default: 0,
+      min: 0,
+      max: 10,
+    },
+
+    avgPerformanceScore: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 10,
+    },
+
+    readinessScore: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 10,
     },
 
     targetCalories: {
