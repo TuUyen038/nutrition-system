@@ -39,5 +39,5 @@ const recipeItemSchema = new mongoose.Schema(
     },
   },
 );
-
+  
 module.exports = recipeItemSchema;
