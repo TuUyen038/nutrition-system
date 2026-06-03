@@ -1,56 +1,52 @@
-const workoutSessionService = require("../services/workoutSession.service");
+const workoutSessionService = require(
+  "../services/workoutSession.service"
+);
 
 /**
  * ============================================
- * WORKOUT SESSION CONTROLLER
+ * START WORKOUT
  * ============================================
- * Handles workout session HTTP requests
  */
-
 const startWorkout = async (req, res) => {
   try {
-    const { userId, exerciseId, intensity } = req.body;
+    const {
+      userId,
+      planId,
+      day,
+      exerciseId,
+    } = req.body;
 
-    // Validate input
-    if (!userId || !exerciseId || !intensity) {
+    if (
+      !userId ||
+      !planId ||
+      !day ||
+      !exerciseId
+    ) {
       return res.status(400).json({
         success: false,
-        message: "userId, exerciseId, and intensity are required",
+        message:
+          "userId, planId, day, exerciseId are required",
       });
     }
 
-    const session = await workoutSessionService.startWorkout({ userId, exerciseId, intensity });
+    const session =
+      await workoutSessionService.startWorkout({
+        userId,
+        planId,
+        day,
+        exerciseId,
+      });
+
     return res.json({
       success: true,
       data: session,
     });
   } catch (error) {
-    console.error("startWorkout error:", error);
-    return res.status(400).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
+    console.error(
+      "startWorkout error:",
+      error
+    );
 
-const stopWorkout = async (req, res) => {
-  try {
-    const { sessionId } = req.body;
-
-    if (!sessionId) {
-      return res.status(400).json({
-        success: false,
-        message: "sessionId is required",
-      });
-    }
-
-    const session = await workoutSessionService.stopWorkout(sessionId);
-    return res.json({
-      success: true,
-      data: session,
-    });
-  } catch (error) {
-    console.error("stopWorkout error:", error);
     return res.status(400).json({
       success: false,
       message: error.message,
@@ -59,29 +55,52 @@ const stopWorkout = async (req, res) => {
 };
 
 /**
- * POST /workout-session/complete
- * Complete workout session and calculate calories burned
- * This is an alias for stopWorkout with more descriptive naming
+ * ============================================
+ * STOP WORKOUT
+ * ============================================
  */
-const completeWorkout = async (req, res) => {
+const stopWorkout = async (req, res) => {
   try {
-    const { sessionId } = req.body;
+    const {
+      sessionId,
+      completedSets,
+      completedReps,
+      perceivedDifficulty,
+    } = req.body;
 
-    if (!sessionId) {
+    if (
+      !sessionId ||
+      completedSets == null ||
+      completedReps == null ||
+      perceivedDifficulty == null
+    ) {
       return res.status(400).json({
         success: false,
-        message: "sessionId is required",
+        message:
+          "sessionId, completedSets, completedReps, perceivedDifficulty are required",
       });
     }
 
-    const session = await workoutSessionService.stopWorkout(sessionId);
+    const session =
+      await workoutSessionService.stopWorkout({
+        sessionId,
+        completedSets,
+        completedReps,
+        perceivedDifficulty,
+      });
+
     return res.json({
       success: true,
       data: session,
-      message: "Workout completed successfully",
+      message:
+        "Workout completed successfully",
     });
   } catch (error) {
-    console.error("completeWorkout error:", error);
+    console.error(
+      "stopWorkout error:",
+      error
+    );
+
     return res.status(400).json({
       success: false,
       message: error.message,
@@ -89,27 +108,58 @@ const completeWorkout = async (req, res) => {
   }
 };
 
-const getTodayKcal = async (req, res) => {
+/**
+ * ============================================
+ * COMPLETE WORKOUT
+ * ============================================
+ * Alias for stopWorkout
+ */
+const completeWorkout = async (
+  req,
+  res
+) => {
+  return stopWorkout(req, res);
+};
+
+/**
+ * ============================================
+ * GET TODAY KCAL
+ * ============================================
+ */
+const getTodayKcal = async (
+  req,
+  res
+) => {
   try {
     const { userId } = req.query;
 
     if (!userId) {
       return res.status(400).json({
         success: false,
-        message: "userId is required",
+        message:
+          "userId is required",
       });
     }
 
-    const result = await workoutSessionService.getTodayKcal(userId);
+    const result =
+      await workoutSessionService.getTodayKcal(
+        userId
+      );
+
     return res.json({
       success: true,
       data: result,
     });
   } catch (error) {
-    console.error("getTodayKcal error:", error);
+    console.error(
+      "getTodayKcal error:",
+      error
+    );
+
     return res.status(500).json({
       success: false,
-      message: "Error retrieving today's kcal",
+      message:
+        "Error retrieving today's kcal",
     });
   }
 };

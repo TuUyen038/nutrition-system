@@ -80,11 +80,64 @@ module.exports = {
         example: "strength_training",
         description: "Loại hoạt động",
       },
-      defaultIntensity: {
+      difficulty: {
         type: "string",
-        enum: ["light", "moderate", "vigorous"],
-        example: "moderate",
-        description: "Cường độ mặc định",
+        enum: ["beginner", "intermediate", "advanced"],
+        example: "beginner",
+        description: "Độ khó bài tập",
+      },
+      exerciseType: {
+        type: "string",
+        enum: [
+          "compound",
+          "isolation",
+          "cardio",
+          "mobility",
+          "stretching",
+        ],
+        example: "compound",
+        description: "Loại bài tập",
+      },
+      impactLevel: {
+        type: "string",
+        enum: ["low", "medium", "high"],
+        example: "medium",
+        description: "Mức độ tác động lên khớp/cơ thể",
+      },
+      fatigueScore: {
+        type: "number",
+        example: 7,
+        description: "Mức độ gây mệt mỏi (1-10)",
+      },
+      suitableGoals: {
+        type: "array",
+        items: {
+          type: "string",
+          enum: [
+            "lose_weight",
+            "maintain_weight",
+            "gain_weight",
+            "endurance",
+            "strength",
+            "mobility",
+          ],
+        },
+        example: ["lose_weight", "strength"],
+        description: "Mục tiêu phù hợp với bài tập",
+      },
+      avoidFor: {
+        type: "array",
+        items: {
+          type: "string",
+          enum: [
+            "knee_pain",
+            "lower_back_pain",
+            "shoulder_pain",
+            "obesity",
+          ],
+        },
+        example: ["lower_back_pain"],
+        description: "Các trường hợp nên tránh bài tập này",
       },
     },
   },

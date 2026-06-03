@@ -71,11 +71,27 @@ const ExerciseSchema = new mongoose.Schema(
       default: "strength_training",
       index: true,
     },
-    defaultIntensity: {
+    difficulty: {
       type: String,
-      enum: ["light", "moderate", "vigorous"],
-      default: "moderate",
+      enum: ["beginner", "intermediate", "advanced"],
     },
+    exerciseType: {
+      type: String,
+      enum: [
+        "compound",
+        "isolation",
+        "cardio",
+        "mobility",
+        "stretching",
+      ],
+    },
+    impactLevel: {
+      type: String,
+      enum: ["low", "medium", "high"],
+    },
+    fatigueScore: Number,
+    suitableGoals: [String],
+    avoidFor: [String],
     videos: {
       type: [String],
       default: [],

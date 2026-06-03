@@ -1,10 +1,36 @@
 const mongoose = require("mongoose");
 
+const metLevelSchema = new mongoose.Schema(
+  {
+    light: {
+      type: Number,
+      min: 0,
+      default: null,
+    },
+
+    moderate: {
+      type: Number,
+      min: 0,
+      default: null,
+    },
+
+    vigorous: {
+      type: Number,
+      min: 0,
+      default: null,
+    },
+  },
+  {
+    _id: false,
+  }
+);
+
 const ActivityMetSchema = new mongoose.Schema(
   {
     activityType: {
       type: String,
       required: true,
+      unique: true,
       index: true,
       enum: [
         "strength_training",
@@ -13,25 +39,24 @@ const ActivityMetSchema = new mongoose.Schema(
         "hiit",
         "aerobic_dance",
         "yoga_stretching",
-        "functional_training"
+        "functional_training",
       ],
     },
-    intensity: {
-      type: String,
+
+    mets: {
+      type: metLevelSchema,
       required: true,
-      enum: ["light", "moderate", "vigorous"],
-    },
-    met: {
-      type: Number,
-      required: true,
-      min: 0,
     },
   },
   {
     timestamps: true,
-  },
+  }
 );
 
-const ActivityMet = mongoose.model("ActivityMet", ActivityMetSchema, "activity_met");
+const ActivityMet = mongoose.model(
+  "ActivityMet",
+  ActivityMetSchema,
+  "activity_met"
+);
 
 module.exports = ActivityMet;

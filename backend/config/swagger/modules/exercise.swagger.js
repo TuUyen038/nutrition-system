@@ -2,18 +2,18 @@ module.exports = {
   "/exercises/import": {
     post: {
       tags: ["Exercise"],
-      summary: "Import exercises từ Wger API",
+      summary: "Import và enrich exercises từ Wger API",
       description: "Lấy dữ liệu bài tập từ Wger và lưu vào hệ thống",
       responses: {
         201: {
-          description: "Import thành công",
+          description: "Import và enrich thành công",
           content: {
             "application/json": {
               schema: {
                 type: "object",
                 properties: {
                   success: { type: "boolean", example: true },
-                  message: { type: "string", example: "Exercises imported successfully" },
+                  message: { type: "string", example: "Exercises imported and metadata enriched successfully" },
                   data: {
                     type: "object",
                     description: "Kết quả import (số lượng, danh sách...)",

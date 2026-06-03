@@ -1,5 +1,9 @@
 const Exercise = require("../models/Exercise");
 const User = require("../models/User");
+const WorkoutPlan = require("../models/WorkoutPlan");
+const ActivityMet = require("../models/ActivityMet");
+const {calculateUserPerformance} = require("./workoutAnalytics.service");
+const UserExerciseStats = require("../models/UserExerciseStats");
 
 // ====================
 // MAPPING CONSTANTS
@@ -15,9 +19,9 @@ const FITNESS_TO_WORKOUT_LEVEL = {
 };
 
 // Target calories burn per day based on goal
-const GOAL_CALORIES_TARGET = {
+const GOAL_TARGET_CALORIES = {
   lose_weight: 400,
-  maintain_weight: 200,
+  maintain_weight: 250,
   gain_weight: 150,
 };
 
@@ -31,14 +35,14 @@ const WORKOUT_DAYS_BY_LEVEL = {
 // Workout splits by level
 const WORKOUT_SPLITS = {
   beginner: ["full_body"], // 3 days: full_body x3
-  intermediate: ["upper", "lower", "upper", "lower"], // 4 days: upper/lower split
-  advanced: ["push", "pull", "legs", "push", "pull"], // 5 days: push/pull/legs split
+  intermediate: ["upper", "lower"], // 4 days: upper/lower split
+  advanced: ["push", "pull", "legs"], // 5 days: push/pull/legs split
 };
 
 // Muscle group mappings (based on exercise categories and muscles)
 const MUSCLE_GROUP_MAPPINGS = {
   push: ["chest", "shoulders", "triceps"],
-  pull: ["back", "biceps", "rear_delts"],
+  pull: ["back", "biceps"],
   legs: ["quads", "hamstrings", "calves", "glutes"],
   upper: ["chest", "back", "shoulders", "biceps", "triceps"],
   lower: ["quads", "hamstrings", "calves", "glutes"],
@@ -63,71 +67,73 @@ function getWorkoutLevel(fitnessLevel) {
   return FITNESS_TO_WORKOUT_LEVEL[fitnessLevel] || "beginner";
 }
 
-/**
- * Calculate target calories for workout day
- */
-function getTargetCalories(goal) {
-  return GOAL_CALORIES_TARGET[goal] || 200;
-}
+// =====================================
+// ANALYZE USER STATE
+// =====================================
 
-const TOTAL_DAYS = 30;
+async function analyzeUserState(userId) {
+  const analytics =
+    await calculateUserPerformance(
+      userId
+    );
 
-/**
- * Get workout days and split for the level
- */
-function getWorkoutPlanStructure(level) {
-  const daysPerWeek = WORKOUT_DAYS_BY_LEVEL[level];
-  const split = WORKOUT_SPLITS[level];
+  let recommendedIntensity =
+    "moderate";
 
-  // Create 30-day structure
-  const plan = [];
-  let splitIndex = 0;
-
-  for (let day = 1; day <= TOTAL_DAYS; day++) {
-    const dayOfWeek = ((day - 1) % 7) + 1;
-    const isWorkoutDay = dayOfWeek <= daysPerWeek;
-
-    if (isWorkoutDay) {
-      const muscleGroup = split[splitIndex % split.length];
-      plan.push({
-        day,
-        type: "workout",
-        muscleGroup,
-        targetCalories: 0, // Will be set later
-        exercises: [],
-      });
-      splitIndex++;
-    } else {
-      plan.push({
-        day,
-        type: "rest",
-      });
-    }
+  if (analytics.recoveryScore <= 4) {
+    recommendedIntensity = "light";
   }
 
-  return plan;
+  if (analytics.recoveryScore >= 8) {
+    recommendedIntensity =
+      "vigorous";
+  }
+
+  return {
+    fatigueScore:
+      analytics.fatigueScore,
+
+    progressionScore:
+      analytics.progressionScore,
+
+    readinessScore:
+      analytics.recoveryScore,
+
+    recommendedIntensity,
+  };
 }
 
-/**
- * Get exercises by muscle group
- */
-async function getExercisesByMuscleGroup(muscleGroup) {
-  const targetMuscles = MUSCLE_GROUP_MAPPINGS[muscleGroup] || [];
+// =====================================
+// GET EXERCISES BY FOCUS
+// =====================================
 
-  // Find exercises that target these muscles or match category
-  const exercises = await Exercise.find({
+async function getExercisesByFocus(focus) {
+  const muscles = MUSCLE_GROUP_MAPPINGS[focus] || [];
+
+  let exercises = await Exercise.find({
     $or: [
-      { "muscles.name": { $in: targetMuscles } },
-      { "muscles.name_en": { $in: targetMuscles } },
-      { category: { $regex: new RegExp(muscleGroup, "i") } },
-      { name: { $regex: new RegExp(muscleGroup, "i") } },
+      {
+        "muscles.name_en": {
+          $in: muscles,
+        },
+      },
+      {
+        "muscles.name": {
+          $in: muscles,
+        },
+      },
     ],
-    activityType: { $in: ["strength_training", "calisthenics", "functional_training"] },
-  }).limit(30); // Limit to avoid too many results
+    activityType: {
+      $in: [
+        "strength_training",
+        "functional_training",
+        "calisthenics",
+      ],
+    },
+  }).limit(50);
 
-  // If no exercises found with specific muscles, get general strength exercises
-  if (exercises.length === 0) {
-    return await Exercise.find({
+  if (!exercises.length) {
+    exercises = await Exercise.find({
       activityType: "strength_training",
     }).limit(20);
   }
@@ -135,119 +141,311 @@ async function getExercisesByMuscleGroup(muscleGroup) {
   return exercises;
 }
 
-/**
- * Calculate calories for exercise
- * Formula: MET × weight (kg) × duration (hours)
- */
-async function calculateExerciseCalories(exercise, weight, durationMinutes, intensity = "moderate") {
-  const ActivityMet = require("../models/ActivityMet");
+// =====================================
+// CALCULATE CALORIES
+// =====================================
 
-  // Try to get MET from database
-  let metValue = 5.0; // Default moderate intensity MET
+async function calculateCalories(
+  exercise,
+  weight,
+  duration,
+  intensity
+) {
+  let met = 5;
 
   try {
     const metData = await ActivityMet.findOne({
       activityType: exercise.activityType,
-      intensity: intensity,
     });
 
-    if (metData) {
-      metValue = metData.met;
+    if (
+      metData &&
+      metData.mets &&
+      metData.mets[intensity]
+    ) {
+      met = metData.mets[intensity];
     }
-  } catch (error) {
-    // Use default MET if database query fails
-    console.warn("Could not fetch MET data, using default:", error.message);
-  }
+  } catch (err) {}
 
-  const durationHours = durationMinutes / 60;
-  return Math.round(metValue * weight * durationHours);
+  return Math.round((met * weight * duration) / 60);
 }
 
-/**
- * Generate exercises for a workout day
- */
-async function generateDayExercises(muscleGroup, level, userWeight, targetCalories) {
-  const exercises = await getExercisesByMuscleGroup(muscleGroup);
-  const { sets, reps, duration } = SETS_REPS_BY_LEVEL[level];
+// =====================================
+// GENERATE DAY EXERCISES
+// =====================================
 
-  // Shuffle exercises to randomize
-  const shuffled = exercises.sort(() => 0.5 - Math.random());
+async function generateDayExercises({
+  userId,
+  fatigueScore,
+  focus,
+  level,
+  weight,
+  targetCalories,
+  intensity,
+}) {
+  const exercises = await getExercisesByFocus(focus);
 
-  const selectedExercises = [];
+  const stats =
+    await UserExerciseStats.find({
+      userId,
+    });
+
+  const statsMap = {};
+
+  stats.forEach((s) => {
+    statsMap[s.exerciseId] = s;
+  });
+
+  const shuffled = exercises
+    .map((exercise) => {
+      let score = 0;
+
+      const stat =
+        statsMap[exercise.exerciseId];
+
+      if (stat) {
+        score +=
+          stat.preferenceScore || 0;
+
+        const daysSinceLast =
+          stat.lastPerformedAt
+            ? (
+                Date.now() -
+                new Date(
+                  stat.lastPerformedAt
+                ).getTime()
+              ) /
+              (1000 * 60 * 60 * 24)
+            : 999;
+
+        if (daysSinceLast <= 2) {
+          score -= 5;
+        }
+      }
+
+      if (fatigueScore >= 7) {
+        score -= 2;
+      }
+
+      return {
+        exercise,
+        score,
+      };
+    })
+    .sort((a, b) => b.score - a.score)
+    .map((s) => s.exercise);
+
+  const config = SETS_REPS_BY_LEVEL[level];
+
+  let maxExercises = 4;
+
+  if (level === "intermediate") {
+    maxExercises = 5;
+  }
+
+  if (level === "advanced") {
+    maxExercises = 6;
+  }
+
+  // Adaptive volume
+  if (intensity === "light") {
+    maxExercises -= 1;
+  }
+
+  if (intensity === "vigorous") {
+    maxExercises += 1;
+  }
+
+  const selected = [];
+
   let totalCalories = 0;
-  const maxExercises = level === "beginner" ? 4 : level === "intermediate" ? 5 : 6;
-
+  
   for (let i = 0; i < Math.min(maxExercises, shuffled.length); i++) {
     const exercise = shuffled[i];
 
-    // Calculate duration per exercise (distribute total workout time)
-    const exerciseDuration = Math.max(5, duration / maxExercises);
+    const duration = Math.max(
+      5,
+      config.duration / maxExercises
+    );
 
-    const calories = await calculateExerciseCalories(exercise, userWeight, exerciseDuration);
+    const calories = await calculateCalories(
+      exercise,
+      weight,
+      duration,
+      intensity
+    );
 
-    selectedExercises.push({
+    selected.push({
       exerciseId: exercise.exerciseId,
       name: exercise.name,
-      sets,
-      reps,
-      duration: exerciseDuration,
+      sets: config.sets,
+      reps: config.reps,
+      duration,
       calories,
+      intensity,
     });
 
-    totalCalories += calories;
+     totalCalories += calories;
 
-    // Stop if close to target (within 20% of target)
     if (totalCalories >= targetCalories * 0.8) {
       break;
     }
   }
 
-  return selectedExercises;
+  return {
+    exercises: selected,
+    totalCalories,
+    totalDuration: selected.reduce(
+      (sum, ex) => sum + ex.duration,
+      0
+    ),
+  };
 }
 
-/**
- * Generate complete workout plan
- */
-async function generateWorkoutPlan(userId) {
-  // Get user data
+// =====================================
+// CREATE WEEK STRUCTURE
+// =====================================
+
+function createWeeklyStructure(level) {
+  const workoutDays = WORKOUT_DAYS_BY_LEVEL[level];
+
+  const splits = WORKOUT_SPLITS[level];
+
+  const week = [];
+
+  let splitIndex = 0;
+
+  for (let day = 1; day <= 7; day++) {
+    const isWorkoutDay = day <= workoutDays;
+
+    if (isWorkoutDay) {
+      week.push({
+        day,
+        type: "workout",
+        focus: splits[splitIndex % splits.length],
+      });
+
+      splitIndex++;
+    } else {
+      week.push({
+        day,
+        type: "rest",
+        focus: "recovery",
+      });
+    }
+  }
+
+  return week;
+}
+
+// =====================================
+// GENERATE ADAPTIVE WEEKLY PLAN
+// =====================================
+
+async function generateAdaptiveWorkoutPlan(userId) {
   const user = await User.findById(userId);
+
   if (!user) {
     throw new Error("User not found");
   }
 
   const workoutLevel = getWorkoutLevel(user.fitnessLevel);
-  const targetCalories = getTargetCalories(user.goal);
 
-  // Generate plan structure
-  const plan = getWorkoutPlanStructure(workoutLevel);
+  const targetCalories =
+    GOAL_TARGET_CALORIES[user.goal] || 200;
 
-  // Generate exercises for workout days
-  for (const day of plan) {
-    if (day.type === "workout") {
-      day.targetCalories = targetCalories;
-      day.exercises = await generateDayExercises(
-        day.muscleGroup,
-        workoutLevel,
-        user.weight,
-        targetCalories
-      );
+  const state = await analyzeUserState(userId);
+
+  const weeklyStructure = createWeeklyStructure(
+    workoutLevel
+  );
+
+  const today = new Date();
+
+  const days = [];
+
+  for (const item of weeklyStructure) {
+    const currentDate = new Date(today);
+
+    currentDate.setDate(today.getDate() + (item.day - 1));
+
+    if (item.type === "rest") {
+      days.push({
+        day: item.day,
+        date: currentDate,
+        type: "rest",
+        focus: "recovery",
+        targetCalories: 0,
+        totalCalories: 0,
+        totalDuration: 0,
+        exerciseDetails: [],
+        estimatedDifficulty: 1,
+        completed: false,
+        skipped: false,
+      });
+
+      continue;
     }
+
+    const generated = await generateDayExercises({
+      userId,
+      fatigueScore: state.fatigueScore,
+      focus: item.focus,
+      level: workoutLevel,
+      weight: user.weight,
+      targetCalories,
+      intensity: state.recommendedIntensity,
+    });
+
+    days.push({
+      day: item.day,
+      date: currentDate,
+      type: "workout",
+      focus: item.focus,
+
+      targetCalories,
+
+      estimatedDifficulty:
+        state.recommendedIntensity === "light"
+          ? 4
+          : state.recommendedIntensity === "vigorous"
+          ? 8
+          : 6,
+
+      exerciseDetails: generated.exercises,
+
+      totalCalories: generated.totalCalories,
+
+      totalDuration: generated.totalDuration,
+
+      completed: false,
+      skipped: false,
+    });
   }
 
   return {
-    userId,
     workoutLevel,
+
+    currentWeek: 1,
+
     targetCalories,
-    plan,
-    generatedAt: new Date(),
+
+    fatigueScore: state.fatigueScore,
+
+    progressionScore: state.progressionScore,
+
+    adaptiveScore: state.readinessScore,
+
+    weekStartDate: today,
+
+    weekEndDate: new Date(
+      today.getTime() + 6 * 24 * 60 * 60 * 1000
+    ),
+
+    days,
   };
 }
 
 module.exports = {
-  generateWorkoutPlan,
-  getWorkoutLevel,
-  getTargetCalories,
-  getWorkoutPlanStructure,
-  getExercisesByMuscleGroup,
-  calculateExerciseCalories,
+  generateAdaptiveWorkoutPlan,
 };
