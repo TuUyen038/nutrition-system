@@ -44,11 +44,13 @@ async function generateWeeklyPlan(userId) {
 
       weekEndDate: generated.weekEndDate,
 
-      adaptiveScore: generated.adaptiveScore,
+      recoveryScore: generated.recoveryScore,
+
+      avgPerformanceScore: generated.avgPerformanceScore,
+
+      readinessScore: generated.readinessScore,
 
       fatigueScore: generated.fatigueScore,
-
-      progressionScore: generated.progressionScore,
 
       targetCalories: generated.targetCalories,
 
@@ -185,9 +187,11 @@ async function getPlanStats(userId) {
 
     fatigueScore: plan.fatigueScore,
 
-    progressionScore: plan.progressionScore,
+    recoveryScore: plan.recoveryScore,
 
-    adaptiveScore: plan.adaptiveScore,
+    avgPerformanceScore: plan.avgPerformanceScore,
+
+    readinessScore: plan.readinessScore,
   };
 }
 

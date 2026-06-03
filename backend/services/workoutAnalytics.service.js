@@ -12,7 +12,8 @@ async function calculateUserPerformance(userId) {
     return {
       fatigueScore: 0,
       recoveryScore: 8,
-      progressionScore: 1,
+      avgPerformanceScore: 5,
+      readinessScore: 7,
     };
   }
 
@@ -23,16 +24,17 @@ async function calculateUserPerformance(userId) {
       0
     ) / sessions.length;
 
-  const avgPerformance =
+  const avgPerformanceScore =
     sessions.reduce(
       (sum, s) =>
         sum + (s.performanceScore || 0),
       0
     ) / sessions.length;
 
+  // Fatigue score (điểm mệt mỏi) được tính dựa trên độ khó trung bình và hiệu suất trung bình
   let fatigueScore = avgDifficulty;
 
-  if (avgPerformance < 5) {
+  if (avgPerformanceScore < 5) {
     fatigueScore += 2;
   }
 
@@ -41,9 +43,16 @@ async function calculateUserPerformance(userId) {
     Math.round(fatigueScore)
   );
 
+  // Recovery score (điểm phục hồi) được tính dựa trên điểm mệt mỏi
   const recoveryScore = Math.max(
     1,
     10 - fatigueScore
+  );
+
+  // Readiness score (điểm sẵn sàng) được tính dựa trên điểm mệt mỏi và hiệu suất trung bình
+  const readinessScore = Math.round(
+    recoveryScore * 0.6 +
+    avgPerformanceScore * 0.4
   );
 
   return {
@@ -51,9 +60,10 @@ async function calculateUserPerformance(userId) {
 
     recoveryScore,
 
-    progressionScore: Math.round(
-      avgPerformance
-    ),
+    avgPerformanceScore:
+      Math.round(avgPerformanceScore),
+
+    readinessScore,
   };
 }
 

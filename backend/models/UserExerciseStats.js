@@ -31,6 +31,8 @@ const UserExerciseStatsSchema = new mongoose.Schema(
     avgPerformanceScore: {
       type: Number,
       default: 0,
+      min: 0,
+      max: 10,
     },
 
     totalDifficulty: {
@@ -41,11 +43,15 @@ const UserExerciseStatsSchema = new mongoose.Schema(
     avgDifficulty: {
       type: Number,
       default: 0,
+      min: 0,
+      max: 10,
     },
 
     preferenceScore: {
       type: Number,
       default: 0,
+      min: 0,
+      max: 10,
     },
 
     lastPerformedAt: {
@@ -58,10 +64,15 @@ const UserExerciseStatsSchema = new mongoose.Schema(
   }
 );
 
-UserExerciseStatsSchema.index({
-  userId: 1,
-  exerciseId: 1,
-});
+UserExerciseStatsSchema.index(
+  {
+    userId: 1,
+    exerciseId: 1,
+  },
+  {
+    unique: true,
+  }
+);
 
 module.exports = mongoose.model(
   "UserExerciseStats",

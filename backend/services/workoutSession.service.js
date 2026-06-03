@@ -68,19 +68,19 @@ async function updateExerciseStats({
 
   stats.completedSessions += 1;
 
-  stats.avgPerformanceScore =
-    (stats.avgPerformanceScore +
-      performanceScore) /
-    2;
+  // Performance score được cập nhật theo trung bình cộng
+  stats.totalPerformanceScore += performanceScore;
 
-  stats.avgDifficulty =
-    (stats.avgDifficulty +
-      perceivedDifficulty) /
-    2;
+  stats.avgPerformanceScore = stats.totalPerformanceScore / stats.completedSessions;
 
-  stats.preferenceScore =
-    stats.avgPerformanceScore -
-    stats.avgDifficulty / 2;
+  // Độ khó trung bình được cập nhật theo trung bình cộng
+  stats.totalDifficulty += perceivedDifficulty;
+  
+  stats.avgDifficulty = stats.totalDifficulty / stats.completedSessions;
+
+  // Preference score có thể được tính dựa trên hiệu suất và độ khó
+  stats.preferenceScore = (stats.avgPerformanceScore * 0.7) +
+  ((10 - stats.avgDifficulty) * 0.3);
 
   stats.lastPerformedAt = new Date();
 

@@ -80,24 +80,26 @@ async function analyzeUserState(userId) {
   let recommendedIntensity =
     "moderate";
 
-  if (analytics.recoveryScore <= 4) {
+  if (analytics.readinessScore <= 4) {
     recommendedIntensity = "light";
   }
 
-  if (analytics.recoveryScore >= 8) {
-    recommendedIntensity =
-      "vigorous";
+  if (analytics.readinessScore >= 8) {
+    recommendedIntensity = "vigorous";
   }
 
   return {
     fatigueScore:
       analytics.fatigueScore,
 
-    progressionScore:
-      analytics.progressionScore,
+    recoveryScore:
+      analytics.recoveryScore,
+
+    avgPerformanceScore:
+      analytics.avgPerformanceScore,
 
     readinessScore:
-      analytics.recoveryScore,
+      analytics.readinessScore,
 
     recommendedIntensity,
   };
@@ -432,9 +434,12 @@ async function generateAdaptiveWorkoutPlan(userId) {
 
     fatigueScore: state.fatigueScore,
 
-    progressionScore: state.progressionScore,
+    recoveryScore: state.recoveryScore,
 
-    adaptiveScore: state.readinessScore,
+    avgPerformanceScore:
+      state.avgPerformanceScore,
+
+    readinessScore: state.readinessScore,
 
     weekStartDate: today,
 
