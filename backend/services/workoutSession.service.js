@@ -149,7 +149,7 @@ async function startWorkout({
     targetReps:
       exerciseData.reps,
 
-    targetCalories:
+    estimatedCalories:
       exerciseData.calories,
 
     muscleGroups:

@@ -182,7 +182,7 @@ async function generateDayExercises({
   focus,
   level,
   weight,
-  targetCalories,
+  dailyTargetCalories,
   intensity,
 }) {
   const exercises = await getExercisesByFocus(focus);
@@ -289,14 +289,14 @@ async function generateDayExercises({
 
      totalCalories += calories;
 
-    if (totalCalories >= targetCalories * 0.8) {
+    if (totalCalories >= dailyTargetCalories) {
       break;
     }
   }
 
   return {
     exercises: selected,
-    totalCalories,
+    estimatedCalories: totalCalories,
     totalDuration: selected.reduce(
       (sum, ex) => sum + ex.duration,
       0
@@ -353,8 +353,7 @@ async function generateAdaptiveWorkoutPlan(userId) {
 
   const workoutLevel = getWorkoutLevel(user.fitnessLevel);
 
-  const targetCalories =
-    GOAL_TARGET_CALORIES[user.goal] || 200;
+  const dailyTargetCalories = GOAL_TARGET_CALORIES[user.goal] || 200;
 
   const state = await analyzeUserState(userId);
 
@@ -365,6 +364,9 @@ async function generateAdaptiveWorkoutPlan(userId) {
   const today = new Date();
 
   const days = [];
+
+  let weeklyEstimatedCalories = 0;
+  let weeklyTargetCalories = 0;
 
   for (const item of weeklyStructure) {
     const currentDate = new Date(today);
@@ -377,8 +379,8 @@ async function generateAdaptiveWorkoutPlan(userId) {
         date: currentDate,
         type: "rest",
         focus: "recovery",
-        targetCalories: 0,
-        totalCalories: 0,
+        dailyTargetCalories: 0,
+        estimatedCalories: 0,
         totalDuration: 0,
         exerciseDetails: [],
         estimatedDifficulty: 1,
@@ -395,9 +397,12 @@ async function generateAdaptiveWorkoutPlan(userId) {
       focus: item.focus,
       level: workoutLevel,
       weight: user.weight,
-      targetCalories,
+      dailyTargetCalories,
       intensity: state.recommendedIntensity,
     });
+
+    weeklyEstimatedCalories += generated.estimatedCalories;
+    weeklyTargetCalories += dailyTargetCalories;
 
     days.push({
       day: item.day,
@@ -405,7 +410,11 @@ async function generateAdaptiveWorkoutPlan(userId) {
       type: "workout",
       focus: item.focus,
 
-      targetCalories,
+      dailyTargetCalories,
+    
+      estimatedCalories: generated.estimatedCalories,
+
+      totalDuration: generated.totalDuration,
 
       estimatedDifficulty:
         state.recommendedIntensity === "light"
@@ -414,15 +423,11 @@ async function generateAdaptiveWorkoutPlan(userId) {
           ? 8
           : 6,
 
-      exerciseDetails: generated.exercises,
-
-      totalCalories: generated.totalCalories,
-
-      totalDuration: generated.totalDuration,
+      exerciseDetails: generated.exercises,      
 
       completed: false,
       skipped: false,
-    });
+    }); 
   }
 
   return {
@@ -430,14 +435,15 @@ async function generateAdaptiveWorkoutPlan(userId) {
 
     currentWeek: 1,
 
-    targetCalories,
+    weeklyTargetCalories,
+
+    weeklyEstimatedCalories,
 
     fatigueScore: state.fatigueScore,
 
     recoveryScore: state.recoveryScore,
 
-    avgPerformanceScore:
-      state.avgPerformanceScore,
+    avgPerformanceScore: state.avgPerformanceScore,
 
     readinessScore: state.readinessScore,
 

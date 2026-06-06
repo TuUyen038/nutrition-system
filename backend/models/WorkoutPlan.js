@@ -24,6 +24,12 @@ const WorkoutPlanSchema = new mongoose.Schema(
 
     weekEndDate: Date,
 
+    // Weekly target calories
+    weeklyTargetCalories: { type: Number, default: 0, }, 
+    
+    weeklyEstimatedCalories: { type: Number, default: 0, },
+
+    // Adapative scores
     fatigueScore: {
       type: Number,
       default: 0,
@@ -52,11 +58,6 @@ const WorkoutPlanSchema = new mongoose.Schema(
       max: 10,
     },
 
-    targetCalories: {
-      type: Number,
-      default: 200,
-    },
-
     days: [
       {
         day: Number,
@@ -81,7 +82,12 @@ const WorkoutPlanSchema = new mongoose.Schema(
           ],
         },
 
-        targetCalories: Number,
+        // daily target calories
+        dailyTargetCalories: { type: Number, default: 0, },
+
+        estimatedCalories: { type: Number, default: 0, },
+
+        totalDuration: { type: Number, default: 0, },
 
         estimatedDifficulty: {
           type: Number,
@@ -121,10 +127,6 @@ const WorkoutPlanSchema = new mongoose.Schema(
             },
           },
         ],
-
-        totalCalories: Number,
-
-        totalDuration: Number,
       },
     ],
 
