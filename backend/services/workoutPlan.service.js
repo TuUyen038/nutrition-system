@@ -44,6 +44,10 @@ async function generateWeeklyPlan(userId) {
 
       weekEndDate: generated.weekEndDate,
 
+      weeklyTargetCalories: generated.weeklyTargetCalories,
+
+      weeklyEstimatedCalories: generated.weeklyEstimatedCalories,
+
       recoveryScore: generated.recoveryScore,
 
       avgPerformanceScore: generated.avgPerformanceScore,

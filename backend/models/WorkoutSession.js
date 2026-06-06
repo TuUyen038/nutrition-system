@@ -75,7 +75,7 @@ const WorkoutSessionSchema = new mongoose.Schema(
       default: 0,
     },
 
-    targetCalories: {
+    estimatedCalories: {
       type: Number,
       default: 0,
     },
