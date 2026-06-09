@@ -25,6 +25,7 @@ function getTodayVN() {
     timeZone: "Asia/Ho_Chi_Minh",
   });
 }
+const isValidObjectId = (id) => /^[a-f\d]{24}$/i.test(id);
 
 /**
  * Generic helper: format user selection prompt cho search tools
@@ -48,7 +49,7 @@ function formatUserSelectionPrompt(toolName, data, selectionConfig) {
     .join("\n");
 
   const instruction =
-    `📋 Danh sách kết quả:\n${itemsList}\n\n` +
+    `Danh sách kết quả:\n${itemsList}\n\n` +
     `${selectionConfig.selectionPrompt}\n` +
     `(Bạn có thể nói số thứ tự hoặc tên của mục muốn xem chi tiết)`;
 
@@ -85,6 +86,9 @@ async function executeTool(toolName, args, userId) {
       case "get_daily_menu":
         return await _getDailyMenu(args, userId);
 
+      case "update_daily_menu_status":
+        return await _updateDailyMenuStatus(args, userId);
+        
       case "add_recipe_to_daily_menu":
         return await _addRecipeToDailyMenu(args, userId);
 
@@ -234,44 +238,70 @@ async function _getRecipeDetail(args) {
 }
 
 // ─── DAILY MENU ───────────────────────────────────────────────────────────────
-
 async function _getDailyMenu(args, userId) {
   const date = args.date || getTodayVN();
-
-  const menu = await dailyMenuService.getDailyMenuByDate({ userId, date });
-
-  if (!menu || !menu.recipes?.length) {
-    return {
-      success: true,
-      data: null,
-      summary: `Chưa có thực đơn cho ngày ${date}. Bạn có thể gợi ý thực đơn mới.`,
-    };
+  const statusFilter = args.status_filter || "active";
+ 
+  const STATUS_MAP = {
+    active:    ["manual", "selected"],
+    suggested: ["suggested"],
+  };
+  const statuses = STATUS_MAP[statusFilter] || STATUS_MAP.active;
+ 
+  const menus = await dailyMenuService.getDailyMenusByDateAndStatus({
+    userId,
+    date,
+    statuses,
+  });
+ 
+  if (!menus.length) {
+    const hint =
+      statusFilter === "suggested"
+        ? `Chưa có thực đơn gợi ý cho ngày ${date}. Hỏi người dùng có muốn hệ thống tạo gợi ý không. Không được tự gọi hàm khác.`
+        : `Chưa có thực đơn cho ngày ${date}. Nếu user chưa có thực đơn nào cho ngày này, hãy hỏi user có muốn hệ thống gợi ý thực đơn không. `;
+    return { success: true, data: [], summary: hint };
   }
-
-  const recipeSummary = menu.recipes.map((r) => ({
-    recipeItemId: r._id, // ← subdoc _id, dùng cho update/delete
-    recipeId: r.recipeId,
-    name: r.name,
-    servingTime: r.servingTime,
-    scale: r.scale,
-    calories: r.nutrition?.calories,
-    isChecked: r.isChecked,
-  }));
-
-  return {
-    success: true,
-    data: {
+ 
+  const formattedMenus = menus.map((menu) => {
+    const recipeSummary = (menu.recipes || []).map((r) => ({
+      recipeItemId: r._id,
+      recipeId: r.recipeId,
+      name: r.name,
+      servingTime: r.servingTime,
+      scale: r.scale,
+      calories: r.nutrition?.calories,
+      isChecked: r.isChecked,
+    }));
+ 
+    return {
       _id: menu._id,
       date: menu.date,
       status: menu.status,
       recipes: recipeSummary,
       totalNutrition: menu.totalNutrition,
       targetNutrition: menu.targetNutrition,
-    },
+    };
+  });
+ 
+  // Summary include đủ ID để Gemini dùng cho các tool tiếp theo
+  const summaryParts = formattedMenus.map((menu) => {
+    const recipeList = menu.recipes
+      .map((r) => `${r.name} (${r.servingTime}, scale: ${r.scale}, recipeItemId: ${r.recipeItemId})`)
+      .join(", ");
+    return (
+      `[${menu.status}] menuId: ${menu._id} — ` +
+      `${menu.recipes.length} món: ${recipeList || "chưa có món"}, ` +
+      `tổng ${menu.totalNutrition?.calories || 0} kcal`
+    );
+  });
+ console.log(">>>>summary:", summaryParts.join(" | "));
+  return {
+    success: true,
+    data: formattedMenus,
     summary:
-      `Thực đơn ngày ${date}: ${recipeSummary.length} món, ` +
-      `tổng ${menu.totalNutrition?.calories || 0} kcal. ` +
-      `Các món: ${recipeSummary.map((r) => `${r.name} (${r.servingTime})`).join(", ")}.`,
+      `Thực đơn ngày ${date} (${statusFilter}): ` +
+      summaryParts.join(" | ") +
+      `. Dùng menuId cho update_daily_menu_status, recipeItemId cho update/delete recipe.`,
   };
 }
 
@@ -304,115 +334,190 @@ async function _addRecipeToDailyMenu(args, userId) {
       `Tổng calo ngày đó hiện là ${result.totalNutrition?.calories || 0} kcal.`,
   };
 }
+// chatTools.executor.js
 
 async function _updateRecipeInMenu(args, userId) {
   const { daily_menu_id, recipe_item_id, new_scale, checked } = args;
 
-  if (new_scale === undefined && checked === undefined) {
+  if (!isValidObjectId(daily_menu_id) || !isValidObjectId(recipe_item_id)) {
     return {
       success: false,
-      error: "Thiếu thông tin cập nhật: cần new_scale hoặc checked",
-      summary: "Vui lòng cung cấp new_scale hoặc checked để cập nhật món ăn.",
+      error: "ID không hợp lệ",
+      summary:
+        "daily_menu_id hoặc recipe_item_id không hợp lệ. " +
+        "Gọi get_daily_menu trước để lấy đúng menuId và recipeItemId.",
     };
   }
 
-  const result = await dailyMenuService.updateRecipeInMenu({
-    userId,
-    dailyMenuId: daily_menu_id,
-    recipeItemId: recipe_item_id,
-    newScale: typeof new_scale === "number" ? new_scale : undefined,
-    checked,
-  });
-
-  // Item vẫn còn trong result nếu scale > 0
-  const updatedItem = result.recipes.find(
-    (r) => r._id?.toString() === recipe_item_id,
-  );
-
-  const changes = [];
-  if (typeof new_scale === "number") {
-    changes.push(
-      new_scale <= 0
-        ? "đã xoá món khỏi thực đơn"
-        : `đã cập nhật khẩu phần thành ${new_scale}`,
-    );
+  if (new_scale === undefined && checked === undefined) {
+    return {
+      success: false,
+      error: "Thiếu thông tin cập nhật",
+      summary: "Cần cung cấp new_scale hoặc checked.",
+    };
   }
-  if (checked === true) changes.push("đã đánh dấu đã ăn");
-  if (checked === false) changes.push("đã bỏ đánh dấu đã ăn");
 
-  return {
-    success: true,
-    data: {
-      dailyMenuId: result._id,
-      updatedItem: updatedItem
-        ? {
-            name: updatedItem.name,
-            scale: updatedItem.scale,
-            isChecked: updatedItem.isChecked,
-          }
-        : null,
-      newTotalNutrition: result.totalNutrition,
-    },
-    summary:
-      `${changes.join(", ")}. ` +
-      `Tổng calo thực đơn: ${result.totalNutrition?.calories || 0} kcal.`,
-  };
+  try {
+    const result = await dailyMenuService.updateRecipeInMenu({
+      userId,
+      dailyMenuId: daily_menu_id,
+      recipeItemId: recipe_item_id,
+      newScale: typeof new_scale === "number" ? new_scale : undefined,
+      checked,
+    });
+
+    const updatedItem = result.recipes.find(
+      (r) => r._id?.toString() === recipe_item_id,
+    );
+    const changes = [];
+    if (typeof new_scale === "number")
+      changes.push(new_scale <= 0 ? "đã xoá món" : `khẩu phần → ${new_scale}`);
+    if (checked === true) changes.push("đã đánh dấu đã ăn");
+    if (checked === false) changes.push("bỏ đánh dấu đã ăn");
+
+    return {
+      success: true,
+      data: {
+        dailyMenuId: result._id,
+        updatedItem: updatedItem
+          ? { name: updatedItem.name, scale: updatedItem.scale, isChecked: updatedItem.isChecked }
+          : null,
+        newTotalNutrition: result.totalNutrition,
+      },
+      summary:
+        `${changes.join(", ")}. Tổng calo: ${result.totalNutrition?.calories || 0} kcal.`,
+    };
+  } catch (err) {
+    // Trả hint rõ để Gemini tự recover thay vì fallback
+    return {
+      success: false,
+      error: err.message,
+      summary:
+        `Không thể cập nhật món ăn: ${err.message}. ` +
+        `Gọi get_daily_menu(date: hôm nay) để lấy lại menuId và recipeItemId hợp lệ, sau đó thử lại.`,
+    };
+  }
 }
 
 async function _deleteRecipeInMenu(args, userId) {
   const { daily_menu_id, recipe_item_id } = args;
 
-  const result = await dailyMenuService.deleteRecipeInMenu({
-    userId,
-    dailyMenuId: daily_menu_id,
-    recipeItemId: recipe_item_id,
-  });
+  if (!isValidObjectId(daily_menu_id) || !isValidObjectId(recipe_item_id)) {
+    return {
+      success: false,
+      error: "ID không hợp lệ",
+      summary:
+        "daily_menu_id hoặc recipe_item_id không hợp lệ. " +
+        "Gọi get_daily_menu trước để lấy đúng menuId và recipeItemId.",
+    };
+  }
 
-  return {
-    success: true,
-    data: {
-      dailyMenuId: result._id,
-      remainingCount: result.recipes.length,
-      newTotalNutrition: result.totalNutrition,
-    },
-    summary:
-      `Đã xoá món khỏi thực đơn. ` +
-      `Còn ${result.recipes.length} món, tổng ${result.totalNutrition?.calories || 0} kcal.`,
-  };
+  try {
+    const result = await dailyMenuService.deleteRecipeInMenu({
+      userId,
+      dailyMenuId: daily_menu_id,
+      recipeItemId: recipe_item_id,
+    });
+
+    return {
+      success: true,
+      data: {
+        dailyMenuId: result._id,
+        remainingCount: result.recipes.length,
+        newTotalNutrition: result.totalNutrition,
+      },
+      summary:
+        `Đã xoá món khỏi thực đơn. ` +
+        `Còn ${result.recipes.length} món, tổng ${result.totalNutrition?.calories || 0} kcal.`,
+    };
+  } catch (err) {
+    return {
+      success: false,
+      error: err.message,
+      summary:
+        `Không thể xoá món ăn: ${err.message}. ` +
+        `Gọi get_daily_menu(date: hôm nay) để lấy lại menuId và recipeItemId hợp lệ, sau đó thử lại.`,
+    };
+  }
 }
 
+async function _updateDailyMenuStatus(args, userId) {
+  const { daily_menu_id, new_status } = args;
+
+  if (!isValidObjectId(daily_menu_id)) {
+    return {
+      success: false,
+      error: "ID không hợp lệ",
+      summary:
+        "daily_menu_id không hợp lệ. " +
+        "Gọi get_daily_menu trước để lấy đúng menuId.",
+    };
+  }
+
+  const validStatuses = ["manual", "suggested", "selected", "completed", "deleted", "expired"];
+  if (!validStatuses.includes(new_status)) {
+    return {
+      success: false,
+      error: "Trạng thái không hợp lệ",
+      summary: `Trạng thái "${new_status}" không hợp lệ. Chọn một trong: ${validStatuses.join(", ")}.`,
+    };
+  }
+
+  try {
+    const result = await dailyMenuService.updateDailyMenuStatus({
+      userId,
+      dailyMenuId: daily_menu_id,
+      newStatus: new_status,
+    });
+
+    return {
+      success: true,
+      data: { dailyMenuId: result._id, newStatus: result.status },
+      summary: `Đã cập nhật trạng thái thực đơn thành "${result.status}".`,
+    };
+  } catch (err) {
+    return {
+      success: false,
+      error: err.message,
+      summary:
+        `Không thể cập nhật trạng thái: ${err.message}. ` +
+        `Gọi get_daily_menu(date: hôm nay) để lấy lại menuId hợp lệ, sau đó thử lại.`,
+    };
+  }
+}
 async function _suggestDailyMenu(args, userId) {
   const date = args.date || getTodayVN();
-
   const result = await mealRecommendationService.recommendDayPlan(userId, {
     date: new Date(date),
   });
-
-  // Nhóm theo bữa ăn để dễ đọc
   const byMeal = {};
   (result.recipes || []).forEach((r) => {
     const meal = r.servingTime || "other";
     if (!byMeal[meal]) byMeal[meal] = [];
     byMeal[meal].push(r.name);
   });
-
+ 
   const mealSummary = Object.entries(byMeal)
     .map(([meal, names]) => `${meal}: ${names.join(", ")}`)
     .join("; ");
-
+ 
+  const menuId = result._id;
+ 
   return {
     success: true,
     data: {
-      _id: result._id,
+      _id: menuId,
       date: result.date,
       totalNutrition: result.totalNutrition,
       targetNutrition: result.targetNutrition,
       byMeal,
     },
     summary:
-      `Đã tạo thực đơn gợi ý cho ngày ${date}: ${mealSummary}. ` +
+      `Đã tạo thực đơn gợi ý cho ngày ${date} (menuId: ${menuId}): ${mealSummary}. ` +
       `Tổng: ${result.totalNutrition?.calories || 0} kcal ` +
-      `(mục tiêu: ${result.targetNutrition?.calories || 0} kcal).`,
+      `(mục tiêu: ${result.targetNutrition?.calories || 0} kcal). ` +
+      `Nếu user đồng ý lưu/chọn → gọi update_daily_menu_status(daily_menu_id: "${menuId}", new_status: "selected"). ` +
+      `Hỏi user xác nhận và embed: [pending_action: update_daily_menu_status|daily_menu_id:${menuId}|new_status:selected]`,
   };
 }
 
