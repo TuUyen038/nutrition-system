@@ -31,7 +31,8 @@ class MealPlanService {
       .sort({ createdAt: -1 })
       .lean();
 
-    if (!goal) throw new Error("Không tìm thấy mục tiêu dinh dưỡng đang hoạt động.");
+    if (!goal)
+      throw new Error("Không tìm thấy mục tiêu dinh dưỡng đang hoạt động.");
 
     const start = dayjs(startDateStr);
     const dailyMenuIds = [];
@@ -87,7 +88,11 @@ class MealPlanService {
     const endDate = calculateEndDate(startDateNorm, period);
     const dates = this._generateDateList(startDateNorm, period);
 
-    const existingMenus = await DailyMenu.find({ userId, date: { $in: dates }, status: { $in: ["manual", "selected"] } }).lean();
+    const existingMenus = await DailyMenu.find({
+      userId,
+      date: { $in: dates },
+      status: { $in: ["manual", "selected"] },
+    }).lean();
     const existingMap = {};
     existingMenus.forEach((dm) => {
       existingMap[normalizeDate(dm.date)] = dm;
@@ -103,7 +108,15 @@ class MealPlanService {
           userId,
           date,
           recipes: [],
-          totalNutrition: { calories: 0, protein: 0, fat: 0, carbs: 0, fiber: 0, sugar: 0, sodium: 0 },
+          totalNutrition: {
+            calories: 0,
+            protein: 0,
+            fat: 0,
+            carbs: 0,
+            fiber: 0,
+            sugar: 0,
+            sodium: 0,
+          },
           status: "manual",
         });
       }
@@ -175,7 +188,11 @@ class MealPlanService {
    */
   async checkWeekDailyMenus({ userId, startDateStr, days = 7 }) {
     const dates = this._generateDateList(startDateStr, days);
-    const menus = await DailyMenu.find({ userId, date: { $in: dates }, status: { $in: ["manual", "selected"] } })
+    const menus = await DailyMenu.find({
+      userId,
+      date: { $in: dates },
+      status: { $in: ["manual", "selected"] },
+    })
       .select("date _id")
       .lean();
 
@@ -198,17 +215,29 @@ class MealPlanService {
    * Status hợp lệ: "manual" | "suggested" | "selected" | "completed" | "deleted" | "expired"
    */
   async updatePlanStatus(userId, planId, newStatus) {
-    const VALID_STATUSES = ["manual", "suggested", "selected", "completed", "deleted", "expired"];
+    const VALID_STATUSES = [
+      "manual",
+      "suggested",
+      "selected",
+      "completed",
+      "deleted",
+      "expired",
+    ];
     if (!VALID_STATUSES.includes(newStatus)) {
-      throw new Error(`Trạng thái không hợp lệ. Các giá trị cho phép: ${VALID_STATUSES.join(", ")}`);
+      throw new Error(
+        `Trạng thái không hợp lệ. Các giá trị cho phép: ${VALID_STATUSES.join(", ")}`,
+      );
     }
 
     const plan = await MealPlan.findOne({ _id: planId, userId });
-    if (!plan) throw new Error("Không tìm thấy MealPlan hoặc bạn không có quyền.");
+    if (!plan)
+      throw new Error("Không tìm thấy MealPlan hoặc bạn không có quyền.");
 
     // Không cho cập nhật plan đã kết thúc
     if (plan.status === "completed" || plan.status === "deleted") {
-      throw new Error(`Không thể cập nhật Plan đang ở trạng thái "${plan.status}".`);
+      throw new Error(
+        `Không thể cập nhật Plan đang ở trạng thái "${plan.status}".`,
+      );
     }
 
     // Khi user chọn 1 plan -> expire các plan suggested khác bị trùng thời gian
@@ -225,7 +254,7 @@ class MealPlanService {
             { endDate: { $exists: false } },
           ],
         },
-        { $set: { status: "expired" } }
+        { $set: { status: "expired" } },
       );
     }
 
@@ -240,7 +269,8 @@ class MealPlanService {
    */
   async deletePlan(userId, planId) {
     const plan = await MealPlan.findOne({ _id: planId, userId });
-    if (!plan) throw new Error("Không tìm thấy MealPlan hoặc bạn không có quyền.");
+    if (!plan)
+      throw new Error("Không tìm thấy MealPlan hoặc bạn không có quyền.");
 
     if (plan.status === "completed") {
       throw new Error("Không thể xóa Plan đã hoàn thành.");
@@ -275,6 +305,63 @@ class MealPlanService {
     }
 
     return list;
+  }
+
+  async refreshMealPlanNutritionByDailyMenu(dailyMenuId) {
+    const plan = await MealPlan.findOne({
+      dailyMenuIds: dailyMenuId,
+      status: {
+        $nin: ["deleted", "expired"],
+      },
+    });
+
+    if (!plan) return null;
+
+    const dailyMenus = await DailyMenu.find({
+      _id: { $in: plan.dailyMenuIds },
+      status: {
+        $nin: ["deleted", "expired"],
+      },
+    }).lean();
+
+    const total = {
+      calories: 0,
+      protein: 0,
+      fat: 0,
+      carbs: 0,
+      fiber: 0,
+      sugar: 0,
+      sodium: 0,
+    };
+
+    for (const menu of dailyMenus) {
+      total.calories += menu.totalNutrition?.calories || 0;
+      total.protein += menu.totalNutrition?.protein || 0;
+      total.fat += menu.totalNutrition?.fat || 0;
+      total.carbs += menu.totalNutrition?.carbs || 0;
+      total.fiber += menu.totalNutrition?.fiber || 0;
+      total.sugar += menu.totalNutrition?.sugar || 0;
+      total.sodium += menu.totalNutrition?.sodium || 0;
+    }
+
+    const count = dailyMenus.length || 1;
+
+    const average = {
+      calories: Number((total.calories / count).toFixed(2)),
+      protein: Number((total.protein / count).toFixed(2)),
+      fat: Number((total.fat / count).toFixed(2)),
+      carbs: Number((total.carbs / count).toFixed(2)),
+      fiber: Number((total.fiber / count).toFixed(2)),
+      sugar: Number((total.sugar / count).toFixed(2)),
+      sodium: Number((total.sodium / count).toFixed(2)),
+    };
+
+    plan.weeklyTotalNutrition = total;
+    plan.weeklyAverageNutrition = average;
+
+    await plan.save();
+
+    return plan;
   }
 }
 
