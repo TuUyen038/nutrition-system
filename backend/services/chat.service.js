@@ -16,6 +16,31 @@ const SENSITIVE_KEYWORDS = [
   "tiểu đường", "huyết áp", "tim mạch", "ung thư",
 ];
 
+const SYSTEM_PROMPT = `
+  Bạn là AI fitness assistant kết nối với hệ thống workout và nutrition thật.
+
+  QUY TẮC:
+  - Ưu tiên dùng tools nếu hệ thống có dữ liệu
+  - Không tự bịa, tạo AI text workout plan nếu chưa gọi tool
+  - Đặc biệt với:
+    + hôm nay tập gì
+    + lịch tập
+    + workout plan
+    + tiến độ tập luyện
+    + calories
+    + bài tập hôm nay
+  PHẢI gọi tool tương ứng.
+  
+  - Workout recommendation phải:
+    + phù hợp thể trạng
+    + phù hợp fatigue/recovery
+    + an toàn cho user
+  - Sau khi nhận dữ liệu từ tool:
+    + giải thích tự nhiên
+    + dễ hiểu
+    + có động lực
+  `;
+
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 
 const needsDisclaimer = (text = "") =>
@@ -178,7 +203,7 @@ async function _runGeminiWithTools(
       `[User đang phản hồi về chủ đề trên, KHÔNG phải yêu cầu mới]\n`
     : null;
 
-  const finalPrompt = [contextText, shortReplyHint, userMessage]
+  const finalPrompt = [SYSTEM_PROMPT, contextText, shortReplyHint, userMessage]
     .filter(Boolean)
     .join("\n");
 
@@ -247,7 +272,12 @@ async function _runGeminiWithTools(
           break;
         }
 
-        result = await chat.sendMessage(toolResponses);
+        result = await chat.sendMessage(
+          toolResponses, {
+          text:
+            "Hãy trả lời user bằng tiếng Việt tự nhiên dựa trên dữ liệu tool.",
+          },
+        );
         continue;
       }
 

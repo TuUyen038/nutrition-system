@@ -6,7 +6,6 @@ const WorkoutPlanSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
-      unique: true,
     },
 
     workoutLevel: {
@@ -77,7 +76,9 @@ const WorkoutPlanSchema = new mongoose.Schema(
             "legs",
             "upper",
             "lower",
-            "full_body",
+            "full_body_push",
+            "full_body_pull",
+            "full_body_legs",
             "recovery",
           ],
         },
@@ -147,7 +148,9 @@ const WorkoutPlanSchema = new mongoose.Schema(
 
 WorkoutPlanSchema.index({
   userId: 1,
-  isActive: 1,
+  currentWeek: 1
+}, {
+  unique: true
 });
 
 module.exports = mongoose.model(
