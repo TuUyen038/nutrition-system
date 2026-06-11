@@ -18,6 +18,8 @@ const { findExercises, getExerciseById } = require("./exercise.service");
 const favoriteService = require("./favorite.service");
 const ingredientService = require("./ingredient.service");
 const { CHAT_TOOLS } = require("./chatTools.definition");
+const workoutRecommendationService = require("./workoutRecommendation.service");
+const workoutPlanService = require("./workoutPlan.service");
 
 // Helper: lấy ngày hôm nay dạng YYYY-MM-DD theo giờ VN
 function getTodayVN() {
@@ -109,6 +111,7 @@ async function executeTool(toolName, args, userId) {
 
       case "get_meal_history":
         return await _getMealHistory(args, userId);
+
       case "search_ingredients":
         return await _searchIngredients(args);
 
@@ -120,6 +123,24 @@ async function executeTool(toolName, args, userId) {
 
       case "get_exercise_detail":
         return await _getExerciseDetail(args);
+
+      case "get_today_workout":
+        return await _getTodayWorkout(userId);
+
+      case "get_current_workout_plan":
+        return await _getCurrentWorkoutPlan(userId);
+
+      case "generate_next_week_workout":
+        return await _generateNextWeekWorkout(userId);
+
+      case "complete_workout_day":
+        return await _completeWorkoutDay(args, userId);
+
+      case "skip_workout_day":
+        return await _skipWorkoutDay(args, userId);
+
+      case "get_workout_stats":
+        return await _getWorkoutStats(userId);
 
       case "get_favorite_recipes":
         return await _getFavoriteRecipes(args, userId);
@@ -843,6 +864,151 @@ async function _getExerciseDetail(args) {
       `Nhóm cơ chính: ${exercise.muscles?.map((m) => m.name_en || m.name).join(", ") || "không rõ"}. ` +
       `Thiết bị: ${exercise.equipment?.map((e) => e.name).join(", ") || "không cần"}. ` +
       `Cường độ: ${exercise.defaultIntensity || "moderate"}.`,
+  };
+}
+
+async function _getTodayWorkout(userId) {
+  const todayWorkout =
+    await workoutPlanService.getTodayWorkout(userId);
+
+  if (!todayWorkout) {
+    return {
+      success: false,
+      summary: "Hôm nay là ngày nghỉ recovery.",
+    };
+  }
+
+  const exercises =
+    todayWorkout.exerciseDetails.map((e) => ({
+      name: e.name,
+      sets: e.sets,
+      reps: e.reps,
+    }));
+
+  return {
+    success: true,
+
+    data: {
+      focus: todayWorkout.focus,
+        
+      exercises,
+    },
+
+    summary:
+      `Hôm nay tập ${todayWorkout.focus} với ${exercises.length} bài tập.`,
+  };
+}
+
+async function _getCurrentWorkoutPlan(userId) {
+
+  const plan =
+    await workoutPlanService.getCurrentPlan(userId);
+
+  return {
+    success: true,
+
+    data: {
+      currentWeek: plan.currentWeek,
+
+      workoutLevel: plan.workoutLevel,
+
+      days: plan.days.map((d) => ({
+        day: d.day,
+        type: d.type,
+        focus: d.focus,
+        completed: d.completed,
+        skipped: d.skipped,
+      })),
+    },
+
+    summary:
+      `Đây là workout plan tuần ${plan.currentWeek}.`,
+  };
+}
+
+async function _generateNextWeekWorkout(userId) {
+
+  // check tuần sau đã có chưa
+  const existedNextWeek =
+    await workoutPlanService.getNextWeekPlan(userId);
+
+  // đã có → không generate nữa
+  if (existedNextWeek) {
+    return {
+      success: true,
+
+      data: {
+        currentWeek:
+          existedNextWeek.currentWeek,
+      },
+
+      summary:
+        `Lịch tập tuần ${existedNextWeek.currentWeek} đã tồn tại rồi.`,
+    };
+  }
+
+  // chưa có → generate
+  const plan =
+    await workoutPlanService.generateNextWeek(userId);
+
+  return {
+    success: true,
+
+    data: {
+      currentWeek: plan.currentWeek,
+    },
+
+    summary:
+      `Đã tạo workout plan tuần ${plan.currentWeek}.`,
+  };
+}
+
+async function _completeWorkoutDay(args, userId) {
+
+  const { day } = args;
+
+  await workoutPlanService.completeWorkoutDay(
+    userId,
+    day
+  );
+
+  return {
+    success: true,
+
+    summary:
+      `Đã đánh dấu hoàn thành buổi tập ngày ${day}.`,
+  };
+}
+
+async function _skipWorkoutDay(args, userId) {
+
+  const { day } = args;
+
+  await workoutPlanService.skipWorkoutDay(
+    userId,
+    day
+  );
+
+  return {
+    success: true,
+
+    summary:
+      `Đã bỏ qua buổi tập ngày ${day}.`,
+  };
+}
+
+async function _getWorkoutStats(userId) {
+
+  const stats =
+    await workoutPlanService.getPlanStats(userId);
+
+  return {
+    success: true,
+
+    data: stats,
+
+    summary:
+      `Bạn đã hoàn thành ${stats.completedDays} buổi tập.`,
   };
 }
 

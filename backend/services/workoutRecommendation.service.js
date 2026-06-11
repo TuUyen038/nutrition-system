@@ -20,21 +20,35 @@ const FITNESS_TO_WORKOUT_LEVEL = {
 
 // Target calories burn per day based on goal
 const GOAL_TARGET_CALORIES = {
-  lose_weight: 400,
-  maintain_weight: 250,
-  gain_weight: 150,
+  lose_weight: {
+    beginner: 250,
+    intermediate: 400,
+    advanced: 550,
+  },
+
+  maintain_weight: {
+    beginner: 150,
+    intermediate: 250,
+    advanced: 350,
+  },
+
+  gain_weight: {
+    beginner: 120,
+    intermediate: 180,
+    advanced: 250,
+  },
 };
 
 // Workout days per week by level
-const WORKOUT_DAYS_BY_LEVEL = {
-  beginner: 3,
-  intermediate: 4,
-  advanced: 5,
+const WORKOUT_PATTERNS = {
+  beginner: [1, 3, 5],
+  intermediate: [1, 2, 4, 6],
+  advanced: [1, 2, 3, 5, 6],
 };
 
 // Workout splits by level
 const WORKOUT_SPLITS = {
-  beginner: ["full_body"], // 3 days: full_body x3
+  beginner: ["full_body_push", "full_body_pull", "full_body_legs"], // 3 days: full_body x3
   intermediate: ["upper", "lower"], // 4 days: upper/lower split
   advanced: ["push", "pull", "legs"], // 5 days: push/pull/legs split
 };
@@ -46,7 +60,9 @@ const MUSCLE_GROUP_MAPPINGS = {
   legs: ["quads", "hamstrings", "calves", "glutes"],
   upper: ["chest", "back", "shoulders", "biceps", "triceps"],
   lower: ["quads", "hamstrings", "calves", "glutes"],
-  full_body: ["chest", "back", "shoulders", "biceps", "triceps", "quads", "hamstrings", "calves", "glutes"],
+  full_body_push: ["chest", "shoulders", "triceps", "quads"],
+  full_body_pull: ["back", "biceps", "hamstrings"],
+  full_body_legs: ["quads", "glutes", "calves", "hamstrings"],
 };
 
 // Sets and reps by level
@@ -184,6 +200,8 @@ async function generateDayExercises({
   weight,
   dailyTargetCalories,
   intensity,
+  recoveryScore,
+  recentExerciseIds,
 }) {
   const exercises = await getExercisesByFocus(focus);
 
@@ -220,13 +238,20 @@ async function generateDayExercises({
               (1000 * 60 * 60 * 24)
             : 999;
 
-        if (daysSinceLast <= 2) {
-          score -= 5;
+        if (daysSinceLast <= 1) {
+          score -= 100;
+        }
+        else if (daysSinceLast <= 3) {
+          score -= 10;
         }
       }
 
       if (fatigueScore >= 7) {
         score -= 2;
+      }
+      
+      if (recentExerciseIds.includes(exercise.exerciseId)) {
+        score -= 20;
       }
 
       return {
@@ -235,6 +260,8 @@ async function generateDayExercises({
       };
     })
     .sort((a, b) => b.score - a.score)
+    .slice(0, 15)
+    .sort(() => Math.random() - 0.5)
     .map((s) => s.exercise);
 
   const config = SETS_REPS_BY_LEVEL[level];
@@ -258,6 +285,17 @@ async function generateDayExercises({
     maxExercises += 1;
   }
 
+  // Recovery-aware adjustment
+  if (recoveryScore <= 4) {
+    maxExercises -= 1;
+  }
+
+  if (recoveryScore <= 2) {
+    intensity = "light";
+  }
+
+  maxExercises = Math.max(2, maxExercises);
+
   const selected = [];
 
   let totalCalories = 0;
@@ -265,10 +303,11 @@ async function generateDayExercises({
   for (let i = 0; i < Math.min(maxExercises, shuffled.length); i++) {
     const exercise = shuffled[i];
 
-    const duration = Math.max(
-      5,
-      config.duration / maxExercises
-    );
+    const duration =
+      Math.max(
+        5,
+        config.duration / maxExercises
+      ) + Math.floor(Math.random() * 4);
 
     const calories = await calculateCalories(
       exercise,
@@ -276,6 +315,14 @@ async function generateDayExercises({
       duration,
       intensity
     );
+
+    // Nếu vượt quá nhiều thì bỏ qua bài này
+    if (
+      totalCalories + calories >
+      dailyTargetCalories
+    ) {
+      continue;
+    }
 
     selected.push({
       exerciseId: exercise.exerciseId,
@@ -287,7 +334,7 @@ async function generateDayExercises({
       intensity,
     });
 
-     totalCalories += calories;
+    totalCalories += calories;
 
     if (totalCalories >= dailyTargetCalories) {
       break;
@@ -309,16 +356,14 @@ async function generateDayExercises({
 // =====================================
 
 function createWeeklyStructure(level) {
-  const workoutDays = WORKOUT_DAYS_BY_LEVEL[level];
-
   const splits = WORKOUT_SPLITS[level];
+  const workoutPattern = WORKOUT_PATTERNS[level];
 
   const week = [];
-
   let splitIndex = 0;
 
   for (let day = 1; day <= 7; day++) {
-    const isWorkoutDay = day <= workoutDays;
+    const isWorkoutDay = workoutPattern.includes(day);
 
     if (isWorkoutDay) {
       week.push({
@@ -344,7 +389,13 @@ function createWeeklyStructure(level) {
 // GENERATE ADAPTIVE WEEKLY PLAN
 // =====================================
 
-async function generateAdaptiveWorkoutPlan(userId) {
+async function generateAdaptiveWorkoutPlan(
+  userId,
+  {
+    baseDate = new Date(),
+    currentWeek = 1,
+  } = {}
+) {
   const user = await User.findById(userId);
 
   if (!user) {
@@ -353,18 +404,71 @@ async function generateAdaptiveWorkoutPlan(userId) {
 
   const workoutLevel = getWorkoutLevel(user.fitnessLevel);
 
-  const dailyTargetCalories = GOAL_TARGET_CALORIES[user.goal] || 200;
+  const dailyTargetCalories = GOAL_TARGET_CALORIES[user.goal]?.[workoutLevel] || 200;
 
   const state = await analyzeUserState(userId);
 
-  const weeklyStructure = createWeeklyStructure(
+  let weeklyStructure = createWeeklyStructure(
     workoutLevel
   );
 
-  const today = new Date();
+  // Recovery-aware adjustment
+  if (state.recoveryScore <= 3) {
+
+    // Convert 1 workout day to rest
+    const workoutIndex =
+      weeklyStructure.findIndex(
+        (d) => d.type === "workout"
+      );
+
+    if (workoutIndex !== -1) {
+      weeklyStructure[
+        workoutIndex
+      ] = {
+        ...weeklyStructure[
+          workoutIndex
+        ],
+        type: "rest",
+        focus: "recovery",
+      };
+    }
+  }
+
+  // High fatigue -> reduce training frequency
+  if (state.fatigueScore >= 8) {
+
+    const lastWorkoutIndex =
+      weeklyStructure
+        .map((d, index) => ({
+          ...d,
+          index,
+        }))
+        .reverse()
+        .find(
+          (d) =>
+            d.type === "workout"
+        )?.index;
+
+    if (
+      lastWorkoutIndex !== undefined
+    ) {
+      weeklyStructure[
+        lastWorkoutIndex
+      ] = {
+        ...weeklyStructure[
+          lastWorkoutIndex
+        ],
+        type: "rest",
+        focus: "recovery",
+      };
+    }
+  }
+
+  const today = new Date(baseDate);
 
   const days = [];
 
+  let recentExerciseIds = [];
   let weeklyEstimatedCalories = 0;
   let weeklyTargetCalories = 0;
 
@@ -399,10 +503,33 @@ async function generateAdaptiveWorkoutPlan(userId) {
       weight: user.weight,
       dailyTargetCalories,
       intensity: state.recommendedIntensity,
+      recoveryScore: state.recoveryScore,
+      recentExerciseIds,
     });
+
+    recentExerciseIds = generated.exercises.map(
+      e => e.exerciseId
+    );
 
     weeklyEstimatedCalories += generated.estimatedCalories;
     weeklyTargetCalories += dailyTargetCalories;
+
+    let estimatedDifficulty = 6;
+
+    if (state.recommendedIntensity === "light") {
+      estimatedDifficulty = 4;
+    }
+
+    if (state.recommendedIntensity === "vigorous") {
+      estimatedDifficulty = 8;
+    }
+
+    estimatedDifficulty += Math.floor(Math.random() * 3) - 1;
+
+    estimatedDifficulty = Math.max(
+      1,
+      Math.min(10, estimatedDifficulty)
+    );
 
     days.push({
       day: item.day,
@@ -416,12 +543,7 @@ async function generateAdaptiveWorkoutPlan(userId) {
 
       totalDuration: generated.totalDuration,
 
-      estimatedDifficulty:
-        state.recommendedIntensity === "light"
-          ? 4
-          : state.recommendedIntensity === "vigorous"
-          ? 8
-          : 6,
+      estimatedDifficulty,
 
       exerciseDetails: generated.exercises,      
 
@@ -433,7 +555,7 @@ async function generateAdaptiveWorkoutPlan(userId) {
   return {
     workoutLevel,
 
-    currentWeek: 1,
+    currentWeek,
 
     weeklyTargetCalories,
 

@@ -10,31 +10,79 @@ async function getCurrentPlan(userId) {
   let plan = await WorkoutPlan.findOne({
     userId,
     isActive: true,
-  });
+  })
 
+  // chưa có plan nào
   if (!plan) {
-    plan = await generateWeeklyPlan(userId);
+    plan = await generateWeeklyPlan(userId, 1);
+  }
+
+  const today = new Date();
+
+  // đã qua tuần mới
+  if (today > plan.weekEndDate) {
+
+    plan = await generateNextWeek(userId);
   }
 
   return plan;
 }
 
 // =====================================
+// GET TODAY WORKOUT
+// =====================================
+
+async function getTodayWorkout(userId) {
+  let plan = await getCurrentPlan(userId);
+
+  const today = new Date();
+
+  const todayDay = today.getDay();
+
+  // convert sunday
+  const mappedDay = todayDay === 0 ? 7 : todayDay;
+
+  let workoutDay = plan.days.find(
+    (d) => d.day === mappedDay
+  );
+
+  // nếu plan lỗi hoặc thiếu
+  if (!workoutDay) {
+    plan = await generateWeeklyPlan(userId);
+
+    workoutDay = plan.days.find(
+      (d) => d.day === mappedDay
+    );
+  }
+
+  return workoutDay;
+}
+
+// =====================================
 // GENERATE WEEKLY PLAN
 // =====================================
 
-async function generateWeeklyPlan(userId) {
+async function generateWeeklyPlan(
+  userId,
+  {
+    currentWeek = 1,
+    startDate = new Date(),
+  } = {}
+) {
   const generated =
     await workoutRecommendationService.generateAdaptiveWorkoutPlan(
-      userId
+      userId,
+      {
+        currentWeek,
+        baseDate: startDate,
+      }
     );
 
-  const plan = await WorkoutPlan.findOneAndUpdate(
+  const plan = await WorkoutPlan.create(
     {
       userId,
-    },
-    {
-      userId,
+
+      currentWeek,
 
       workoutLevel: generated.workoutLevel,
 
@@ -63,14 +111,37 @@ async function generateWeeklyPlan(userId) {
       generatedAt: new Date(),
 
       isActive: true,
-    },
-    {
-      new: true,
-      upsert: true,
     }
   );
 
   return plan;
+}
+
+// =====================================
+// GET NEXT WEEK PLAN
+// =====================================
+async function getNextWeekPlan(userId) {
+
+  const currentPlan =
+    await WorkoutPlan.findOne({
+      userId,
+      isActive: true,
+    });
+
+  if (!currentPlan) {
+    return null;
+  }
+
+  const nextWeek =
+    currentPlan.currentWeek + 1;
+
+  const nextPlan =
+    await WorkoutPlan.findOne({
+      userId,
+      currentWeek: nextWeek,
+    });
+
+  return nextPlan;
 }
 
 // =====================================
@@ -108,17 +179,46 @@ async function completeWorkoutDay(userId, day) {
 // =====================================
 
 async function generateNextWeek(userId) {
-  const current = await WorkoutPlan.findOne({
-    userId,
-    isActive: true,
-  });
+  const latestPlan =
+    await WorkoutPlan.findOne({
+      userId,
+      isActive: true,
+    }).sort({ currentWeek: -1 });
 
-  if (current) {
-    current.currentWeek += 1;
-    await current.save();
+  let nextWeek = 1;
+
+  if (latestPlan) {
+    nextWeek =
+      latestPlan.currentWeek + 1;
+
+    // deactivate all active plans
+    await WorkoutPlan.updateMany(
+      {
+        userId,
+        isActive: true,
+      },
+      {
+        isActive: false,
+      }
+    );
   }
 
-  return await generateWeeklyPlan(userId);
+  // week mới bắt đầu sau week cũ
+  const nextStartDate =
+    latestPlan
+      ? new Date(
+          latestPlan.weekEndDate.getTime()
+          + 24 * 60 * 60 * 1000
+        )
+      : new Date();
+
+  return await generateWeeklyPlan(
+    userId,
+    {
+      currentWeek: nextWeek,
+      startDate: nextStartDate,
+    }
+  );
 }
 
 async function skipWorkoutDay(userId, day) {
@@ -201,7 +301,9 @@ async function getPlanStats(userId) {
 
 module.exports = {
   getCurrentPlan,
+  getTodayWorkout,
   generateWeeklyPlan,
+  getNextWeekPlan,
   completeWorkoutDay,
   generateNextWeek,
   getPlanStats,

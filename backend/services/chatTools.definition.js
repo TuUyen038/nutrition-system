@@ -123,6 +123,131 @@ const CHAT_TOOLS = [
       required: ["exercise_id"],
     },
   },
+  {
+    name: "get_today_workout",
+
+    description:
+      "BẮT BUỘC dùng tool này khi user hỏi bài tập hôm nay. " +
+      "LUÔN ưu tiên dùng tool này khi câu hỏi liên quan đến workout hôm nay." +
+
+      "Các ví dụ user message: " +
+      "'hôm nay tập gì', " +
+      "'workout hôm nay', " +
+      "'lịch tập hôm nay', " +
+      "'today workout', " +
+      "'tôi nên tập gì hôm nay', " +
+      "'bài tập hôm nay là gì'. " +
+
+      "Tool này sẽ lấy bài tập của ngày hôm nay từ workout plan hiện tại của user từ database. " +
+
+      "KHÔNG tự tạo workout bằng AI text. " +
+
+      "KHÔNG tạo plan mới nếu đã có plan hiện tại. " +
+      "Nếu chưa có workout plan thì hệ thống sẽ tự tạo plan.",
+
+    parameters: {
+      type: "object",
+      properties: {},
+    },
+  },
+  {
+    name: "get_current_workout_plan",
+
+    description:
+      "Lấy toàn bộ workout plan của tuần hiện tại. " +
+
+      "Dùng khi user hỏi: " +
+      "'lịch tập tuần này', " +
+      "'workout plan của tôi', " +
+      "'show workout schedule'.",
+
+    parameters: {
+      type: "object",
+      properties: {},
+    },
+  },
+  {
+    name: "generate_next_week_workout",
+
+    description:
+      "Tạo workout plan cho tuần tiếp theo. " +
+
+      "Dùng khi user hỏi: " +
+      "'tạo lịch tuần sau', " +
+      "'generate next week workout', " +
+      "'lịch tập tuần tiếp theo'. " +
+
+      "Tool này sẽ deactivate workout plan cũ và tạo plan mới.",
+
+    parameters: {
+      type: "object",
+      properties: {},
+    },
+  },
+  {
+    name: "complete_workout_day",
+
+    description:
+      "Đánh dấu hoàn thành buổi tập trong workout plan. " +
+
+      "Dùng khi user nói: " +
+      "'tôi đã tập xong ngày 1', " +
+      "'complete workout today', " +
+      "'đã hoàn thành bài tập'.",
+
+    parameters: {
+      type: "object",
+
+      properties: {
+        day: {
+          type: "number",
+          description: "Ngày tập trong tuần (1-7)",
+        },
+      },
+
+      required: ["day"],
+    },
+  },
+  {
+    name: "skip_workout_day",
+
+    description:
+      "Đánh dấu bỏ qua buổi tập. " +
+
+      "Dùng khi user nói: " +
+      "'hôm nay tôi nghỉ', " +
+      "'skip workout today', " +
+      "'bỏ qua ngày tập'.",
+
+    parameters: {
+      type: "object",
+
+      properties: {
+        day: {
+          type: "number",
+          description: "Ngày tập trong tuần (1-7)",
+        },
+      },
+
+      required: ["day"],
+    },
+  },
+  {
+    name: "get_workout_stats",
+
+    description:
+      "Lấy thống kê workout hiện tại: số ngày hoàn thành, calories, completion rate. " +
+
+      "Dùng khi user hỏi: " +
+      "'tiến độ tập luyện', " +
+      "'workout stats', " +
+      "'tôi đã tập được bao nhiêu'.",
+
+    parameters: {
+      type: "object",
+      properties: {},
+    },
+  },
 
   // ─── FAVORITE ────────────────────────────────────────────────────────────────
   {
