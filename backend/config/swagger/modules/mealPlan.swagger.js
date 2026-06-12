@@ -340,8 +340,8 @@ manual    → selected → completed
   "/meal-plans/recommendations/week": {
     post: {
       tags: ["Meal Plans"],
-      summary: "AI gợi ý thực đơn cả tuần",
-      description: `Gọi engine AI (nutrition_ai_v2) để tạo thực đơn tối ưu cho N ngày liên tiếp.
+      summary: "Hệ thống gợi ý thực đơn cả tuần",
+      description: `Gọi engine(nutrition_v2) để tạo thực đơn tối ưu cho N ngày liên tiếp.
  
 **Thuật toán:**
 - Dựa trên TDEE, mục tiêu dinh dưỡng (NutritionGoal active) và lịch sử ăn uống của user

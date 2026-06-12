@@ -15,8 +15,8 @@ const mealPlanSchema = new mongoose.Schema(
     //   default: "week"
     // },
 
-    startDate: { type: Date, required: true },
-    endDate: { type: Date },
+    startDate: { type: String, required: true },
+    endDate: { type: String },
 
     // Các meal cụ thể trong giai đoạn này
     dailyMenuIds: [{ type: mongoose.Schema.Types.ObjectId, ref: "DailyMenu" }],

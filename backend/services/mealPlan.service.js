@@ -2,7 +2,7 @@
 const MealPlan = require("../models/MealPlan");
 const DailyMenu = require("../models/DailyMenu");
 const mealRecommendationService = require("./mealRecommendation.service");
-const { normalizeDate, calculateEndDate } = require("../utils/date");
+const { normalizeDate, calculateEndDate, toVNDateString } = require("../utils/date");
 const User = require("../models/User");
 const NutritionGoal = require("../models/NutritionGoal");
 const mongoose = require("mongoose");
@@ -25,50 +25,96 @@ class MealPlanService {
    * @param {number}  days          - mặc định 7
    * @returns {MealPlan}
    */
-  async suggestWeekPlan({ userId, startDateStr, days = 7 }) {
-    const user = await User.findById(userId).lean();
-    const goal = await NutritionGoal.findOne({ userId, status: "active" })
-      .sort({ createdAt: -1 })
-      .lean();
+  // async suggestWeekPlan({ userId, startDateStr, days = 7 }) {
+  //   const user = await User.findById(userId).lean();
+  //   const goal = await NutritionGoal.findOne({ userId, status: "active" })
+  //     .sort({ createdAt: -1 })
+  //     .lean();
 
-    if (!goal)
-      throw new Error("Không tìm thấy mục tiêu dinh dưỡng đang hoạt động.");
+  //   if (!goal)
+  //     throw new Error("Không tìm thấy mục tiêu dinh dưỡng đang hoạt động.");
 
-    const start = dayjs(startDateStr);
-    const dailyMenuIds = [];
+  //   const start = dayjs(startDateStr);
+  //   const dailyMenuIds = [];
 
-    for (let i = 0; i < days; i++) {
-      const dateStr = start.add(i, "day").format("YYYY-MM-DD");
+  //   const dates = [];
 
-      const { recipesPlanned, nutritionSum } =
-        await mealRecommendationService.generateDailyMenuDataV2({
-          userId,
-          dateStr,
-          user,
-          dailyTarget: goal.targetNutrition,
-        });
+  //   for (let i = 0; i < days; i++) {
+  //     dates.push(start.add(i, "day").format("YYYY-MM-DD"));
+  //   }
 
-      const dailyMenu = await DailyMenu.create({
-        userId,
-        date: dateStr,
-        recipes: recipesPlanned,
-        totalNutrition: nutritionSum,
-        status: "suggested",
-      });
+  //   let result;
 
-      dailyMenuIds.push(dailyMenu._id);
-    }
+  //   const session = await mongoose.startSession();
+  //   try {
+  //     await session.withTransaction(async () => {
+  //       await DailyMenu.updateMany(
+  //         {
+  //           userId,
+  //           date: { $in: dates },
+  //           status: "suggested",
+  //         },
+  //         {
+  //           $set: { status: "expired" },
+  //         },
+  //         { session },
+  //       );
 
-    return MealPlan.create({
-      userId,
-      startDate: startDateStr,
-      endDate: start.add(days - 1, "day").format("YYYY-MM-DD"),
-      dailyMenuIds,
-      source: "ai",
-      generatedBy: "nutrition_ai_v2",
-      status: "suggested",
-    });
-  }
+  //       // expire DailyMenu suggested and create new DailyMenu
+  //       for (let i = 0; i < days; i++) {
+  //         const dateStr = start.add(i, "day").format("YYYY-MM-DD");
+
+  //         const { recipesPlanned, nutritionSum } =
+  //           await mealRecommendationService.generateDailyMenuDataV2({
+  //             userId,
+  //             dateStr,
+  //             user,
+  //             dailyTarget: goal.targetNutrition,
+  //           });
+
+  //         const dailyMenu = new DailyMenu({
+  //           userId,
+  //           date: dateStr,
+  //           recipes: recipesPlanned,
+  //           totalNutrition: nutritionSum,
+  //           status: "suggested",
+  //         });
+  //         await dailyMenu.save({ session });
+
+  //         dailyMenuIds.push(dailyMenu._id);
+  //       }
+  //       // update MealPlan suggested
+  //       result = await MealPlan.findOneAndUpdate(
+  //         {
+  //           userId,
+  //           startDate: startDateStr,
+  //         },
+  //         {
+  //           $set: {
+  //             dailyMenuIds,
+  //             generatedBy: "nutrition_v2",
+  //             status: "suggested",
+  //             endDate: start.add(days - 1, "day").format("YYYY-MM-DD"),
+  //             source: "ai",
+  //           },
+  //           $setOnInsert: {
+  //             userId,
+  //             startDate: startDateStr,
+  //           },
+  //         },
+  //         {
+  //           upsert: true,
+  //           new: true,
+  //           session,
+  //         },
+  //       );
+  //     });
+
+  //     return result;
+  //   } finally {
+  //     await session.endSession();
+  //   }
+  // }
 
   // ─────────────────────────────────────────────────────────────────────────────
   // MANUAL PLAN
@@ -293,19 +339,17 @@ class MealPlanService {
    * @returns {string[]}
    */
   _generateDateList(startDate, period) {
-    const normalized = normalizeDate(startDate);
-    const total = period === "week" ? 7 : Number(period) || 1;
-    const list = [];
-    const base = new Date(normalized + "T00:00:00+07:00");
+  const total = period === "week" ? 7 : Number(period) || 1;
 
-    for (let i = 0; i < total; i++) {
-      const d = new Date(base);
-      d.setDate(base.getDate() + i);
-      list.push(normalizeDate(d));
-    }
-
-    return list;
-  }
+  return Array.from({ length: total }, (_, i) =>
+    toVNDateString(
+      dayjs(startDate)
+        .tz("Asia/Ho_Chi_Minh")
+        .startOf("day")
+        .add(i, "day")
+    )
+  );
+}
 
   async refreshMealPlanNutritionByDailyMenu(dailyMenuId) {
     const plan = await MealPlan.findOne({

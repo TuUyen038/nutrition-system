@@ -8,7 +8,7 @@ const dailyMenuSchema = new mongoose.Schema(
       ref: "User",
       required: false,
     },
-    date: { type: Date, required: true },
+    date: { type: String, required: true },
 
     recipes: [
       {

@@ -22,7 +22,7 @@ module.exports = {
       generatedBy: {
         type: "string",
         description: "Tên engine tạo plan (chỉ có khi source = ai)",
-        example: "nutrition_ai_v2",
+        example: "nutrition_v2",
       },
       status: {
         type: "string",
@@ -61,7 +61,7 @@ module.exports = {
       },
       endDate: { type: "string", format: "date", example: "2026-05-04" },
       source: { type: "string", enum: ["ai", "user"], example: "user" },
-      generatedBy: { type: "string", example: "nutrition_ai_v2" },
+      generatedBy: { type: "string", example: "nutrition_v2" },
       status: {
         type: "string",
         enum: [
@@ -99,7 +99,7 @@ module.exports = {
       },
       endDate: { type: "string", format: "date", example: "2026-05-04" },
       source: { type: "string", enum: ["ai", "user"], example: "ai" },
-      generatedBy: { type: "string", example: "nutrition_ai_v2" },
+      generatedBy: { type: "string", example: "nutrition_v2" },
       status: {
         type: "string",
         enum: [
