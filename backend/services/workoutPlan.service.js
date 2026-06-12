@@ -41,19 +41,44 @@ async function getCurrentPlan(userId) {
 
 async function getTodayWorkout(userId) {
   let plan = await getCurrentPlan(userId);
+  
+  if (!plan?.weekStartDate) return null;
 
+  const start = new Date(plan.weekStartDate);
   const today = new Date();
 
-  const todayDay = today.getDay();
+  // normalize về VN timezone
+  const startVN = new Date(
+    start.toLocaleString("en-US", {
+      timeZone: "Asia/Ho_Chi_Minh",
+    })
+  );
 
-  // convert sunday
-  const mappedDay = todayDay === 0 ? 7 : todayDay;
+  const todayVN = new Date(
+    today.toLocaleString("en-US", {
+      timeZone: "Asia/Ho_Chi_Minh",
+    })
+  );
+
+  // tính số ngày lệch
+  const diffTime = todayVN - startVN;
+
+  const diffDays = Math.floor(
+    diffTime / (1000 * 60 * 60 * 24)
+  );
+
+  // plan.days là 1–7
+  const mappedDay = diffDays + 1;
+
+  if (mappedDay < 1 || mappedDay > 7) {
+    return null;
+  }
 
   let workoutDay = plan.days.find(
     (d) => d.day === mappedDay
   );
 
-  // nếu plan lỗi hoặc thiếu
+  // nếu plan lỗi hoặc thiếu → generate
   if (!workoutDay) {
     plan = await generateWeeklyPlan(userId);
 

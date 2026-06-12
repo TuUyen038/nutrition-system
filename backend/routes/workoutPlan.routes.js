@@ -32,4 +32,7 @@ router.post("/generate-next-week", workoutPlanController.generateNextWeek);
 // GET /workout-plan/stats - Get workout statistics
 router.get("/stats", workoutPlanController.getPlanStats);
 
+// GET workout ngày hôm nay
+router.get("/today", workoutPlanController.getTodayWorkout);
+
 module.exports = router;

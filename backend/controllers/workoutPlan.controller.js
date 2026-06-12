@@ -209,6 +209,32 @@ const skipWorkoutDay = async (req, res) => {
   }
 };
 
+const getTodayWorkout = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    const workout =
+      await workoutPlanService.getTodayWorkout(userId);
+
+    return res.json({
+      success: true,
+      data: workout,
+    });
+  } catch (error) {
+    console.error(
+      "[WorkoutPlan] getTodayWorkout:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        error.message ||
+        "Failed to get today workout",
+    });
+  }
+};
+
 module.exports = {
   getCurrentPlan,
   generateWeeklyPlan,
@@ -216,4 +242,5 @@ module.exports = {
   generateNextWeek,
   getPlanStats,
   skipWorkoutDay,
+  getTodayWorkout,
 };
