@@ -21,13 +21,13 @@ router.get("/current", workoutPlanController.getCurrentPlan);
 router.post("/generate", workoutPlanController.generateWeeklyPlan);
 
 // COMPLETE day
-router.patch("/complete", workoutPlanController.completeWorkoutDay);
+router.patch("/complete-day", workoutPlanController.completeWorkoutDay);
 
 // PATCH /workout-plan/day/:day/skip - Skip day
-router.patch("/skip", workoutPlanController.skipWorkoutDay);
+router.patch("/skip-day", workoutPlanController.skipWorkoutDay);
 
 // NEXT week
-router.post("/next-week", workoutPlanController.generateNextWeek);
+router.post("/generate-next-week", workoutPlanController.generateNextWeek);
 
 // GET /workout-plan/stats - Get workout statistics
 router.get("/stats", workoutPlanController.getPlanStats);

@@ -7,25 +7,32 @@ const workoutRecommendationService = require("./workoutRecommendation.service");
 // =====================================
 
 async function getCurrentPlan(userId) {
-  let plan = await WorkoutPlan.findOne({
-    userId,
-    isActive: true,
-  })
-
-  // chưa có plan nào
-  if (!plan) {
-    plan = await generateWeeklyPlan(userId, 1);
-  }
-
   const today = new Date();
 
-  // đã qua tuần mới
-  if (today > plan.weekEndDate) {
+  // tìm plan của tuần hiện tại
+  let plan = await WorkoutPlan.findOne({
+    userId,
+    weekStartDate: { $lte: today },
+    weekEndDate: { $gte: today },
+  });
 
-    plan = await generateNextWeek(userId);
+  // đã có => return
+  if (plan) { return plan; }
+
+  // tìm plan gần nhất
+  const latestPlan =
+    await WorkoutPlan.findOne({ userId })
+      .sort({ currentWeek: -1 });
+
+  // user mới hoàn toàn
+  if (!latestPlan) {
+    return await generateWeeklyPlan(userId, {
+      currentWeek: 1,
+    });
   }
 
-  return plan;
+  // đã có lịch sử => tạo tuần kế
+  return await generateNextWeek(userId);
 }
 
 // =====================================
