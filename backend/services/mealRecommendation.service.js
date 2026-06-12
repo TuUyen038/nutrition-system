@@ -746,7 +746,6 @@ function buildMeal(poolCache, mealType, adjTarget, context) {
  * @param {Object} sharedContext
  */
 function buildDayPlan(poolCache, dailyTarget, goal, sharedContext) {
-  console.log(">>> Adaptive target lại là:", dailyTarget);
   const debt = { calories: 0, protein: 0, fat: 0, carbs: 0 };
   const dayMeals = [];
 
@@ -825,7 +824,6 @@ function buildDayPlan(poolCache, dailyTarget, goal, sharedContext) {
           dailyTarget.carbs * 0.15) &&
       count < 5
     ) {
-      // console.log("vao tim snack lan:", count + 1);
 
       snack = buildMeal(poolCache, "snack", snackTarget, {
         ...sharedContext,
@@ -880,7 +878,6 @@ async function getFavouriteIds(userId) {
 
 function normalizeRecipes(rawRecipes, allergies = []) {
   const allergyLower = allergies.map((a) => a.toLowerCase());
-  // console.log("rawRecipe:", rawRecipes[0])
   return rawRecipes.reduce((acc, item) => {
     // 1. PHẦN FILTER: Kiểm tra điều kiện ngay tại đây
     const calories = parseFloat(item.totalNutritionPerServing?.calories || 0);
@@ -1259,7 +1256,7 @@ async function generateDailyMenuDataV2(opts = {}) {
       recipes: mealToRecipe,
       totalNutrition: dailyTotal,
       targetNutrition: dailyTarget,
-      status: "selected",
+      status: "suggested",
     },
     { upsert: true, new: true, setDefaultsOnInsert: true },
   );
@@ -1270,7 +1267,7 @@ async function generateDailyMenuDataV2(opts = {}) {
     recipes: mealToRecipe,
     totalNutrition: { ...dailyTotal },
     targetNutrition: { ...dailyTarget },
-    status: "selected",
+    status: "suggested",
     ...(dailyMenuId && { _id: dailyMenuId }),
   };
 }

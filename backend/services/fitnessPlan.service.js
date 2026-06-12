@@ -54,33 +54,30 @@ class FitnessPlanService {
           dailyTarget: targetNutrition,
         });
 
-      const dailyMenu = await DailyMenu.findOneAndUpdate(
-        {
-          userId,
-          date: dateStr,
-          status: { $in: ["selected", "manual", "suggested"] },
-        },
-        {
-          $set: {
-            recipes,
-            totalNutrition: totalNutrition,
-            targetNutrition: targetNutrition,
-            status: "selected",
-          },
-        },
-        {
-          upsert: true,
-          new: true,
-        },
-      );
-      console.log(">>>id của từng daily mới nè: ", dailyMenu);
-      dailyMenuIds.push(dailyMenu._id);
+      // const dailyMenu = await DailyMenu.findOneAndUpdate(
+      //   {
+      //     userId,
+      //     date: dateStr,
+      //     status: { $in: ["selected", "manual", "suggested"] },
+      //   },
+      //   {
+      //     $set: {
+      //       recipes,
+      //       totalNutrition: totalNutrition,
+      //       targetNutrition: targetNutrition,
+      //       status: "suggested",
+      //     },
+      //   },
+      //   {
+      //     upsert: true,
+      //     new: true,
+      //   },
+      // );
+      dailyMenuIds.push(_id);
     }
     // ==================================================
     // STEP 5: Create meal plan
     // ==================================================
-    console.log("week start date: ", workoutPlan.weekStartDate);
-    console.log("week end date: ", workoutPlan.weekEndDate);
     const mealPlan = await MealPlan.findOneAndUpdate(
       {
         userId,
@@ -93,7 +90,7 @@ class FitnessPlanService {
           dailyMenuIds,
           source: "ai",
           generatedBy: "fitness_v1",
-          status: "selected",
+          status: "suggested",
         },
       },
       {
@@ -101,7 +98,7 @@ class FitnessPlanService {
         new: true,
       },
     );
-    // NOTE: đối với gợi ý kết hợp thì mealplan sẽ được upsert và status ở đây là SELECTED luôn, chứ k phải suggested rồi chờ gọi hàm updatePlanStatus nữa
+    // NOTE: đối với gợi ý kết hợp thì mealplan sẽ được upsert và status ở đây là SUGGESTED always, chứ k phải selected rồi chờ gọi hàm updatePlanStatus nữa
 
     return {
       workoutPlan,

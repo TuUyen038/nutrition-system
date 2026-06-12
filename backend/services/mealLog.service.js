@@ -130,7 +130,6 @@ async function deleteMealLog(userId, recipeId, date, dailyMenuId = null) {
       query.dailyMenuId = new mongoose.Types.ObjectId(dailyMenuId); // 🔥 fix
     }
 
-    console.log("DELETE QUERY:", query);
 
     const result = await MealLog.deleteOne(query);
 
@@ -390,9 +389,7 @@ async function getRecentlyEatenMap(userId, lookbackDays = 7) {
       }
     });
 
-    console.log(
-      `[getRecentlyEatenMap] Found ${eatenMap.size} unique recently eaten items`
-    );
+    
     return eatenMap;
   } catch (err) {
     console.error("[getRecentlyEatenMap] Error:", err);
