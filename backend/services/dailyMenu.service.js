@@ -2,7 +2,7 @@ const DailyMenu = require("../models/DailyMenu");
 const MealPlan = require("../models/MealPlan");
 const { calculateTotalNutrition } = require("../utils/calTotalNutri");
 const mongoose = require("mongoose");
-const { normalizeDate } = require("../utils/date");
+const { normalizeDate, toVNDateString } = require("../utils/date");
 const User = require("../models/User");
 const NutritionGoal = require("../models/NutritionGoal");
 const Recipe = require("../models/Recipe");
@@ -21,8 +21,8 @@ exports.getRecipesByDateAndStatus = async (data) => {
       throw new Error("Thiếu thời gian hoặc userId.");
     }
 
-    startDate = normalizeDate(startDate);
-    endDate = normalizeDate(endDate);
+    startDate = toVNDateString(startDate);
+    endDate = toVNDateString(endDate);
 
     const dailyMenus = await DailyMenu.find({
       userId,
@@ -115,7 +115,7 @@ exports.addRecipeToMenu = async ({
 }) => {
   const amountToAdd = scale || 1; // Lượng scale người dùng vừa nhập thêm
   const targetTime = servingTime || "other";
-
+  date = toVNDateString(date); // Chuẩn hóa về string "YYYY-MM-DD" để lưu và query nhất quán
   const filter = dailyMenuId ? { _id: dailyMenuId, userId } : { userId, date };
   // 1. Tìm hoặc tạo mới DailyMenu (Khởi tạo totalNutrition = 0 nếu tạo mới)
   let dailyMenu = await DailyMenu.findOneAndUpdate(
@@ -125,7 +125,7 @@ exports.addRecipeToMenu = async ({
         recipes: [],
         totalNutrition: { calories: 0, protein: 0, fat: 0, carbs: 0 },
         targetNutrition: { calories: 0, protein: 0, fat: 0, carbs: 0 },
-        status: "manual",
+        status: "selected",
       },
     },
     { new: true, upsert: true },
@@ -278,9 +278,10 @@ exports.getDailyMenuByDate = async ({ userId, date }) => {
   return await DailyMenu.findOne({
     userId,
     date: date,
-    status: { $in: ["manual", "selected", "suggested"] },
+    status: { $in: ["selected"] },
   }).lean();
 };
+
 exports.getDailyMenusByRange = async ({ userId, startDate, endDate }) => {
   // const normalizedStartDate = toDateOnly(startDate);
   // const normalizedEndDate = toDateOnly(endDate);
@@ -288,107 +289,20 @@ exports.getDailyMenusByRange = async ({ userId, startDate, endDate }) => {
   return await DailyMenu.find({
     userId,
     date: {
-      $gte: startDate,
-      $lte: endDate,
+      $gte: toVNDateString(startDate),
+      $lte: toVNDateString(endDate),
     },
-    status: { $in: ["manual", "selected"] },
+    status: { $in: ["selected"] },
   })
     .lean()
     .sort({ date: 1 });
 };
 
-//TODO: neu ham nay sua nay van k dung thi co the xoa
-// exports.createDailyMenu = async (data) => {
-//   try {
-//     let { userId, date, recipes, status } = data;
-
-//     if (!userId || !date) {
-//       throw new Error("Thiếu userId hoặc date.");
-//     }
-//     // Normalize date TRƯỚC KHI tìm existing để đảm bảo match đúng
-//     date = normalizeDate(date);
-
-//     let deletedMenu = await DailyMenu.find({
-//     userId,
-//     date: {
-//       $gte: date,
-//       $lte: date,
-//     },
-//     status: { $in: ["deleted", "expired"] },
-//   })
-//     .lean()
-
-//     // Tìm existing menu - nếu có nhiều, lấy cái mới nhất (tránh trùng rác cũ)
-//     let existing = await DailyMenu.findOne({ userId, date }).sort({
-//       createdAt: -1,
-//     });
-
-//     const normalizedRecipes = await Promise.all(
-//       (recipes || []).map(async (r) => {
-//         const recipeItem = {
-//           recipeId: r.recipeId,
-//           scale: r.scale || 1,
-//           status: r.status || "suggested",
-//           servingTime: r.servingTime || "other",
-//         };
-//         return recipeItem;
-//       }),
-//     );
-
-//     const totalNutrition = await calculateTotalNutrition(normalizedRecipes);
-
-//     if (!existing) {
-//       // Tạo mới
-//       const created = await DailyMenu.create({
-//         userId,
-//         date,
-//         recipes: normalizedRecipes,
-//         totalNutrition,
-//         status: status || "suggested",
-//       });
-
-//       //  Populate recipes.recipeId để trả về đầy đủ thông tin
-//       await created.populate({
-//         path: "recipes.recipeId",
-//         model: "Recipe",
-//         match: { deleted: { $ne: true } },
-//         select: "name description imageUrl totalNutrition",
-//       });
-//       // Filter out recipes that failed to populate (i.e., deleted)
-//       created.recipes = created.recipes.filter((r) => r.recipeId);
-
-//       return { type: "created", data: created };
-//     }
-//     existing.recipes = normalizedRecipes;
-//     existing.totalNutrition = totalNutrition;
-//     if (status) existing.status = status;
-
-//     await existing.save();
-
-//     //  Populate recipes.recipeId để trả về đầy đủ thông tin
-//     await existing.populate({
-//       path: "recipes.recipeId",
-//       model: "Recipe",
-//       match: { deleted: { $ne: true } },
-//       select: "name description imageUrl totalNutrition",
-//     });
-//     // Filter out recipes that failed to populate (i.e., deleted)
-//     existing.recipes = existing.recipes.filter((r) => r.recipeId);
-
-//     return { type: "updated", data: existing };
-//   } catch (error) {
-//     console.error("Lỗi upsert DailyMenu:", error);
-//     throw new Error("Không thể lưu thực đơn: " + error.message);
-//   }
-// };
-
 exports.getDailyMenusByDateAndStatus = async ({ userId, date, statuses }) => {
-  const start = new Date(date + "T00:00:00+07:00");
-  const end = new Date(date + "T23:59:59+07:00");
  
   return DailyMenu.find({
     userId,
-    date: { $gte: start, $lte: end },
+    date: toVNDateString(date),
     status: { $in: statuses },
   })
     .lean()

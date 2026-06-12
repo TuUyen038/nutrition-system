@@ -20,7 +20,7 @@ const ingredientService = require("./ingredient.service");
 const { CHAT_TOOLS } = require("./chatTools.definition");
 const workoutRecommendationService = require("./workoutRecommendation.service");
 const workoutPlanService = require("./workoutPlan.service");
-
+const fitnessPlanService = require("./fitnessPlan.service");
 // Helper: lấy ngày hôm nay dạng YYYY-MM-DD theo giờ VN
 function getTodayVN() {
   return new Date().toLocaleDateString("sv-SE", {
@@ -151,6 +151,9 @@ async function executeTool(toolName, args, userId) {
       case "remove_favorite_recipe":
         return await _removeFavoriteRecipe(args, userId);
 
+      case "generate_weekly_fitness_plan":
+        return await _generateWeeklyFitnessPlan(userId);
+
       default:
         return {
           success: false,
@@ -166,6 +169,45 @@ async function executeTool(toolName, args, userId) {
       summary: `Lỗi khi thực hiện ${toolName}: ${err.message}`,
     };
   }
+}
+
+// ─── FITNESS ─────────────────────────────────────────────────────────────
+async function _generateWeeklyFitnessPlan(userId) {
+  // Gọi sang service tích hợp ăn + tập của bạn
+  const result = await fitnessPlanService.generateWeeklyFitnessPlan(userId);
+
+  const { workoutPlan, mealPlan } = result;
+
+  const dailyMenus = mealPlan.dailyMenuIds || [];
+
+  const dayDetails = (workoutPlan.days || []).map((day) => {
+    const dateStr = dayjs(day.date).format("YYYY-MM-DD");
+    
+    // Tìm thực đơn tương ứng từ mảng đã được populate
+    const menuOfDay = dailyMenus.find(m => dayjs(m.date).format("YYYY-MM-DD") === dateStr);
+    
+    const foodNames = menuOfDay?.recipes?.map(r => r.name).join(", ") || "Chưa cấu hình món";
+    const nạpKcal = menuOfDay?.targetNutrition?.calories || 0;
+    const tiêuHaoKcal = day.estimatedCalories || 0;
+    const trạngTháiTập = day.type === "workout" ? `Tập ${day.focus}` : "Nghỉ ngơi";
+
+    return `+ Ngày ${dateStr} (${trạngTháiTập}): Tiêu hao ~${tiêuHaoKcal} kcal | Mục tiêu nạp: ${nạpKcal} kcal. Các món: [${foodNames}]`;
+  });
+  
+  return {
+    success: true,
+    data: {
+      workoutPlanId: workoutPlan._id,
+      mealPlanId: mealPlan._id,
+      startDate: workoutPlan.weekStartDate,
+      endDate: workoutPlan.weekEndDate,
+    },
+    summary:
+      `Đã tạo thành công kế hoạch tích hợp Ăn uống & Tập luyện 7 ngày.\n` +
+      `Chi tiết phân phối dinh dưỡng và tập luyện từng ngày như sau:\n` +
+      `${dayDetails.join("\n")}\n\n` +
+      `Hãy thông báo cho người dùng biết lịch tập và bảo họ kiểm tra tab "Thực đơn tuần" hoặc "Lịch tập" để xem chi tiết cấu trúc món ăn cụ thể.`,
+  };
 }
 
 // ─── RECIPE ──────────────────────────────────────────────────────────────────
@@ -190,7 +232,6 @@ async function _searchRecipes(args, userId) {
     description: r.description?.substring(0, 100),
     imageUrl: r.imageUrl,
   }));
-  console.log("result recipes:", result.recipes);
 
   // Check tool config để xem có userSelection không
   const toolConfig = getToolConfig("search_recipes");
@@ -230,7 +271,6 @@ async function _searchRecipes(args, userId) {
 async function _getRecipeDetail(args) {
   const { recipe_id } = args;
   const recipe = await recipeService.getRecipeById(recipe_id);
-  console.log("result recipe:", recipe);
 
   if (!recipe) {
     return {
@@ -264,7 +304,7 @@ async function _getDailyMenu(args, userId) {
   const statusFilter = args.status_filter || "active";
  
   const STATUS_MAP = {
-    active:    ["manual", "selected"],
+    active:    ["selected"],
     suggested: ["suggested"],
   };
   const statuses = STATUS_MAP[statusFilter] || STATUS_MAP.active;
@@ -315,7 +355,6 @@ async function _getDailyMenu(args, userId) {
       `tổng ${menu.totalNutrition?.calories || 0} kcal`
     );
   });
- console.log(">>>>summary:", summaryParts.join(" | "));
   return {
     success: true,
     data: formattedMenus,
@@ -475,7 +514,7 @@ async function _updateDailyMenuStatus(args, userId) {
     };
   }
 
-  const validStatuses = ["manual", "suggested", "selected", "completed", "deleted", "expired"];
+  const validStatuses = ["suggested", "selected", "completed", "deleted", "expired"];
   if (!validStatuses.includes(new_status)) {
     return {
       success: false,
@@ -483,6 +522,7 @@ async function _updateDailyMenuStatus(args, userId) {
       summary: `Trạng thái "${new_status}" không hợp lệ. Chọn một trong: ${validStatuses.join(", ")}.`,
     };
   }
+    console.log("new_status:", new_status);
 
   try {
     const result = await dailyMenuService.updateDailyMenuStatus({
@@ -490,7 +530,7 @@ async function _updateDailyMenuStatus(args, userId) {
       dailyMenuId: daily_menu_id,
       newStatus: new_status,
     });
-
+    console.log("new status:", result.status);
     return {
       success: true,
       data: { dailyMenuId: result._id, newStatus: result.status },
@@ -508,7 +548,7 @@ async function _updateDailyMenuStatus(args, userId) {
 }
 async function _suggestDailyMenu(args, userId) {
   const date = args.date || getTodayVN();
-  const result = await mealRecommendationService.recommendDayPlan(userId, {
+  const result = await mealRecommendationService.recommendDayPlanForAi(userId, {
     date: new Date(date),
   });
   const byMeal = {};
@@ -535,10 +575,11 @@ async function _suggestDailyMenu(args, userId) {
     },
     summary:
       `Đã tạo thực đơn gợi ý cho ngày ${date} (menuId: ${menuId}): ${mealSummary}. ` +
-      `Tổng: ${result.totalNutrition?.calories || 0} kcal ` +
-      `(mục tiêu: ${result.targetNutrition?.calories || 0} kcal). ` +
-      `Nếu user đồng ý lưu/chọn → gọi update_daily_menu_status(daily_menu_id: "${menuId}", new_status: "selected"). ` +
-      `Hỏi user xác nhận và embed: [pending_action: update_daily_menu_status|daily_menu_id:${menuId}|new_status:selected]`,
+      `Tổng: ${result.totalNutrition?.calories || 0} kcal (mục tiêu: ${result.targetNutrition?.calories || 0} kcal). ` +
+      `HƯỚNG DẪN AI: Nếu user đồng ý, say 'Có', 'Ok', hoặc 'Lưu', bạn BẮT BUỘC phải gọi tool update_daily_menu_status với daily_menu_id = "${menuId}" và new_status = "selected". ` +
+      `Hãy hỏi user xem họ có muốn áp dụng thực đơn này không. ` +
+      `[PENDING_ACTION: update_daily_menu_status | daily_menu_id: ${menuId} | new_status: selected]` 
+      // Đuôi [PENDING_ACTION] này giúp hệ thống prompt của bạn (nếu có cấu hình phân tích) nhận diện hành động chờ cực tốt.
   };
 }
 
@@ -1038,7 +1079,6 @@ async function _getFavoriteRecipes(args, userId) {
       r.totalNutritionPerServing?.calories || r.totalNutrition?.calories,
     imageUrl: r.imageUrl,
   }));
-  console.log(">>>>result favorite recipes:", result.recipes);
   const recipeList = simplified
     .map((r, idx) => `${idx + 1}. ${r.name} (id: ${r._id})`)
     .join(", ");

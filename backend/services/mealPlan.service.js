@@ -137,7 +137,7 @@ class MealPlanService {
     const existingMenus = await DailyMenu.find({
       userId,
       date: { $in: dates },
-      status: { $in: ["manual", "selected"] },
+      status: { $in: ["selected"] },
     }).lean();
     const existingMap = {};
     existingMenus.forEach((dm) => {
@@ -163,7 +163,7 @@ class MealPlanService {
             sugar: 0,
             sodium: 0,
           },
-          status: "manual",
+          status: "selected",
         });
       }
 
@@ -176,7 +176,7 @@ class MealPlanService {
       endDate,
       dailyMenuIds,
       source: "user",
-      status: "manual",
+      status: "selected",
     });
 
     await newPlan.save();
@@ -237,7 +237,7 @@ class MealPlanService {
     const menus = await DailyMenu.find({
       userId,
       date: { $in: dates },
-      status: { $in: ["manual", "selected"] },
+      status: { $in: ["selected"] },
     })
       .select("date _id")
       .lean();
@@ -261,8 +261,10 @@ class MealPlanService {
    * Status hợp lệ: "manual" | "suggested" | "selected" | "completed" | "deleted" | "expired"
    */
   async updatePlanStatus(userId, planId, newStatus) {
+    if(newStatus === "manual") {
+      newStatus = "selected";
+    }
     const VALID_STATUSES = [
-      "manual",
       "suggested",
       "selected",
       "completed",
