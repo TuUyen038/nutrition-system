@@ -2,6 +2,50 @@ const WorkoutPlan = require("../models/WorkoutPlan");
 
 const workoutRecommendationService = require("./workoutRecommendation.service");  
 
+function getVNDateOnly(date = new Date()) {
+  return date.toLocaleDateString("en-CA", {
+    timeZone: "Asia/Ho_Chi_Minh",
+  });
+}
+
+function toUTCDateOnly(dateString) {
+  const [year, month, day] = dateString.split("-").map(Number);
+  return Date.UTC(year, month - 1, day);
+}
+
+function isPastOrTodayDateVN(date) {
+  const inputDate = getVNDateOnly(new Date(date));
+  const todayDate = getVNDateOnly(new Date());
+
+  return toUTCDateOnly(inputDate) <= toUTCDateOnly(todayDate);
+}
+
+// Auto complete rest days
+async function autoCompleteRestDays(plan) {
+  if (!plan?.days?.length) return plan;
+
+  let hasChanged = false;
+
+  plan.days.forEach((day) => {
+    if (
+      day.type === "rest" &&
+      isPastOrTodayDateVN(day.date) &&
+      !day.completed
+    ) {
+      day.completed = true;
+      day.skipped = false;
+      day.completedAt = new Date();
+      hasChanged = true;
+    }
+  });
+
+  if (hasChanged) {
+    await plan.save();
+  }
+
+  return plan;
+}
+
 // =====================================
 // GET CURRENT PLAN
 // =====================================
@@ -16,8 +60,10 @@ async function getCurrentPlan(userId) {
     weekEndDate: { $gte: today },
   });
 
-  // đã có => return
-  if (plan) { return plan; }
+  // đã có => return + auto complete rest days
+  if (plan) {
+    return await autoCompleteRestDays(plan);
+  }
 
   // tìm plan gần nhất
   const latestPlan =
@@ -44,27 +90,13 @@ async function getTodayWorkout(userId) {
   
   if (!plan?.weekStartDate) return null;
 
-  const start = new Date(plan.weekStartDate);
-  const today = new Date();
-
-  // normalize về VN timezone
-  const startVN = new Date(
-    start.toLocaleString("en-US", {
-      timeZone: "Asia/Ho_Chi_Minh",
-    })
-  );
-
-  const todayVN = new Date(
-    today.toLocaleString("en-US", {
-      timeZone: "Asia/Ho_Chi_Minh",
-    })
-  );
+  const startDateOnly = getVNDateOnly(new Date(plan.weekStartDate));
+  const todayDateOnly = getVNDateOnly(new Date());
 
   // tính số ngày lệch
-  const diffTime = todayVN - startVN;
-
   const diffDays = Math.floor(
-    diffTime / (1000 * 60 * 60 * 24)
+    (toUTCDateOnly(todayDateOnly) - toUTCDateOnly(startDateOnly)) /
+      (1000 * 60 * 60 * 24)
   );
 
   // plan.days là 1–7
