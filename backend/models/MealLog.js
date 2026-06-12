@@ -5,7 +5,7 @@ const mealLogSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", index: true },
 
   // thời điểm ăn (không chỉ date)
-  eatenAt: { type: Date, required: true, index: true },
+  eatenAt: { type: String, required: true, index: true },
 
   // link với plan (nếu có)
   dailyMenuId: { type: mongoose.Schema.Types.ObjectId },

@@ -4,6 +4,7 @@ const recipeItemSchema = new mongoose.Schema(
   {
     recipeId: { type: mongoose.Schema.Types.ObjectId, ref: "Recipe" },
 
+    recipeItemId: { type: mongoose.Schema.Types.ObjectId},
     // display
     name: { type: String, required: true },
     imageUrl: String,

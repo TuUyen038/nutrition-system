@@ -992,12 +992,12 @@ async function recommendDayPlan(userId, options = {}) {
   });
   // 6. Optionally save
   let dailyMenuId = null;
-  const logDate = toDateOnly(date);
+  const stringDate = toVNDateString(date);
   const logDoc = await DailyMenu.findOneAndUpdate(
-    { userId, date: logDate },
+    { userId, date: stringDate },
     {
       userId,
-      date: logDate,
+      date: stringDate,
       recipes: mealToRecipe,
       totalNutrition: dailyTotal,
       targetNutrition: adaptiveTarget,
@@ -1007,7 +1007,7 @@ async function recommendDayPlan(userId, options = {}) {
   );
   dailyMenuId = logDoc._id;
   return {
-    date: toDateOnly(date),
+    date: stringDate,
     recipes: mealToRecipe,
     totalNutrition: { ...dailyTotal },
     targetNutrition: { ...adaptiveTarget },

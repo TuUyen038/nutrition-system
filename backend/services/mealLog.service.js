@@ -36,19 +36,17 @@ function toDateOnly(d) {
  */
 async function createMealLog(userId, recipeItem, date, dailyMenuId = null) {
   try {
-    const start = new Date(date);
-    start.setHours(0, 0, 0, 0);
-
-    const end = new Date(date);
-    end.setHours(23, 59, 59, 999);
+    // const start = dayjs.tz(date, TIMEZONE_VN).startOf('day').toDate();
+    // const end = dayjs.tz(date, TIMEZONE_VN).endOf('day').toDate();
 
     const query = {
       userId,
-      "recipe.recipeId": recipeItem.recipeId, // 🔥 dùng id
-      eatenAt: {
-        $gte: start,
-        $lte: end,
-      },
+      "recipe.recipeItemId": recipeItem._id, // 🔥 dùng id
+      // eatenAt: {
+      //   $gte: start,
+      //   $lte: end,
+      // },
+      eatenAt: date
     };
 
     if (dailyMenuId) {
@@ -66,10 +64,11 @@ async function createMealLog(userId, recipeItem, date, dailyMenuId = null) {
 
     const mealLog = await MealLog.create({
       userId,
-      eatenAt: start, // hoặc toDateOnly cũng được
+      eatenAt: date,
       dailyMenuId: dailyMenuId || null,
       recipe: {
         recipeId: recipeItem.recipeId,
+        recipeItemId: recipeItem._id,
         name: recipeItem.name,
         imageUrl: recipeItem.imageUrl,
         description: recipeItem.description,
@@ -111,19 +110,16 @@ async function createMealLog(userId, recipeItem, date, dailyMenuId = null) {
  */
 async function deleteMealLog(userId, recipeId, date, dailyMenuId = null) {
   try {
-    const start = new Date(date);
-    start.setHours(0, 0, 0, 0);
+    // const start = new Date(date);
+    // start.setHours(0, 0, 0, 0);
 
-    const end = new Date(date);
-    end.setHours(23, 59, 59, 999);
+    // const end = new Date(date);
+    // end.setHours(23, 59, 59, 999);
 
     const query = {
       userId: new mongoose.Types.ObjectId(userId), // 🔥 fix
-      "recipe.recipeId": new mongoose.Types.ObjectId(recipeId), // 🔥 fix
-      eatenAt: {
-        $gte: start,
-        $lte: end,
-      },
+      "recipe.recipeItemId": new mongoose.Types.ObjectId(recipeId), // 🔥 fix
+      eatenAt: date
     };
 
     if (dailyMenuId) {

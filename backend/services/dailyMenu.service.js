@@ -227,7 +227,7 @@ exports.updateRecipeInMenu = async ({
       await createMealLog(userId, targetRecipe, dailyMenu.date, dailyMenu._id);
     } else {
       console.log("Xóa MealLog");
-      await deleteMealLog(userId, targetRecipe.recipeId, dailyMenu.date, dailyMenu._id);
+      await deleteMealLog(userId, targetRecipe._id, dailyMenu.date, dailyMenu._id);
     }
   }
 
@@ -274,30 +274,22 @@ exports.deleteRecipeInMenu = async ({ userId, dailyMenuId, recipeItemId }) => {
 };
 
 exports.getDailyMenuByDate = async ({ userId, date }) => {
-  const start = new Date(date);
-  start.setUTCHours(0, 0, 0, 0);
-
-  const end = new Date(date);
-  end.setUTCHours(23, 59, 59, 999);
 
   return await DailyMenu.findOne({
     userId,
-    date: {
-      $gte: start,
-      $lte: end,
-    },
+    date: date,
     status: { $in: ["manual", "selected", "suggested"] },
   }).lean();
 };
 exports.getDailyMenusByRange = async ({ userId, startDate, endDate }) => {
-  const normalizedStartDate = toDateOnly(startDate);
-  const normalizedEndDate = toDateOnly(endDate);
+  // const normalizedStartDate = toDateOnly(startDate);
+  // const normalizedEndDate = toDateOnly(endDate);
 
   return await DailyMenu.find({
     userId,
     date: {
-      $gte: normalizedStartDate,
-      $lte: normalizedEndDate,
+      $gte: startDate,
+      $lte: endDate,
     },
     status: { $in: ["manual", "selected"] },
   })
