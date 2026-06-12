@@ -3,22 +3,61 @@ const dayjs = require("dayjs");
 const MealPlan = require("../models/MealPlan");
 const DailyMenu = require("../models/DailyMenu");
 const NutritionGoal = require("../models/NutritionGoal");
-
-const {
-  generateAdaptiveWorkoutPlan,
-} = require("./workoutRecommendation.service");
+const WorkoutPlan = require("../models/WorkoutPlan");
 
 const mealRecommendationService = require("./mealRecommendation.service");
+const workoutPlanService = require("./workoutPlan.service");
 const dailyMenuService = require("./dailyMenu.service");
 const mealPlanService = require("./mealPlan.service");
 const { toVNDateString } = require("../utils/date");
 class FitnessPlanService {
   async generateWeeklyFitnessPlan(userId) {
     // ==================================================
-    // STEP 1: Generate workout như cũ
+    // STEP 1: Lấy hoặc tạo workout plan tuần hiện tại
     // ==================================================
 
-    const workoutPlan = await generateAdaptiveWorkoutPlan(userId);
+    const today = new Date();
+
+    let workoutPlan;
+
+    // tìm plan tuần hiện tại
+    const currentWorkoutPlan =
+      await WorkoutPlan.findOne({
+        userId,
+        weekStartDate: { $lte: today },
+        weekEndDate: { $gte: today },
+      });
+
+    // CASE 1: đã có current week -> dùng luôn
+    if (currentWorkoutPlan) {
+      workoutPlan = currentWorkoutPlan;
+    } else {
+
+    // CASE 2: chưa có current week
+    const latestPlan =
+        await WorkoutPlan.findOne({ userId })
+          .sort({ currentWeek: -1 });
+
+      // user mới hoàn toàn
+      if (!latestPlan) {
+        workoutPlan =
+          await workoutPlanService.generateWeeklyPlan(
+            userId,
+            {
+              currentWeek: 1,
+              startDate: today,
+            }
+          );
+
+      } else {
+
+        // đã có lịch sử -> tạo tuần kế tiếp
+        workoutPlan =
+          await workoutPlanService.generateNextWeek(
+            userId
+          );
+      }
+    }
 
     // ==================================================
     // STEP 2: Lấy nutrition goal
