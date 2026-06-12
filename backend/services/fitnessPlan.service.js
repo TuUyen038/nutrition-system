@@ -92,44 +92,23 @@ class FitnessPlanService {
           dateStr,
           dailyTarget: targetNutrition,
         });
-
-      // const dailyMenu = await DailyMenu.findOneAndUpdate(
-      //   {
-      //     userId,
-      //     date: dateStr,
-      //     status: { $in: ["selected", "manual", "suggested"] },
-      //   },
-      //   {
-      //     $set: {
-      //       recipes,
-      //       totalNutrition: totalNutrition,
-      //       targetNutrition: targetNutrition,
-      //       status: "suggested",
-      //     },
-      //   },
-      //   {
-      //     upsert: true,
-      //     new: true,
-      //   },
-      // );
       dailyMenuIds.push(_id);
     }
     // ==================================================
     // STEP 5: Create meal plan
     // ==================================================
-    const mealPlan = await MealPlan.findOneAndUpdate(
+    let mealPlan = await MealPlan.findOneAndUpdate(
       {
         userId,
         startDate: toVNDateString(workoutPlan.weekStartDate),
         endDate: toVNDateString(workoutPlan.weekEndDate),
-        status: { $nin: ["deleted", "expired"] },
+        status: { $in: ["selected"] },
       },
       {
         $set: {
           dailyMenuIds,
-          source: "ai",
           generatedBy: "fitness_v1",
-          status: "suggested",
+          status: "selected",
         },
       },
       {
@@ -139,6 +118,11 @@ class FitnessPlanService {
     );
     // NOTE: đối với gợi ý kết hợp thì mealplan sẽ được upsert và status ở đây là SUGGESTED always, chứ k phải selected rồi chờ gọi hàm updatePlanStatus nữa
 
+    mealPlan = await mealPlan.populate({
+      path: "dailyMenuIds",
+      model: "DailyMenu" // Đảm bảo điền đúng tên Model DailyMenu của bạn
+    });
+    
     return {
       workoutPlan,
       mealPlan,

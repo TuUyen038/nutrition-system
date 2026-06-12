@@ -27,6 +27,14 @@ const messageSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    pendingAction: {
+    type: {
+      tool: String,
+      args: mongoose.Schema.Types.Mixed,
+    },
+    default: null,
+  },
+
   },
   { _id: false, timestamps: false } // không cần _id riêng cho từng message
 );

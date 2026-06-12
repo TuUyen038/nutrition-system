@@ -182,7 +182,7 @@ exports.suggestRecipesForMeal = async (req, res) => {
     }
 
     // Lấy nutrition đã gọi trong ngày (nếu có)
-    const existing = await DailyMenu.findOne({ userId, date, status: { $in: ["manual", "selected"] } }).lean();
+    const existing = await DailyMenu.findOne({ userId, date, status: { $in: ["selected"] } }).lean();
 
     const currentDayNutrition = existing?.totalNutrition || {
       calories: 0,

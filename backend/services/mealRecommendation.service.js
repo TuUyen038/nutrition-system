@@ -824,7 +824,6 @@ function buildDayPlan(poolCache, dailyTarget, goal, sharedContext) {
           dailyTarget.carbs * 0.15) &&
       count < 5
     ) {
-
       snack = buildMeal(poolCache, "snack", snackTarget, {
         ...sharedContext,
         goal,
@@ -993,8 +992,108 @@ async function recommendDayPlan(userId, options = {}) {
   // 6. Optionally save
   let dailyMenuId = null;
   const stringDate = toVNDateString(date);
+
   const logDoc = await DailyMenu.findOneAndUpdate(
-    { userId, date: stringDate },
+    { userId, date: stringDate, status: { $in: ["selected"] }, },
+    {
+      userId,
+      date: stringDate,
+      recipes: mealToRecipe,
+      totalNutrition: dailyTotal,
+      targetNutrition: adaptiveTarget,
+      status: "selected",
+    },
+    { upsert: true, new: true, setDefaultsOnInsert: true },
+  );
+  dailyMenuId = logDoc._id;
+  return {
+    date: stringDate,
+    recipes: mealToRecipe,
+    totalNutrition: { ...dailyTotal },
+    targetNutrition: { ...adaptiveTarget },
+    status: "selected",
+    ...(dailyMenuId && { _id: dailyMenuId }),
+  };
+}
+
+
+
+async function recommendDayPlanForAi(userId, options = {}) {
+  const { date = new Date() } = options;
+
+  // 1. Profile + adaptive target (getAdaptiveTarget = điều chỉnh lịch sử DB)
+  const {
+    tdee,
+    goal,
+    target: dailyTarget,
+  } = await getUserNutritionProfile(userId);
+  const adaptiveTarget = await getAdaptiveTarget(userId, dailyTarget, date);
+
+  // 2. Load data song song
+  const [rawRecipes, recentNames, favouriteIds, user] = await Promise.all([
+    Recipe.aggregate([
+      {
+        $match: {
+          deleted: { $ne: true },
+          verified: true,
+          "totalNutritionPerServing.calories": { $gt: 0 },
+        },
+      },
+      {
+        $project: {
+          _id: 1,
+          name: 1,
+          totalWeight: 1,
+          category: 1,
+          description: 1,
+          allergy_tags: 1,
+          ingredients: 1,
+          servings: 1,
+          totalNutritionPerServing: 1,
+          imageUrl: 1,
+          nutritionVector: 1,
+        },
+      },
+    ]),
+    mealLogService.getRecentlyEatenMap(userId),
+    getFavouriteIds(userId),
+    User.findById(userId).select("allergies").lean(),
+  ]);
+
+  // 3. Normalize + OPT-4 cache
+  const recipes = normalizeRecipes(rawRecipes, user?.allergies || []);
+  const poolCache = buildPoolCache(recipes);
+
+  // 4. Context ngày
+  const dayContext = {
+    usedNames: new Set(),
+    usedMealSources: new Map(),
+    usedCategories: new Map(),
+    favouriteIds,
+    recentEatenMap: recentNames,
+  };
+
+  // 5. Build plan — FIX-1: truyền adaptiveTarget (bù lịch sử DB đã xong)
+  //    buildDayPlan chỉ còn lo rolling-debt nội ngày
+  const { meals, dailyTotal } = buildDayPlan(
+    poolCache,
+    adaptiveTarget,
+    goal,
+    dayContext,
+  );
+  const mealToRecipe = meals.flatMap((meal) => {
+    // Map các items bên trong meal và gán _id cho từng item
+    return meal.items.map((item) => ({
+      _id: new mongoose.Types.ObjectId(), // Gán ID mới cho mỗi item trong menu ngày
+      ...item, // Giữ lại các trường khác
+    }));
+  });
+  // 6. Optionally save
+  let dailyMenuId = null;
+  const stringDate = toVNDateString(date);
+
+  const logDoc = await DailyMenu.findOneAndUpdate(
+    { userId, date: stringDate, status: { $in: ["suggested"] } },
     {
       userId,
       date: stringDate,
@@ -1015,7 +1114,6 @@ async function recommendDayPlan(userId, options = {}) {
     ...(dailyMenuId && { _id: dailyMenuId }),
   };
 }
-
 /**
  * Gợi ý thực đơn 7 ngày.
  *
@@ -1040,8 +1138,8 @@ async function recommendWeekPlan(userId, options = {}) {
 
   // 2. Load data + tính adaptive targets cho cả tuần 1 lần
   const dates = Array.from({ length: numDays }, (_, i) =>
-  dayjs(startDate).add(i, "day").toDate(),
-);
+    dayjs(startDate).add(i, "day").toDate(),
+  );
 
   const [rawRecipes, recentNames, favouriteIds, user, adaptiveTargetsMap] =
     await Promise.all([
@@ -1068,7 +1166,7 @@ async function recommendWeekPlan(userId, options = {}) {
   for (let i = 0; i < numDays; i++) {
     const dayDate = dates[i];
     const adaptiveTarget =
-  adaptiveTargetsMap.get(toVNDateString(dayDate)) || dailyTarget;
+      adaptiveTargetsMap.get(toVNDateString(dayDate)) || dailyTarget;
 
     const dayContext = {
       usedNames: weekContext.usedNames, // shared cả tuần → tránh lặp món
@@ -1103,44 +1201,44 @@ async function recommendWeekPlan(userId, options = {}) {
     const dailyMenuDocs = await Promise.all(
       weekPlan.map((day) => {
         return DailyMenu.findOneAndUpdate(
-  {
-    userId,
-    date: day.date,
-  },
-  {
-    userId,
-    date: day.date,
-    recipes: day.recipes,
-    totalNutrition: day.totalNutrition,
-    targetNutrition: day._adaptiveTarget,
-    status: "suggested",
-  },
-  {
-    upsert: true,
-    new: true,
-    setDefaultsOnInsert: true,
-  },
-);
+          {
+            userId,
+            date: day.date,
+            status: { $in: ["selected"] },
+          },
+          {
+            userId,
+            date: day.date,
+            recipes: day.recipes,
+            totalNutrition: day.totalNutrition,
+            targetNutrition: day._adaptiveTarget,
+            status: "selected",
+          },
+          {
+            upsert: true,
+            new: true,
+            setDefaultsOnInsert: true,
+          },
+        );
       }),
     );
 
     const dailyMenuIds = dailyMenuDocs.map((dm) => dm._id);
     const startDateStr = toVNDateString(dates[0]);
-const endDateStr = toVNDateString(dates[numDays - 1]);
+    const endDateStr = toVNDateString(dates[numDays - 1]);
 
     await MealPlan.findOneAndUpdate(
       {
         userId,
         startDate: startDateStr,
         endDate: endDateStr,
-        status: "suggested",
+        status: { $in: ["selected"] },
       },
       {
         $set: {
           dailyMenuIds,
           source: "ai",
           generatedBy: "nutrition_v2",
-          status: "suggested",
         },
       },
       {
@@ -1187,7 +1285,6 @@ const endDateStr = toVNDateString(dates[numDays - 1]);
   };
 }
 
-module.exports = { recommendDayPlan, recommendWeekPlan };
 
 /**
  * Backwards-compatible API used by other services.
@@ -1249,25 +1346,25 @@ async function generateDailyMenuDataV2(opts = {}) {
   let dailyMenuId = null;
   const logDate = toDateOnly(date);
   const logDoc = await DailyMenu.findOneAndUpdate(
-    { userId, date: dateStr },
+    { userId, date: dateStr, status: { $in: ["selected"] } },
     {
       userId,
       date: dateStr,
       recipes: mealToRecipe,
       totalNutrition: dailyTotal,
       targetNutrition: dailyTarget,
-      status: "suggested",
+      status: "selected",
     },
     { upsert: true, new: true, setDefaultsOnInsert: true },
   );
   dailyMenuId = logDoc._id;
-  
+
   return {
     date: dateStr,
     recipes: mealToRecipe,
     totalNutrition: { ...dailyTotal },
     targetNutrition: { ...dailyTarget },
-    status: "suggested",
+    status: "selected",
     ...(dailyMenuId && { _id: dailyMenuId }),
   };
 }
@@ -1276,4 +1373,5 @@ module.exports = {
   recommendDayPlan,
   recommendWeekPlan,
   generateDailyMenuDataV2,
+  recommendDayPlanForAi
 };

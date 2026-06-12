@@ -7,6 +7,17 @@
  *  - description phải rõ WHEN TO USE, không chỉ là WHAT IT DOES
  */
 const CHAT_TOOLS = [
+  {
+    name: "generate_weekly_fitness_plan",
+    description:
+      "Tạo kế hoạch toàn diện tích hợp cả lịch tập luyện (Workout) và thực đơn ăn uống (Meal Plan) cho cả tuần dựa trên mục tiêu dinh dưỡng, ngày bắt đầu do user chọn. Nếu use không nói gì, mặc định ngày bắt đầu là hôm nay. " +
+      "Cực kỳ phù hợp khi user muốn có giải pháp trọn gói, tối ưu lượng calories tăng/giảm theo từng ngày tập hoặc ngày nghỉ. " +
+      "Gọi khi user yêu cầu: 'lên lịch tập và ăn uống tuần tới', 'thiết kế combo ăn tập 7 ngày', 'gợi ý thực đơn kết hợp bài tập'.",
+    parameters: {
+      type: "object",
+      properties: {}, // Không cần tham số truyền vào vì xử lý tự động theo tuần của userId
+    },
+  },
   // ─── INGREDIENT ───────────────────────────────────────────────────────────────
   {
     name: "search_ingredients",
@@ -361,7 +372,7 @@ const CHAT_TOOLS = [
       "'xem thực đơn gợi ý', 'thực đơn tôi đang dùng'. " +
       "Dùng date = today nếu user không nêu ngày cụ thể. " +
       "status_filter: " +
-      "'active' (mặc định) = manual + selected (thực đơn user đang dùng); " +
+      "'active' (mặc định) = selected (thực đơn user đang dùng); " +
       "'suggested' = thực đơn hệ thống gợi ý chưa được chọn; ",
     parameters: {
       type: "object",
@@ -375,7 +386,7 @@ const CHAT_TOOLS = [
           type: "string",
           enum: ["active", "suggested"],
           description:
-            "'active' = manual hoặc selected (mặc định, thực đơn user đang dùng); " +
+            "'active' = selected (mặc định, thực đơn user đang dùng); " +
             "'suggested' = chỉ thực đơn hệ thống gợi ý; ",
         },
       },
@@ -387,12 +398,12 @@ const CHAT_TOOLS = [
     name: "update_daily_menu_status",
     description:
       "Cập nhật trạng thái của thực đơn ngày (daily menu). " +
-      "Gọi khi user nói 'hoàn thành thực đơn', 'đánh dấu menu hôm nay đã xong', 'Chọn thực đơn này', 'hoàn thành',..." +
-      "PHẢI có daily_menu_id hợp lệ — nếu chưa có hoặc không chắc, " +
-      "gọi get_daily_menu trước để lấy ID hiện tại. ",
-    // "KHÔNG dùng ID từ lịch sử hội thoại cũ.",
+      "ĐẶC BIỆT: Gọi tool này với new_status = 'selected' khi hệ thống vừa gợi ý thực đơn và user nói 'Có', 'Đồng ý', 'Lưu lại', 'Ok', 'Chốt', 'Chọn thực đơn này'. " +
+      "PHẢI lấy daily_menu_id từ thực đơn hệ thống vừa trả về ở ngay tin nhắn phía trên để điền vào tham số." +
+      "nếu chưa có hoặc không chắc daily_menu_id, " +
+      "gọi get_daily_menu với status_filter là 'suggested' để lấy ID hiện tại. ",
 
-    parameters: {
+      parameters: {
       type: "object",
       properties: {
         daily_menu_id: {
@@ -402,7 +413,6 @@ const CHAT_TOOLS = [
         new_status: {
           type: "string",
           enum: [
-            "manual",
             "suggested",
             "selected",
             "completed",
@@ -410,11 +420,10 @@ const CHAT_TOOLS = [
             "expired",
           ],
           description:
-            "Trạng thái mới của thực đơn: manual/completed/suggested/selected/deleted/expired." +
+            "Trạng thái mới của thực đơn: completed/suggested/selected/deleted/expired." +
             "Nếu user nói 'hoàn thành thực đơn', 'đánh dấu menu hôm nay đã xong' thì new_status = completed; " +
             "Nếu user nói kiểu: 'Chọn thực đơn này' thì new_status = selected; " +
-            "Nếu user nói kiểu: 'hủy thực đơn này', 'xóa thực đơn này', 'không chọn thực đơn này nữa' thì new_status = deleted; " +
-            "Nếu user nói kiểu: 'đây là thực đơn tôi tự tạo' thì new_status = manual.",
+            "Nếu user nói kiểu: 'hủy thực đơn này', 'xóa thực đơn này', 'không chọn thực đơn này nữa' thì new_status = deleted; ",
         },
       },
       required: ["daily_menu_id", "new_status"],

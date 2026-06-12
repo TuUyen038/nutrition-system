@@ -160,6 +160,107 @@ const SHORT_REPLY_PATTERNS = [
 
 const isShortReply = (message = "") =>
   SHORT_REPLY_PATTERNS.some((p) => p.test(message.trim()));
+// ─── PENDING ACTION HELPERS ───────────────────────────────────────────────────
+
+/**
+ * Regex parse tag [PENDING_ACTION: tool | daily_menu_id: xxx | new_status: yyy]
+ * do tool (ví dụ suggest_daily_menu) chèn vào cuối summary.
+ */
+const PENDING_ACTION_REGEX =
+  /\[PENDING_ACTION:\s*([\w_]+)\s*\|\s*daily_menu_id:\s*([a-f0-9]{24})\s*\|\s*new_status:\s*(\w+)\]/;
+
+const parsePendingAction = (summary = "") => {
+  const match = summary.match(PENDING_ACTION_REGEX);
+  if (!match) return null;
+  return {
+    tool: match[1],
+    args: { daily_menu_id: match[2], new_status: match[3] },
+  };
+};
+
+/**
+ * Phân loại reply ngắn: đồng ý / từ chối / khác.
+ * Dùng để quyết định có thực thi pendingAction hay không.
+ */
+const POSITIVE_REPLY_REGEX =
+  /^(có|co|ok|oke|ừ|uh|uhm|vâng|dạ|đồng ý|dong y|chốt|lưu|được|dc|yes|tiếp|tiếp tục|next|continue)$/i;
+
+const NEGATIVE_REPLY_REGEX =
+  /^(không|k|no|thôi|bỏ qua|huỷ|hủy)$/i;
+
+const classifyShortReply = (message = "") => {
+  const trimmed = message.trim();
+  if (POSITIVE_REPLY_REGEX.test(trimmed)) return "positive";
+  if (NEGATIVE_REPLY_REGEX.test(trimmed)) return "negative";
+  return "other";
+};
+
+/**
+ * Lấy message model cuối cùng (có thể kèm pendingAction).
+ */
+const extractLastModelMessage = (messages = []) =>
+  [...messages].reverse().find((m) => m.role === "model");
+
+// ─── DIRECT PENDING ACTION EXECUTION ──────────────────────────────────────────
+
+/**
+ * Thực thi trực tiếp tool đã được "chốt" từ lượt trước (pendingAction),
+ * KHÔNG đi qua agentic loop của Gemini — đảm bảo hành động chắc chắn xảy ra.
+ *
+ * Sau khi có kết quả tool, gọi Gemini (1 lần, không tool) để soạn câu trả lời
+ * tự nhiên dựa trên kết quả đó.
+ *
+ * @returns {Object} cùng shape với _runGeminiWithTools (text, toolsUsed, dataSource, ...)
+ */
+async function _executeDirectAction(pendingAction, userMessage, userId) {
+  const { tool, args } = pendingAction;
+  const toolsUsed = [];
+
+  let toolResult;
+  try {
+    toolResult = await executeTool(tool, args, userId);
+    toolsUsed.push({ name: tool, args, success: toolResult?.success ?? true });
+  } catch (err) {
+    toolsUsed.push({ name: tool, args, success: false });
+    toolResult = {
+      success: false,
+      error: err.message,
+      summary: `Lỗi khi thực hiện ${tool}: ${err.message}`,
+    };
+  }
+
+  // Nhờ Gemini soạn câu trả lời tự nhiên dựa trên kết quả tool — không cấp tool,
+  // không cần history, chỉ cần 1 prompt ngắn → nhanh và rẻ.
+  const phrasingPrompt =
+    `User vừa xác nhận đồng ý ("${userMessage}") với hành động trước đó.\n` +
+    `Hệ thống đã thực thi và trả về kết quả sau:\n` +
+    `${toolResult.summary || JSON.stringify(toolResult)}\n\n` +
+    `Hãy thông báo cho user kết quả này bằng tiếng Việt, ngắn gọn, ` +
+    `tự nhiên, có động lực. Nếu success = false, xin lỗi và gợi ý hướng xử lý tiếp theo.`;
+
+  try {
+    const text = await withFallback(async (model) => {
+      const chat = model.startChat({ history: [] });
+      const result = await chat.sendMessage(phrasingPrompt);
+      const part = result.response.candidates?.[0]?.content?.parts
+        ?.find((p) => p.text?.trim());
+      return part?.text?.trim();
+    }, "chat");
+
+    if (text) {
+      return buildResponse(text, toolsUsed, userMessage);
+    }
+  } catch (err) {
+    console.warn("[ChatService] Direct action phrasing failed:", err.message);
+  }
+
+  // Fallback nếu Gemini phrasing lỗi — dùng luôn summary của tool
+  const fallbackText = toolResult.success
+    ? toolResult.summary || "Đã thực hiện thành công."
+    : `Xin lỗi, ${toolResult.summary || "có lỗi xảy ra khi xử lý yêu cầu."}`;
+
+  return buildResponse(fallbackText, toolsUsed, userMessage);
+}
 
 /**
  * Lấy topic đang được thảo luận từ lượt model nói cuối cùng.
@@ -193,7 +294,6 @@ async function _runGeminiWithTools(
 ) {
   const contextText = buildUserContext(userContext);
 
-  // Nếu là short reply → thêm hint để Gemini không đi lạc
   const shortReplyHint = contextHint
     ? `[Ngữ cảnh đang thảo luận: "${contextHint}..."]\n` +
       `[User đang phản hồi về chủ đề trên, KHÔNG phải yêu cầu mới]\n`
@@ -206,10 +306,8 @@ async function _runGeminiWithTools(
   const geminiHistory = buildGeminiHistory(history);
   const toolsUsed = [];
   const executedTools = new Set();
+  let pendingAction = null; // ← THÊM
 
-  // withFallback tạo chat session mới với key+model còn khả dụng.
-  // Toàn bộ agentic loop được wrap trong 1 operation duy nhất để
-  // nếu gặp lỗi retryable ở BẤT KỲ bước nào → retry từ đầu với key/model khác.
   return withFallback(async (model) => {
     const chat = model.startChat({
       history: geminiHistory,
@@ -217,9 +315,9 @@ async function _runGeminiWithTools(
       toolConfig: { functionCallingConfig: { mode: "AUTO" } },
     });
 
-    // Reset state cho mỗi lần retry với key/model khác
     toolsUsed.length = 0;
     executedTools.clear();
+    pendingAction = null; // reset mỗi lần retry
 
     let result = await chat.sendMessage(finalPrompt);
 
@@ -247,6 +345,13 @@ async function _runGeminiWithTools(
             const toolResult = await executeTool(name, args, userId);
             toolsUsed.push({ name, args, success: toolResult?.success ?? true });
             toolResponses.push({ functionResponse: { name, response: toolResult } });
+
+            // ← THÊM: bắt pendingAction từ summary
+            const parsed = parsePendingAction(toolResult?.summary || "");
+            if (parsed) {
+              pendingAction = parsed;
+              console.log("[Gemini] Pending action detected:", pendingAction);
+            }
           } catch (err) {
             console.error(`[Gemini] Tool error: ${name}`, err.message);
             toolsUsed.push({ name, args, success: false });
@@ -280,7 +385,7 @@ async function _runGeminiWithTools(
       const textPart = parts.find((p) => p.text?.trim());
       if (textPart?.text?.trim()) {
         console.log(`[Gemini] Done at step ${step}`);
-        return buildResponse(textPart.text, toolsUsed, userMessage);
+        return { ...buildResponse(textPart.text, toolsUsed, userMessage), pendingAction }; // ← SỬA
       }
 
       console.warn("[Gemini] No function calls and no text");
@@ -288,7 +393,8 @@ async function _runGeminiWithTools(
     }
 
     console.warn("[Gemini] Loop ended, attempting fallback");
-    return handleFallback(chat, toolsUsed, userMessage);
+    const fallback = await handleFallback(chat, toolsUsed, userMessage);
+    return { ...fallback, pendingAction }; // ← SỬA
   }, "chat");
 }
 
@@ -320,39 +426,59 @@ async function sendChatWithTools(userId, userMessage, userContext, sessionId) {
     });
   }
 
-  // 2. Detect short reply — cần làm TRƯỚC khi push user message vào session
-  //    để extractLastTopic tìm đúng message model cuối
+  // 2. Detect short reply + pendingAction từ lượt model trước
   let contextHint = null;
+  let pendingActionFromLastTurn = null;
+  let replyClass = "other";
+
   if (isShortReply(userMessage)) {
-    contextHint = extractLastTopic(session.messages);
-    console.log(`[ChatService] Short reply detected, context hint: "${contextHint}"`);
+    const lastModel = extractLastModelMessage(session.messages);
+    contextHint = lastModel?.content || null;
+    pendingActionFromLastTurn = lastModel?.pendingAction || null;
+    replyClass = classifyShortReply(userMessage);
+    console.log(
+      `[ChatService] Short reply detected (${replyClass}), ` +
+      `pendingAction: ${JSON.stringify(pendingActionFromLastTurn)}`
+    );
   }
 
   // 3. Lưu message user
   session.messages.push({ role: "user", content: userMessage });
 
-  // 4. History cho Gemini = tất cả NGOẠI TRỪ message user vừa push
-  //    (message user được gửi qua finalPrompt trong _runGeminiWithTools)
-  const historyForGemini = session.messages.slice(0, -1);
+  let geminiResult;
 
-  // Trim SAU khi đã lấy historyForGemini để không làm lệch slice
-  session.trimMessages();
+  // ── BRANCH: nếu có pendingAction + user đồng ý → thực thi trực tiếp ──
+  if (pendingActionFromLastTurn && replyClass === "positive") {
+    console.log("[ChatService] Executing pending action directly:", pendingActionFromLastTurn);
+    geminiResult = await _executeDirectAction(
+      pendingActionFromLastTurn,
+      userMessage,
+      userId
+    );
+  } else {
+    // ── FLOW BÌNH THƯỜNG: agentic loop với Gemini ──
 
-  // 5. Gọi Gemini
-  const geminiResult = await _runGeminiWithTools(
-    historyForGemini,
-    userMessage,
-    userContext,
-    userId,
-    contextHint
-  );
+    // Nếu user từ chối pendingAction → không cần truyền pendingAction xuống,
+    // nhưng vẫn giữ contextHint để Gemini hiểu là user đang nói về thực đơn vừa gợi ý.
+    const historyForGemini = session.messages.slice(0, -1);
+    session.trimMessages();
 
-  // 6. Lưu response model + save
+    geminiResult = await _runGeminiWithTools(
+      historyForGemini,
+      userMessage,
+      userContext,
+      userId,
+      contextHint
+    );
+  }
+
+  // 4. Lưu response model + save (kèm pendingAction nếu có)
   session.messages.push({
     role: "model",
     content: geminiResult.text,
     dataSource: geminiResult.dataSource,
     hasDisclaimer: geminiResult.hasDisclaimer,
+    pendingAction: geminiResult.pendingAction || null, // ← THÊM
   });
   session.trimMessages();
   await session.save();
