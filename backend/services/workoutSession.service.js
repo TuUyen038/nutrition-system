@@ -87,6 +87,75 @@ async function updateExerciseStats({
   await stats.save();
 }
 
+async function getWorkoutHistory(userId, options = {}) {
+  try {
+    const {
+      page = 1,
+      limit = 20,
+      sortBy = "endTime",
+    } = options;
+
+    const skip = (Number(page) - 1) * Number(limit);
+
+    const filter = {
+      userId,
+      completed: true,
+      endTime: { $ne: null },
+    };
+
+    const [sessions, total] = await Promise.all([
+      WorkoutSession.find(filter)
+        .sort({ [sortBy]: -1 })
+        .skip(skip)
+        .limit(Number(limit))
+        .lean(),
+
+      WorkoutSession.countDocuments(filter),
+    ]);
+
+    return {
+      sessions: sessions.map((session) => ({
+        _id: session._id,
+        planId: session.planId,
+        day: session.day,
+        focus: session.focus,
+
+        exerciseId: session.exerciseId,
+        exerciseName: session.exerciseName,
+        intensity: session.intensity,
+        muscleGroups: session.muscleGroups || [],
+
+        targetSets: session.targetSets,
+        targetReps: session.targetReps,
+        completedSets: session.completedSets,
+        completedReps: session.completedReps,
+
+        durationMinutes: session.durationMinutes,
+        estimatedCalories: session.estimatedCalories,
+        actualCalories: session.actualCalories,
+
+        perceivedDifficulty: session.perceivedDifficulty,
+        performanceScore: session.performanceScore,
+        fatigueImpact: session.fatigueImpact,
+
+        startTime: session.startTime,
+        endTime: session.endTime,
+        createdAt: session.createdAt,
+      })),
+
+      pagination: {
+        total,
+        page: Number(page),
+        limit: Number(limit),
+        totalPages: Math.ceil(total / Number(limit)),
+      },
+    };
+  } catch (err) {
+    console.error("[getWorkoutHistory] Error:", err);
+    throw err;
+  }
+}
+
 async function startWorkout({
   userId,
   planId,
@@ -308,4 +377,5 @@ module.exports = {
   startWorkout,
   stopWorkout,
   getTodayKcal,
+  getWorkoutHistory,
 };

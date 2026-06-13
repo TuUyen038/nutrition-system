@@ -6,6 +6,7 @@ const {
   stopWorkout,
   completeWorkout,
   getTodayKcal,
+  getWorkoutHistoryController,
 } = require("../controllers/workoutSession.controller");
 
 const { authenticate } = require("../middlewares/auth");
@@ -17,5 +18,6 @@ router.post("/start", startWorkout);
 router.post("/stop", stopWorkout);
 router.post("/complete", completeWorkout); // Alias for stop - calculates calories
 router.get("/today-kcal", getTodayKcal);
+router.get("/history", getWorkoutHistoryController);
 
 module.exports = router;

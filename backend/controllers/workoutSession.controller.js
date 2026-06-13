@@ -2,6 +2,30 @@ const workoutSessionService = require(
   "../services/workoutSession.service"
 );
 
+async function getWorkoutHistoryController(req, res) {
+  try {
+    const userId = req.user._id;
+    const { page = 1, limit = 20 } = req.query;
+
+    const result = await workoutSessionService.getWorkoutHistory(userId, {
+      page: Number(page),
+      limit: Number(limit),
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (err) {
+    console.error("[getWorkoutHistoryController] Error:", err);
+
+    return res.status(500).json({
+      success: false,
+      message: err.message || "Internal server error",
+    });
+  }
+}
+
 /**
  * ============================================
  * START WORKOUT
@@ -169,4 +193,5 @@ module.exports = {
   stopWorkout,
   completeWorkout,
   getTodayKcal,
+  getWorkoutHistoryController,
 };
