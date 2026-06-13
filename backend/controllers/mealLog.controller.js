@@ -24,7 +24,7 @@ const {
 async function getMealHistoryController(req, res) {
   try {
     const userId = req.user._id;
-    const { days = 7, page = 1, limit = 20 } = req.query;
+    const { days = 20, page = 1, limit = 20 } = req.query;
 
     const result = await getMealHistory(userId, {
       days: Number(days),

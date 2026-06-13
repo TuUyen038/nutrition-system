@@ -213,7 +213,7 @@ async function _generateWeeklyFitnessPlan(userId) {
 // ─── RECIPE ──────────────────────────────────────────────────────────────────
 
 async function _searchRecipes(args, userId) {
-  const { keyword, limit = 5 } = args;
+  const { keyword, limit = 1 } = args;
 
   const result = await recipeService.searchRecipesByIngredientName(keyword, {
     limit,
@@ -229,6 +229,7 @@ async function _searchRecipes(args, userId) {
       r.totalNutrition?.calories || r.totalNutritionPerServing?.calories,
     nutritionPerServing: r.totalNutritionPerServing,
     nutrition: r.totalNutrition,
+    instructions: r.instructions,
     description: r.description?.substring(0, 100),
     imageUrl: r.imageUrl,
   }));

@@ -9,6 +9,7 @@
 const MealLog = require("../models/MealLog");
 const Recipe = require("../models/Recipe");
 const mongoose = require("mongoose");
+const { toVNDateString } = require("../utils/date");
 
 // ─────────────────────────────────────────────────────────────
 // UTILITY
@@ -193,35 +194,21 @@ async function deleteMealLogsByDate(userId, dateString) {
 async function getMealHistory(userId, options = {}) {
   try {
     const {
-      days = 7,
       page = 1,
       limit = 20,
       sortBy = "eatenAt",
     } = options;
 
-    const since = new Date();
-    since.setDate(since.getDate() - Number(days));
-
     const skip = (Number(page) - 1) * Number(limit);
 
+    // Sử dụng Promise.all để chạy song song query lấy data và đếm tổng số bản ghi
     const [logs, total] = await Promise.all([
-      MealLog.find({
-        userId,
-        eatenAt: { $gte: since },
-      })
-        .sort({ [sortBy]: -1 })
+      MealLog.find({ userId })                 // Lấy full lịch sử, chỉ lọc duy nhất theo userId
+        .sort({ [sortBy]: -1 })                // Sắp xếp theo ngày ăn mới nhất (hoặc trường sortBy truyền vào)
         .skip(skip)
         .limit(Number(limit))
-        .populate({
-          path: "recipe.recipeId",
-          model: "Recipe",
-          select: "name imageUrl description scale nutrition",
-        })
-        .lean(),
-      MealLog.countDocuments({
-        userId,
-        eatenAt: { $gte: since },
-      }),
+        .lean(),                               // Dùng .lean() để tăng tốc độ xử lý JSON
+      MealLog.countDocuments({ userId }),      // Đếm tổng số lịch sử của user này để phân trang
     ]);
 
     return {
@@ -229,10 +216,10 @@ async function getMealHistory(userId, options = {}) {
         _id: log._id,
         eatenAt: log.eatenAt,
         recipe: {
-          name: log.recipe.name,
-          imageUrl: log.recipe.imageUrl,
-          mealSource: log.recipe.mealSource,
-          nutrition: log.recipe.nutrition,
+          name: log.recipe?.name || null,
+          imageUrl: log.recipe?.imageUrl || null,
+          mealSource: log.recipe?.mealSource || "none",
+          nutrition: log.recipe?.nutrition || null,
         },
         createdAt: log.createdAt,
       })),

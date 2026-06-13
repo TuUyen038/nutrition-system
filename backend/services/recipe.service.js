@@ -85,6 +85,7 @@ exports.searchRecipesByIngredientName = async (keyword, options = {}) => {
         category: 1,
         imageUrl: 1,
         totalNutrition: 1,
+        instructions: 1,
         ingredients: 1,
         matchByName: 1,
         matchByIngredient: 1,
