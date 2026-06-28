@@ -1,20 +1,24 @@
 # Smart Nutrition Recommendation System
   
-  AI Nutrition Recommendation System is a full-stack web application that delivers personalized nutrition recommendations and weekly meal planning powered by AI. 
+  Nutrition Recommendation System is a full-stack web application that delivers personalized meal planning, automated nutrition analysis from recipes, and conversational assistance through an intelligent chatbot.
   The platform is tailored for Vietnamese users, leveraging Vietnamese food data, local ingredients, and culturally relevant dietary and exercise patterns.
 
 ---
-## Overview
+## Main Features
 
-This system allows users to:
+#### User Features
 
-- Create and manage weekly meal plans 
-- Track daily calories and macronutrients
-- Analyze nutrition data with charts
-- Receive AI-powered food recommendations
-- Upload and manage food-related images
+- Manage personal profiles, daily and weekly meal.
+- Calculate personalized nutritional requirements (TDEE, BRM).
+- Receive adaptive daily and weekly meal recommendations.
+- Track meal history and daily nutrition intake.
+- Calculate total calories and detailed nutritional facts from recipes/food image.
+- Interact with the AI chatbot for nutrition assistance.
 
-The application is built with a React frontend and a Node.js + Express backend using MongoDB.
+#### Admin Features
+
+- Manage ingredients, recipes, exercises, users, audit logs.
+- Maintain the nutrition knowledge base.
 
 ---
 
@@ -22,27 +26,20 @@ The application is built with a React frontend and a Node.js + Express backend u
 
 ### Frontend
 - React 18
-- React Router v6
-- Material UI (MUI)
-- Chart.js
-- React Table
-- Yup (form validation)
-- Day.js
+- Material UI
 
 ### Backend
 - Node.js
-- Express 5
+- Express 
 - MongoDB + Mongoose
 - JWT Authentication
-- Cloudinary (image storage)
-- Multer
-- Nodemailer
-- Swagger (API documentation)
+- Cloudinary
+- Gemini API
 
-### AI Integration
-- Google GenAI
-- HuggingFace Inference API
-- Transformers
+### Search Service
+- Python
+- Sentence Transformers (multilingual-e5-base)
+- FAISS
 
 ---
 
@@ -52,27 +49,12 @@ The application is built with a React frontend and a Node.js + Express backend u
 
 cd backend  
 npm install  
-
-Create a `.env` file inside the backend directory:
-
-PORT=5000  
-MONGO_URI=your_mongodb_connection_string  
-JWT_SECRET=your_jwt_secret  
-CLOUDINARY_CLOUD_NAME=your_cloud_name  
-CLOUDINARY_API_KEY=your_api_key  
-CLOUDINARY_API_SECRET=your_api_secret  
-...
-
-Run the backend:
-
 npm run dev  
 
 Backend will run at:
-
 http://localhost:3000  
 
 Swagger API documentation:
-
 http://localhost:3000/api-docs  
 
 ---
@@ -94,15 +76,13 @@ http://localhost:3001
 ## Search Service (Python)
 
 cd search-service
-
 python3 -m venv venv  
-
 source venv/bin/activate
-
 python3 -m pip install -r requirements.txt
-
 python build_index.py
-
 uvicorn server:app --host 0.0.0.0 --port 8000 --reload
+
+Search Service will run at:
+http://localhost:8000
 
 ---
