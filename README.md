@@ -24,11 +24,11 @@
 
 ## Tech Stack
 
-### Frontend
+#### Frontend
 - React 18
 - Material UI
 
-### Backend
+#### Backend
 - Node.js
 - Express 
 - MongoDB + Mongoose
@@ -36,7 +36,7 @@
 - Cloudinary
 - Gemini API
 
-### Search Service
+#### Search Service
 - Python
 - Sentence Transformers (multilingual-e5-base)
 - FAISS
@@ -45,7 +45,7 @@
 
 ## Installation
 
-## Backend Setup
+#### Backend
 
 cd backend  
 npm install  
@@ -59,7 +59,7 @@ http://localhost:3000/api-docs
 
 ---
 
-## Frontend Setup
+#### Frontend
 
 cd frontend  
 npm install  
@@ -73,7 +73,7 @@ http://localhost:3001
 
 ---
 
-## Search Service (Python)
+#### Search Service
 
 cd search-service
 python3 -m venv venv  
