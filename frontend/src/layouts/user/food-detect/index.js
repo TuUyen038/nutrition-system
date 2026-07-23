@@ -28,7 +28,7 @@ function DetectFood() {
   const [note, setNote] = useState("");
   const [error, setError] = useState(null); // Trạng thái lỗi
   // Trạng thái kết quả, khớp với cấu trúc JSON của Backend
-  const [analysisData, setAnalysisData] = useState(null);
+  const [analysisData, setAnalysisData] = useState([]);
   const [fileToUpload, setFileToUpload] = useState(null); // Lưu file gốc
 
   const handleImageUpload = (event) => {
@@ -65,7 +65,7 @@ function DetectFood() {
     // 1. Thiết lập trạng thái ban đầu
     setFileToUpload(file);
     setSelectedImage(URL.createObjectURL(file));
-    setAnalysisData(null); // Clear previous data
+    setAnalysisData([]); // Clear previous data
     setError(null); // Clear previous error
     setLoading(true);
 
@@ -98,6 +98,7 @@ function DetectFood() {
       if (status === 429 || message.includes("429") || message.includes("Lỗi HTTP: 429")) {
         errorMessage = "Quá nhiều yêu cầu. Vui lòng thử lại sau vài phút.";
       } else if (status === 400 || message.includes("400") || message.includes("Lỗi HTTP: 400")) {
+        console.log(status, message);
         errorMessage = "Dữ liệu không hợp lệ. Vui lòng kiểm tra lại ảnh.";
       } else if (status >= 500 || message.includes("500") || message.includes("Lỗi HTTP: 5")) {
         errorMessage = "Lỗi máy chủ. Vui lòng thử lại sau.";
@@ -106,7 +107,7 @@ function DetectFood() {
       }
 
       setError(errorMessage);
-      setAnalysisData(null);
+      setAnalysisData([]);
     } finally {
       setLoading(false);
     }
@@ -114,7 +115,7 @@ function DetectFood() {
 
   const handleMoveToRecipe = () => {
     // Nếu có error, vẫn cho phép chuyển với dữ liệu mặc định
-    const dishName = error ? "Lỗi API/Không xác định" : analysisData || "Lỗi API/Không xác định";
+    const dishName = error ? "Lỗi API/Không xác định" : analysisData[0] || "Lỗi API/Không xác định";
     navigate(`/analyze-recipe?dish=${encodeURIComponent(dishName)}`);
   };
   return (
@@ -194,19 +195,20 @@ function DetectFood() {
                 <>
                   {selectedImage && (
                     <>
-                      {analysisData && (
+                      {analysisData.length > 0 && (
                         <Grid container spacing={1} alignItems="center" mb={5}>
                           <Grid item xs={6} md={3} lg={2}>
                             <MDTypography variant="h6" fontWeight="medium">
                               Kết quả nhận diện:
                             </MDTypography>
                           </Grid>
-                          <Grid item xs={6} md={3} lg={3}>
-                            <Typography variant="body2">{analysisData}</Typography>
-                          </Grid>
+                          {analysisData.map((item, index) => (
+                            <Grid item xs={6} md={3} lg={3} key={index}>
+                              <Typography variant="body2">{item}</Typography>
+                            </Grid>
+                          ))}
                         </Grid>
                       )}
-
                       {error && (
                         <Grid container spacing={1} alignItems="center" mb={2}>
                           <Grid item xs={12}>
@@ -217,11 +219,11 @@ function DetectFood() {
                         </Grid>
                       )}
 
-                      {!analysisData && !error && (
+                      {analysisData.length === 0 && !error && (
                         <Grid container spacing={1} alignItems="center" mb={5}>
                           <Grid item xs={12}>
                             <Typography variant="body2" color="text.secondary">
-                              Không thể nhận diện được món ăn! Vui lòng thử lại với ảnh khác.
+                              Không có món ăn nào được nhận diện. Bạn có thể thử lại với ảnh khác.
                             </Typography>
                           </Grid>
                         </Grid>

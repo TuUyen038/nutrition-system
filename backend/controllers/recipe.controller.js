@@ -104,6 +104,7 @@ const getAllRecipe = async (req, res) => {
 const detectImage = async (req, res, next) => {
   const imageFile = req.file;
   const modelToUse = req.body.model || "gemini-2.5-flash"; // Đặt model mặc định rõ ràng hơn
+  const userId = req.user?._id; // Có thể undefined nếu route không yêu cầu auth
 
   let foodName;
 
@@ -128,9 +129,9 @@ const detectImage = async (req, res, next) => {
 
     const detectionJsonString = await identifyFoodName(imageFile);
     const parsedDetection = safeParse(detectionJsonString);
-
+console.log(">>>>Kết quả multi-dish: ",parsedDetection);
     // Trích xuất Tên món ăn
-    foodName = parsedDetection.foodName || "Không xác định";
+    foodName = parsedDetection.foods || "Không xác định";
 
     if (foodName === "Không xác định" || parsedDetection.error) {
       return res.status(400).json({

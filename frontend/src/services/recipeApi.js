@@ -127,7 +127,7 @@ export const detectFood = async (imageFile) => {
   formData.append("foodImage", imageFile);
 
   try {
-    const response = await fetch(`${API_BASE_URL}/detect`, {
+    const response = await fetch(`${API_BASE_URL}/ai/detect-food`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -140,9 +140,11 @@ export const detectFood = async (imageFile) => {
       let errorData;
       try {
         errorData = await response.json();
+        console.log(errorData);
       } catch (e) {
-        errorData = { message: `Lỗi HTTP: ${response.status}` };
+        errorData = { message: `Lỗi HTTP ne: ${response.status}` };
       }
+      
       const error = new Error(errorData.message || `Lỗi HTTP: ${response.status}`);
       error.status = response.status; // Thêm status code vào error object
       throw error;

@@ -2,7 +2,6 @@
 const { GeminiService } = require("./geminiProvider.js");
 
 const GEMINI_API_KEY_FOOD = process.env.GEMINI_API_KEY;
-
 const foodGeminiService = new GeminiService(
   GEMINI_API_KEY_FOOD,
   "gemini-2.5-flash",
@@ -98,12 +97,25 @@ const analyzeWithFallback = async (
 //Nhận diện ảnh
 const identifyFoodName = async (imageFile) => {
   const prompt = `
-        Hãy nhận dạng món ăn trong bức ảnh. Nếu không tìm ra tên hãy trả về null. Chỉ trả về một đối tượng JSON với 
-        tên món ăn bằng tiếng Việt, theo mẫu sau:
-        * {
-        * "foodName": "Bánh Mì Kẹp Thịt Nướng",
-        * }
-        `;
+    Hãy nhận diện tất cả món ăn xuất hiện trong ảnh.
+
+    - Chỉ trả về tên món ăn bằng tiếng Việt, món nào không biết thì bỏ qua không nêu.
+    - Không giải thích.
+    - Nếu không có món ăn thì trả về:
+    {
+      "foods": []
+    }
+
+    Chỉ trả về JSON:
+
+    {
+      "foods": [
+        "Cơm trắng",
+        "Thịt kho trứng",
+        "Canh cải"
+      ]
+    }
+    `;
   const { result, provider, model } = await analyzeWithFallback(
     imageFile,
     prompt,
