@@ -247,7 +247,10 @@ function toLocalDate(utcTime, utcOffset) {
 /**
  * Exercise sessions (walks, runs, workouts the user logged or a watch detected).
  * Session type: list() with a civil_start_time filter, max 25 per page.
- * Returns { "YYYY-MM-DD": { activeMinutes, caloriesBurned, sessions } }.
+ * Returns { "YYYY-MM-DD": { activeMinutes, caloriesBurned, manualActiveMinutes,
+ *   manualCaloriesBurned, sessions } }.
+ * "manual" = sessions the user typed in the app (recordingMethod MANUAL).
+ * Google does not add those to the daily rollups, so the caller must add them.
  */
 async function fetchDailyExercise(client, from, to, debugLog) {
   const result = {};
@@ -285,12 +288,22 @@ async function fetchDailyExercise(client, from, to, debugLog) {
       const day = result[date] || {
         activeMinutes: 0,
         caloriesBurned: 0,
+        manualActiveMinutes: 0,
+        manualCaloriesBurned: 0,
         sessions: 0,
       };
 
-      day.activeMinutes += durationToMinutes(exercise.activeDuration) || 0;
-      day.caloriesBurned += toNumber(exercise.metricsSummary?.caloriesKcal) || 0;
+      const minutes = durationToMinutes(exercise.activeDuration) || 0;
+      const calories = toNumber(exercise.metricsSummary?.caloriesKcal) || 0;
+
+      day.activeMinutes += minutes;
+      day.caloriesBurned += calories;
       day.sessions += 1;
+
+      if (point.dataSource?.recordingMethod === "MANUAL") {
+        day.manualActiveMinutes += minutes;
+        day.manualCaloriesBurned += calories;
+      }
 
       result[date] = day;
     });

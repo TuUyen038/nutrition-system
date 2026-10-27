@@ -110,23 +110,27 @@ function normalizeHealthPayload(payload = {}) {
 }
 
 /**
- * Build $set from normalized data, skipping null fields.
- * A metric that is missing in this sync keeps its previously saved value.
+ * Build $set from normalized data.
+ *
+ * Null fields are skipped (old value kept), EXCEPT fields listed in
+ * `confirmedFields`: those were fetched successfully this time, so null
+ * really means "no data any more" (e.g. user deleted the workout) and
+ * must overwrite the old value.
  */
-function buildHealthUpdate(normalized, source) {
+function buildHealthUpdate(normalized, source, confirmedFields = []) {
   const update = {
     source,
     syncedAt: new Date(),
   };
 
   ["steps", "caloriesBurned", "activeMinutes"].forEach((field) => {
-    if (normalized[field] !== null) {
+    if (normalized[field] !== null || confirmedFields.includes(field)) {
       update[field] = normalized[field];
     }
   });
 
   Object.entries(normalized.sleep).forEach(([field, value]) => {
-    if (value !== null) {
+    if (value !== null || confirmedFields.includes("sleep")) {
       update[`sleep.${field}`] = value;
     }
   });
@@ -260,6 +264,22 @@ function describeMetricError(error) {
   return "error";
 }
 
+/**
+ * Combine the daily rollup with exercise sessions for one metric.
+ *
+ * - Rollup exists: rollup already counts sessions recorded by a device,
+ *   but NOT sessions typed in manually -> rollup + manual part.
+ * - No rollup: use all sessions of the day.
+ * - Neither: null (no data).
+ */
+function combineWithExercise(rollupValue, exerciseTotal, exerciseManual) {
+  if (rollupValue !== undefined && rollupValue !== null) {
+    return rollupValue + (exerciseManual || 0);
+  }
+
+  return exerciseTotal ?? null;
+}
+
 function listDates(from, to) {
   const dates = [];
   let current = dayjs(from);
@@ -327,7 +347,18 @@ async function syncGoogleHealthData(userId, { from, to, debug = false } = {}) {
     }
   }
 
+  // A stored field may only be cleared when every source it is built
+  // from was read successfully in this sync.
+  const isOk = (metric) => metricStatus[metric] === "ok";
+  const confirmedFields = [];
+
+  if (isOk("steps")) confirmedFields.push("steps");
+  if (isOk("caloriesBurned") && isOk("exercise")) confirmedFields.push("caloriesBurned");
+  if (isOk("activeMinutes") && isOk("exercise")) confirmedFields.push("activeMinutes");
+  if (isOk("sleep")) confirmedFields.push("sleep");
+
   const syncedDates = [];
+  const clearedDates = [];
 
   for (const date of listDates(fromDate, toDate)) {
     const sleep = metricValues.sleep?.[date];
@@ -336,13 +367,16 @@ async function syncGoogleHealthData(userId, { from, to, debug = false } = {}) {
     const normalized = normalizeHealthPayload({
       date,
       steps: metricValues.steps?.[date],
-      // Daily rollup first (covers the whole day). If the day has no
-      // rollup (e.g. only manually logged workouts), fall back to the
-      // sum of exercise sessions.
-      caloriesBurned:
-        metricValues.caloriesBurned?.[date] ?? exercise?.caloriesBurned,
-      activeMinutes:
-        metricValues.activeMinutes?.[date] ?? exercise?.activeMinutes,
+      caloriesBurned: combineWithExercise(
+        metricValues.caloriesBurned?.[date],
+        exercise?.caloriesBurned,
+        exercise?.manualCaloriesBurned
+      ),
+      activeMinutes: combineWithExercise(
+        metricValues.activeMinutes?.[date],
+        exercise?.activeMinutes,
+        exercise?.manualActiveMinutes
+      ),
       sleep: sleep || {},
     });
 
@@ -352,12 +386,30 @@ async function syncGoogleHealthData(userId, { from, to, debug = false } = {}) {
       normalized.activeMinutes !== null ||
       normalized.sleep.durationMinutes !== null;
 
-    // No data at all for this day: do not create an empty document.
-    if (!hasAnyValue) continue;
+    const update = buildHealthUpdate(
+      normalized,
+      "google_health",
+      confirmedFields
+    );
+
+    // No data at all for this day: never create an empty document,
+    // but clear an existing one (data was deleted on Google).
+    if (!hasAnyValue) {
+      if (!confirmedFields.length) continue;
+
+      const result = await GoogleHealthData.updateOne(
+        { userId, date },
+        { $set: update }
+      );
+
+      if (result.matchedCount) clearedDates.push(date);
+
+      continue;
+    }
 
     await GoogleHealthData.findOneAndUpdate(
       { userId, date },
-      { $set: buildHealthUpdate(normalized, "google_health") },
+      { $set: update },
       {
         upsert: true,
         runValidators: true,
@@ -381,6 +433,7 @@ async function syncGoogleHealthData(userId, { from, to, debug = false } = {}) {
     metrics: metricStatus,
     syncedDays: syncedDates.length,
     syncedDates,
+    clearedDates,
     ...(debug && { debug: debugLog }),
   };
 }

@@ -126,6 +126,9 @@ const WorkoutPlanSchema = new mongoose.Schema(
               type: String,
               enum: ["light", "moderate", "vigorous"],
             },
+
+            // Weighted score (0-1) from exerciseScoring.service
+            score: Number,
           },
         ],
       },
