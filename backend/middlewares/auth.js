@@ -16,10 +16,12 @@ exports.authenticate = async (req, res, next) => {
     const token = authHeader.substring(7); // Bỏ "Bearer "
     
     // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "your-secret-key-change-in-production");
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
     // Tìm user
-    const user = await User.findById(decoded.userId).select("-password");
+    const user = await User.findById(decoded.userId).select(
+      "_id name email role isEmailVerified"
+    );
     
     if (!user) {
       return res.status(401).json({ 
@@ -31,14 +33,14 @@ exports.authenticate = async (req, res, next) => {
     req.user = user;
     next();
   } catch (error) {
-    if (error.name === "JsonWebTokenError") {
-      return res.status(401).json({ 
-        message: "Token không hợp lệ." 
-      });
-    }
     if (error.name === "TokenExpiredError") {
       return res.status(401).json({ 
         message: "Token đã hết hạn. Vui lòng đăng nhập lại." 
+      });
+    }
+    if (error.name === "JsonWebTokenError") {
+      return res.status(401).json({ 
+        message: "Token không hợp lệ." 
       });
     }
     return res.status(500).json({ 
@@ -70,6 +72,12 @@ exports.authorize = (...allowedRoles) => {
  * (trừ khi là ADMIN)
  */
 exports.ensureOwnershipOrAdmin = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({
+      message: "Chưa xác thực. Vui lòng đăng nhập."
+    });
+  }
+
   if (req.user.role === "ADMIN") {
     return next(); // Admin có thể truy cập tất cả
   }

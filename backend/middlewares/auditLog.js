@@ -12,6 +12,36 @@ const AuditLog = require("../models/AuditLog");
  * @param {String|ObjectId} userIdOverride - User ID override (dùng khi req.user chưa có, như LOGIN)
  * @param {String} userEmailOverride - User email override (dùng khi req.user chưa có)
  */
+
+const SENSITIVE_FIELDS = [
+  "password",
+  "currentPassword",
+  "newPassword",
+  "confirmPassword",
+  "token",
+  "accessToken",
+  "refreshToken",
+  "resetPasswordToken",
+  "resetPasswordOTP",
+  "resetPasswordOTPExpires",
+  "emailVerificationOTP",
+  "emailVerificationOTPExpires",
+];
+
+function sanitizeData(data) {
+  if (!data) return null;
+
+  const copied = JSON.parse(JSON.stringify(data));
+
+  for (const field of SENSITIVE_FIELDS) {
+    if (field in copied) {
+      copied[field] = "[REDACTED]";
+    }
+  }
+
+  return copied;
+}
+
 async function logAction(req, action, resourceType, resourceId, oldData, newData, reason, userIdOverride = null, userEmailOverride = null) {
   try {
     // Lấy thông tin user từ request hoặc override
@@ -25,7 +55,7 @@ async function logAction(req, action, resourceType, resourceId, oldData, newData
     
     // Nếu vẫn không có userId, không thể tạo audit log (required field)
     if (!userId) {
-      console.warn("⚠️  Cannot create audit log: userId is required but not available");
+      console.warn("Cannot create audit log: userId is required but not available");
       return;
     }
     
@@ -39,7 +69,7 @@ async function logAction(req, action, resourceType, resourceId, oldData, newData
     else if (oldData?.name) resourceName = oldData.name;
     else if (newData?.email) resourceName = newData.email;
     else if (oldData?.email) resourceName = oldData.email;
-    
+
     await AuditLog.create({
       userId,
       userEmail,
@@ -47,8 +77,8 @@ async function logAction(req, action, resourceType, resourceId, oldData, newData
       resourceType,
       resourceId: resourceId || null,
       resourceName,
-      oldData: oldData ? JSON.parse(JSON.stringify(oldData)) : null, // Deep copy để tránh reference
-      newData: newData ? JSON.parse(JSON.stringify(newData)) : null,
+      oldData: oldData ? sanitizeData(oldData) : null,
+      newData: newData ? sanitizeData(newData) : null,
       ipAddress,
       userAgent,
       reason,

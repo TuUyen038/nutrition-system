@@ -4,7 +4,7 @@ const userSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
     email: { type: String, required: true},
-    password: { type: String, required: true },
+    password: { type: String, required: true, select: false }, // Không trả về password khi query
     role: {
       type: String,
       enum: ["USER", "ADMIN"],
@@ -30,21 +30,25 @@ const userSchema = new mongoose.Schema(
         ref: "Recipe",
       },
     ],
-    resetPasswordOTP: String,
-    resetPasswordOTPExpires: Date,
-    resetPasswordOTPVerified: { type: Boolean, default: false },
-    isEmailVerified: { type: Boolean, default: false },
-    emailVerificationOTP: String,
-    emailVerificationOTPExpires: Date,
+    resetPasswordOTP: { type: String, default: null, select: false },
+    resetPasswordOTPExpires: { type: Date, default: null, select: false },
+    resetPasswordOTPVerified: { type: Boolean, default: false, select: false },
+    resetPasswordOTPLastSentAt: { type: Date, default: null, select: false },
 
+    isEmailVerified: { type: Boolean, default: false },
+    emailVerificationOTP: { type: String, default: null, select: false },
+    emailVerificationOTPExpires: { type: Date, default: null, select: false },
+    emailVerificationOTPLastSentAt: { type: Date, default: null, select: false },
+    
     /* --- CÁC TRƯỜNG SOFT DELETE & AUDIT LOG --- */
     deletedAt: { type: Date, default: null },
     deletedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       default: null,
+      select: false
     },
-    deletionReason: { type: String, default: null },
+    deletionReason: { type: String, default: null, select: false },
   },
   { timestamps: true },
 );

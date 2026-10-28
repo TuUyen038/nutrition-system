@@ -5,7 +5,7 @@ const bcrypt = require("bcryptjs");
 const dailyMenuService = require("../services/dailyMenu.service");
 const DailyMenu = require("../models/DailyMenu");
 const NutritionGoal = require("../models/NutritionGoal");
-const { normalizeDate } = require("../utils/date");
+const { toVNDateString } = require("../utils/date");
 
 /**
  * Lấy danh sách tất cả người dùng (CHỈ ADMIN)
@@ -291,7 +291,7 @@ exports.getDashboardStats = async (req, res) => {
 
     // 2. Lấy menu hôm nay (donut chart)
     const today = new Date();
-    const todayStr = normalizeDate(today);
+    const todayStr = toVNDateString(today);
 
     const todayMenus = await DailyMenu.find({
       userId,
@@ -363,7 +363,7 @@ exports.getDashboardStats = async (req, res) => {
     // 3. Lấy menu 7 ngày gần nhất (line chart)
     const sevenDaysAgo = new Date(today);
     sevenDaysAgo.setDate(today.getDate() - 6); // 7 ngày (bao gồm hôm nay)
-    const startDateStr = normalizeDate(sevenDaysAgo);
+    const startDateStr = toVNDateString(sevenDaysAgo);
 
     const weeklyMenus = await DailyMenu.find({
       userId,
@@ -383,7 +383,7 @@ exports.getDashboardStats = async (req, res) => {
     for (let i = 6; i >= 0; i--) {
       const date = new Date(today);
       date.setDate(today.getDate() - i);
-      const dateStr = normalizeDate(date);
+      const dateStr = toVNDateString(date);
       dates.push(dateStr);
       consumedByDate[dateStr] = 0;
     }

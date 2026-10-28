@@ -132,7 +132,6 @@ const detectImage = async (req, res, next) => {
 console.log(">>>>Kết quả multi-dish: ",parsedDetection);
     // Trích xuất Tên món ăn
     foodName = parsedDetection.foods || "Không xác định";
-
     if (foodName === "Không xác định" || parsedDetection.error) {
       return res.status(400).json({
         message: "Không thể nhận diện món ăn trong hình ảnh.",
