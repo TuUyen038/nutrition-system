@@ -1,6 +1,7 @@
 const { withFallback } = require("../config/gemini.config");
-const { GEMINI_TOOLS } = require("./chatTools.definition");
+const { getGeminiToolsForIntent } = require("./chatTools.definition");
 const { executeTool } = require("./chatTools.executor");
+const ragClient = require("./ragClient.service");
 const ChatSession = require("../models/ChatSession");
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
@@ -20,7 +21,12 @@ const SYSTEM_PROMPT = `
   Bạn là AI fitness assistant kết nối với hệ thống workout và nutrition thật.
 
   QUY TẮC:
-  - Ưu tiên dùng tools nếu hệ thống có dữ liệu
+  - Với kiến thức dinh dưỡng/vận động nói chung, PHẢI gọi rag_retrieve trước khi trả lời.
+  - Với câu hỏi về trẻ em, ăn dặm, nhu cầu theo lứa tuổi hoặc khuyến nghị WHO/Bộ Y tế,
+    PHẢI ưu tiên rag_retrieve; không được dùng search_ingredients.
+  - Chỉ dùng search_ingredients khi user hỏi về MỘT nguyên liệu cụ thể như thịt gà,
+    gạo hoặc trứng và cần dữ liệu dinh dưỡng trong database.
+  - Không dùng database tools để trả lời kiến thức chung.
   - Không tự bịa, tạo AI text workout plan nếu chưa gọi tool
   - Đặc biệt với:
     + hôm nay tập gì
@@ -40,6 +46,19 @@ const SYSTEM_PROMPT = `
     + dễ hiểu
     + có động lực
   `;
+
+const CHITCHAT_REPLIES = {
+  greeting:
+    "Xin chào! Mình có thể hỗ trợ bạn về dinh dưỡng, thực đơn và luyện tập.",
+  thanks: "Không có gì! Mình luôn sẵn sàng hỗ trợ bạn.",
+  goodbye: "Tạm biệt! Chúc bạn một ngày khỏe mạnh.",
+  about_bot:
+    "Mình là trợ lý NutriCare, có thể tra cứu kiến thức dinh dưỡng và dữ liệu ăn uống, luyện tập của bạn.",
+  other: "Mình có thể giúp gì cho bạn về dinh dưỡng hoặc luyện tập?",
+};
+
+const OUT_OF_SCOPE_REPLY =
+  "Xin lỗi, mình chỉ hỗ trợ các chủ đề về dinh dưỡng, thực đơn và luyện tập.";
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 
@@ -119,7 +138,45 @@ const buildResponse = (text, toolsUsed, userMessage) => {
   };
 };
 
-const handleFallback = async (chat, toolsUsed, userMessage) => {
+const buildRuleResponse = (text) => ({
+  text,
+  toolsUsed: [],
+  dataSource: "rule",
+  disclaimer: null,
+  hasDisclaimer: false,
+});
+
+async function classifyIntentSafe(userMessage) {
+  try {
+    const result = await ragClient.classify(userMessage);
+    if (!result?.intent) return null;
+    console.log("[IntentRouter]", {
+      intent: result.intent,
+      method: result.method,
+    });
+    return result;
+  } catch (err) {
+    console.warn("[IntentRouter] unavailable, using Gemini fallback:", err.message);
+    return null;
+  }
+}
+
+const handleFallback = async (chat, toolsUsed, userMessage, lastToolResult) => {
+  // Nếu Gemini không tạo được câu trả lời sau khi tool đã chạy,
+  // dùng ngay dữ liệu thật từ tool, không gọi Gemini thêm một lần nữa.
+  if (lastToolResult) {
+    const toolText =
+      lastToolResult.summary ||
+      (lastToolResult.data
+        ? JSON.stringify(lastToolResult.data)
+        : lastToolResult.error);
+
+    if (toolText?.trim()) {
+      return buildResponse(toolText, toolsUsed, userMessage);
+    }
+  }
+
+  // Chỉ gọi Gemini bổ sung nếu không có dữ liệu tool để trả trực tiếp.
   if (toolsUsed.some((t) => t.success)) {
     try {
       const summary = await chat.sendMessage(
@@ -132,6 +189,7 @@ const handleFallback = async (chat, toolsUsed, userMessage) => {
       }
     } catch (_) {}
   }
+
   return {
     text: "Xin lỗi, tôi chưa thể xử lý yêu cầu này lúc này.",
     toolsUsed,
@@ -290,7 +348,8 @@ async function _runGeminiWithTools(
   userMessage,
   userContext,
   userId,
-  contextHint = null
+  contextHint = null,
+  routeInfo = null,
 ) {
   const contextText = buildUserContext(userContext);
 
@@ -299,7 +358,12 @@ async function _runGeminiWithTools(
       `[User đang phản hồi về chủ đề trên, KHÔNG phải yêu cầu mới]\n`
     : null;
 
-  const finalPrompt = [SYSTEM_PROMPT, contextText, shortReplyHint, userMessage]
+  const routeHint = routeInfo?.intent
+    ? `[Intent nhóm do router local xác định: ${routeInfo.intent}]\n` +
+      "Hãy tự xác định sub-intent và chỉ chọn tool phù hợp với yêu cầu user."
+    : null;
+
+  const finalPrompt = [SYSTEM_PROMPT, contextText, routeHint, shortReplyHint, userMessage]
     .filter(Boolean)
     .join("\n");
 
@@ -307,17 +371,24 @@ async function _runGeminiWithTools(
   const toolsUsed = [];
   const executedTools = new Set();
   let pendingAction = null; // ← THÊM
+  let lastToolResult = null;
+  const geminiTools = getGeminiToolsForIntent(routeInfo?.intent);
+  console.log("[Gemini] Intent tools:", routeInfo?.intent || "fallback", {
+    count: geminiTools[0].functionDeclarations.length,
+    names: geminiTools[0].functionDeclarations.map((tool) => tool.name),
+  });
 
   return withFallback(async (model) => {
     const chat = model.startChat({
       history: geminiHistory,
-      tools: GEMINI_TOOLS,
+      tools: geminiTools,
       toolConfig: { functionCallingConfig: { mode: "AUTO" } },
     });
 
     toolsUsed.length = 0;
     executedTools.clear();
     pendingAction = null; // reset mỗi lần retry
+    lastToolResult = null;
 
     let result = await chat.sendMessage(finalPrompt);
 
@@ -343,6 +414,7 @@ async function _runGeminiWithTools(
 
           try {
             const toolResult = await executeTool(name, args, userId);
+            lastToolResult = toolResult;
             toolsUsed.push({ name, args, success: toolResult?.success ?? true });
             toolResponses.push({ functionResponse: { name, response: toolResult } });
 
@@ -365,6 +437,11 @@ async function _runGeminiWithTools(
                 },
               },
             });
+            lastToolResult = {
+              success: false,
+              error: err.message,
+              summary: `Lỗi khi thực hiện ${name}: ${err.message}`,
+            };
           }
         }
 
@@ -373,12 +450,10 @@ async function _runGeminiWithTools(
           break;
         }
 
-        result = await chat.sendMessage(
-          toolResponses, {
-          text:
-            "Hãy trả lời user bằng tiếng Việt tự nhiên dựa trên dữ liệu tool.",
-          },
-        );
+        // Function response phải được gửi như một message riêng.
+        // Không truyền prompt ở argument thứ hai: argument đó chỉ là
+        // request options của SDK, không phải instruction cho Gemini.
+        result = await chat.sendMessage(toolResponses);
         continue;
       }
 
@@ -388,12 +463,21 @@ async function _runGeminiWithTools(
         return { ...buildResponse(textPart.text, toolsUsed, userMessage), pendingAction }; // ← SỬA
       }
 
-      console.warn("[Gemini] No function calls and no text");
+      console.warn("[Gemini] No function calls and no text", {
+        finishReason: result.response.candidates?.[0]?.finishReason,
+        promptFeedback: result.response.promptFeedback,
+        candidateCount: result.response.candidates?.length || 0,
+      });
       break;
     }
 
-    console.warn("[Gemini] Loop ended, attempting fallback");
-    const fallback = await handleFallback(chat, toolsUsed, userMessage);
+    console.warn("Loop ended, attempting fallback");
+    const fallback = await handleFallback(
+      chat,
+      toolsUsed,
+      userMessage,
+      lastToolResult,
+    );
     return { ...fallback, pendingAction }; // ← SỬA
   }, "chat");
 }
@@ -463,13 +547,27 @@ async function sendChatWithTools(userId, userMessage, userContext, sessionId) {
     const historyForGemini = session.messages.slice(0, -1);
     session.trimMessages();
 
-    geminiResult = await _runGeminiWithTools(
-      historyForGemini,
-      userMessage,
-      userContext,
-      userId,
-      contextHint
-    );
+    const routeInfo = await classifyIntentSafe(userMessage);
+
+    if (routeInfo?.intent === "chitchat") {
+      const subIntent = routeInfo.sub_intent || "other";
+      geminiResult = buildRuleResponse(
+        CHITCHAT_REPLIES[subIntent] || CHITCHAT_REPLIES.other,
+      );
+    } else if (routeInfo?.intent === "out_of_scope") {
+      geminiResult = buildRuleResponse(OUT_OF_SCOPE_REPLY);
+    } else {
+      // knowledge/personal/mixed: Gemini vẫn xác định sub-intent, chọn tool
+      // và tạo câu trả lời. Router local chỉ giới hạn nhóm tool được cấp.
+      geminiResult = await _runGeminiWithTools(
+        historyForGemini,
+        userMessage,
+        userContext,
+        userId,
+        contextHint,
+        routeInfo,
+      );
+    }
   }
 
   // 4. Lưu response model + save (kèm pendingAction nếu có)

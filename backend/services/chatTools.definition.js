@@ -598,18 +598,59 @@ const CHAT_TOOLS = [
   },
 ];
 
+const RAG_TOOL = {
+  name: "rag_retrieve",
+  description:
+    "Tìm kiếm trong kho kiến thức dinh dưỡng và vận động đã được kiểm duyệt. " +
+    "BẮT BUỘC dùng tool này khi user hỏi kiến thức chung, khuyến nghị từ tài liệu, " +
+    "WHO/Bộ Y tế, vitamin, khoáng chất, chế độ ăn hoặc hoạt động thể lực. " +
+    "Không dùng tool này để lấy dữ liệu cá nhân đang lưu trong database.",
+  parameters: {
+    type: "object",
+    properties: {
+      query: {
+        type: "string",
+        description: "Câu hỏi đầy đủ cần tìm trong kho kiến thức",
+      },
+      top_k: {
+        type: "number",
+        description: "Số đoạn tài liệu cần lấy, mặc định 5",
+      },
+    },
+    required: ["query"],
+  },
+};
+
+const toGeminiDeclaration = (tool) => ({
+  name: tool.name,
+  description: tool.description,
+  parameters: tool.parameters,
+});
+
+function getGeminiToolsForIntent(intent) {
+  let tools = CHAT_TOOLS;
+
+  if (intent === "knowledge") {
+    tools = [RAG_TOOL];
+  } else if (intent === "mixed") {
+    tools = [...CHAT_TOOLS, RAG_TOOL];
+  } else if (!intent || intent === "ambiguous") {
+    // Nếu router không khả dụng hoặc chưa chắc chắn, vẫn cho Gemini RAG.
+    // Nếu không, Gemini chỉ thấy DB tools và dễ gọi nhầm search_ingredients.
+    tools = [...CHAT_TOOLS, RAG_TOOL];
+  }
+
+  return [{ functionDeclarations: tools.map(toGeminiDeclaration) }];
+}
+
 /**
  * Format tools theo chuẩn Gemini Function Calling SDK
  * @see https://ai.google.dev/gemini-api/docs/function-calling
  */
 const GEMINI_TOOLS = [
   {
-    functionDeclarations: CHAT_TOOLS.map((tool) => ({
-      name: tool.name,
-      description: tool.description,
-      parameters: tool.parameters,
-    })),
+    functionDeclarations: CHAT_TOOLS.map(toGeminiDeclaration),
   },
 ];
 
-module.exports = { CHAT_TOOLS, GEMINI_TOOLS };
+module.exports = { CHAT_TOOLS, GEMINI_TOOLS, RAG_TOOL, getGeminiToolsForIntent };

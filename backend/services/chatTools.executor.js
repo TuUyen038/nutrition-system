@@ -21,6 +21,7 @@ const { CHAT_TOOLS } = require("./chatTools.definition");
 const workoutRecommendationService = require("./workoutRecommendation.service");
 const workoutPlanService = require("./workoutPlan.service");
 const fitnessPlanService = require("./fitnessPlan.service");
+const ragClient = require("./ragClient.service");
 // Helper: lấy ngày hôm nay dạng YYYY-MM-DD theo giờ VN
 function getTodayVN() {
   return new Date().toLocaleDateString("sv-SE", {
@@ -154,6 +155,9 @@ async function executeTool(toolName, args, userId) {
       case "generate_weekly_fitness_plan":
         return await _generateWeeklyFitnessPlan(userId);
 
+      case "rag_retrieve":
+        return await _retrieveRag(args);
+
       default:
         return {
           success: false,
@@ -169,6 +173,52 @@ async function executeTool(toolName, args, userId) {
       summary: `Lỗi khi thực hiện ${toolName}: ${err.message}`,
     };
   }
+}
+
+async function _retrieveRag(args = {}) {
+  const query = String(args.query || "").trim();
+  const topK = Math.min(Math.max(Number(args.top_k) || 5, 1), 10);
+
+  if (!query) {
+    return {
+      success: false,
+      error: "Thiếu câu hỏi cần tìm kiếm",
+      summary: "Không thể tìm kiếm vì câu hỏi rỗng.",
+    };
+  }
+
+  const result = await ragClient.retrieve(query, topK);
+  const chunks = (result.chunks || []).filter((chunk) => chunk.relevant !== false);
+
+  if (!chunks.length) {
+    return {
+      success: false,
+      data: { chunks: [], citations: [] },
+      summary: "Không tìm thấy thông tin phù hợp trong kho kiến thức đã kiểm duyệt.",
+    };
+  }
+
+  const citations = chunks.map((chunk) => ({
+    title: chunk.title,
+    org: chunk.org,
+    year: chunk.year,
+    url: chunk.url,
+    section: chunk.section,
+  }));
+
+  return {
+    success: true,
+    data: { chunks, citations },
+    summary:
+      "Đã tìm thấy thông tin trong kho kiến thức. Hãy trả lời dựa trên các đoạn " +
+      "tài liệu dưới đây và nêu nguồn khi phù hợp:\n\n" +
+      chunks
+        .map(
+          (chunk, index) =>
+            `[Nguồn ${index + 1}: ${chunk.title || "Tài liệu"}]\n${chunk.text}`,
+        )
+        .join("\n\n"),
+  };
 }
 
 // ─── FITNESS ─────────────────────────────────────────────────────────────
