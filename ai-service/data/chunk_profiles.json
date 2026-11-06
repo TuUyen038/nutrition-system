@@ -1,0 +1,20 @@
+{
+  "structured": {
+    "chunk_strategy": "section",
+    "chunk_max_tokens": 400,
+    "chunk_overlap": 60,
+    "split_level": 6
+  },
+  "compact": {
+    "chunk_strategy": "section",
+    "chunk_max_tokens": 250,
+    "chunk_overlap": 40,
+    "split_level": 6
+  },
+  "plain": {
+    "chunk_strategy": "fixed",
+    "chunk_max_tokens": 400,
+    "chunk_overlap": 70,
+    "split_level": 6
+  }
+}

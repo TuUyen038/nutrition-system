@@ -1,0 +1,107 @@
+{"question": "Một ngày nên ăn bao nhiêu protein?", "expect_docs": ["who_healthy_diet", "thap_dinh_duong_moi", "thua_can_beo_phi_nguoi_lon_2007"], "group": "nguoi_lon"}
+{"question": "Chất béo nào tốt, chất béo nào nên tránh?", "expect_docs": ["who_healthy_diet", "thua_can_beo_phi_nguoi_lon_2007", "thap_dinh_duong_moi"], "group": "nguoi_lon"}
+{"question": "Nên ăn bao nhiêu muối mỗi ngày?", "expect_docs": ["who_healthy_diet", "giam_muoi_2018", "thap_dinh_duong_moi"], "group": "nguoi_lon"}
+{"question": "Ăn nhiều đường có hại không?", "expect_docs": ["who_healthy_diet", "tac_hai_do_uong_co_duong_2025", "thap_dinh_duong_moi"], "group": "nguoi_lon"}
+{"question": "Chế độ ăn lành mạnh gồm những gì?", "expect_docs": ["who_healthy_diet", "thap_dinh_duong_moi", "gia_tri_dinh_duong_rau_qua", "an_rau_qua_dung_cach", "thua_can_beo_phi_nguoi_lon_2007"], "group": "nguoi_lon"}
+{"question": "Mỗi ngày cần ăn bao nhiêu rau và trái cây?", "expect_docs": ["who_healthy_diet", "an_rau_qua_dung_cach", "gia_tri_dinh_duong_rau_qua", "rau_qua_mua_he", "thap_dinh_duong_moi", "thua_can_beo_phi_nguoi_lon_2007"], "group": "nguoi_lon"}
+{"question": "Chất xơ nên ăn bao nhiêu?", "expect_docs": ["who_healthy_diet", "rau_qua_mua_he", "rau_qua_mua_thu", "gia_tri_dinh_duong_rau_qua", "thua_can_beo_phi_nguoi_lon_2007", "an_rau_qua_dung_cach"], "group": "nguoi_lon"}
+{"question": "Kali có vai trò gì với huyết áp?", "expect_docs": ["who_healthy_diet", "gia_tri_dinh_duong_rau_qua", "rau_qua_mua_he", "rau_qua_mua_thu"], "group": "nguoi_lon"}
+{"question": "Thực phẩm chế biến sẵn có tốt không?", "expect_docs": ["who_healthy_diet", "giam_muoi_2018", "thua_can_beo_phi_nguoi_lon_2007"], "group": "nguoi_lon"}
+{"question": "Có nên dùng chất tạo ngọt thay đường không?", "expect_docs": ["who_healthy_diet"], "group": "chi_tieng_anh"}
+{"question": "Chất béo chuyển hóa nên giới hạn dưới bao nhiêu phần trăm năng lượng?", "expect_docs": ["who_healthy_diet"], "group": "chi_tieng_anh"}
+{"question": "Chính phủ cần làm gì để thúc đẩy chế độ ăn lành mạnh?", "expect_docs": ["who_healthy_diet"], "group": "chi_tieng_anh"}
+{"question": "Ngồi nhiều thì có cần tập nhiều hơn mức khuyến nghị không?", "expect_docs": ["who_physical_activity_2020"], "group": "chi_tieng_anh"}
+{"question": "Bé 7 tháng ăn dặm mấy bữa một ngày?", "expect_docs": ["huong_dan_an_bo_sung"], "group": "tre_nho"}
+{"question": "Cách nấu cháo cho bé?", "expect_docs": ["huong_dan_an_bo_sung"], "group": "tre_nho"}
+{"question": "Trẻ biếng ăn phải làm sao?", "expect_docs": ["huong_dan_an_bo_sung"], "group": "tre_nho"}
+{"question": "Bé bị dị ứng thức ăn thì xử lý thế nào?", "expect_docs": ["huong_dan_an_bo_sung"], "group": "tre_nho"}
+{"question": "Khi nào bắt đầu cho bé ăn dặm?", "expect_docs": ["huong_dan_an_bo_sung"], "group": "tre_nho"}
+{"question": "Trẻ 1 tuổi cần bao nhiêu năng lượng mỗi ngày?", "expect_docs": ["huong_dan_an_bo_sung"], "group": "tre_nho"}
+{"question": "Có nên cho bé uống nước trái cây không?", "expect_docs": ["huong_dan_an_bo_sung"], "group": "tre_nho"}
+{"question": "Bảo quản thức ăn cho bé như thế nào?", "expect_docs": ["huong_dan_an_bo_sung"], "group": "tre_nho"}
+{"question": "Vitamin và khoáng chất quan trọng thế nào?", "expect_docs": ["who_healthy_diet", "huong_dan_an_bo_sung", "hoi_dap_thieu_vi_chat_bot_mi_2012", "gia_tri_dinh_duong_rau_qua", "rau_qua_mua_he", "rau_qua_mua_thu", "rau_qua_5_nhom_mau"], "group": "mo_ho"}
+{"question": "Sữa mẹ có lợi gì?", "expect_docs": ["who_healthy_diet", "huong_dan_an_bo_sung"], "group": "mo_ho"}
+{"question": "Nên hạn chế thực phẩm nào?", "expect_docs": ["who_healthy_diet", "thap_dinh_duong_moi", "giam_muoi_2018", "thua_can_beo_phi_nguoi_lon_2007", "tac_hai_do_uong_co_duong_2025", "huong_dan_an_bo_sung"], "group": "mo_ho"}
+{"question": "Muối và đường ảnh hưởng gì đến sức khỏe?", "expect_docs": ["who_healthy_diet", "giam_muoi_2018", "tac_hai_do_uong_co_duong_2025", "thap_dinh_duong_moi", "huong_dan_an_bo_sung"], "group": "mo_ho"}
+{"question": "Chất đạm lấy từ đâu?", "expect_docs": ["who_healthy_diet", "huong_dan_an_bo_sung", "thap_dinh_duong_moi", "thua_can_beo_phi_nguoi_lon_2007", "rau_qua_mua_thu"], "group": "mo_ho"}
+{"question": "Thiếu sắt thì sao?", "expect_docs": ["who_healthy_diet", "huong_dan_an_bo_sung", "hoi_dap_thieu_vi_chat_bot_mi_2012", "gia_tri_dinh_duong_rau_qua", "rau_qua_mua_he"], "group": "mo_ho"}
+{"question": "Ăn uống thế nào cho khỏe?", "expect_docs": ["who_healthy_diet", "huong_dan_an_bo_sung", "thap_dinh_duong_moi", "giam_muoi_2018", "thua_can_beo_phi_nguoi_lon_2007", "tac_hai_do_uong_co_duong_2025", "hoi_dap_thieu_vi_chat_bot_mi_2012", "gia_tri_dinh_duong_rau_qua", "an_rau_qua_dung_cach", "rau_qua_mua_he", "rau_qua_mua_thu", "rau_qua_5_nhom_mau"], "group": "mo_ho"}
+{"question": "Dinh dưỡng quan trọng thế nào?", "expect_docs": ["who_healthy_diet", "huong_dan_an_bo_sung", "thap_dinh_duong_moi", "giam_muoi_2018", "thua_can_beo_phi_nguoi_lon_2007", "tac_hai_do_uong_co_duong_2025", "hoi_dap_thieu_vi_chat_bot_mi_2012", "gia_tri_dinh_duong_rau_qua", "an_rau_qua_dung_cach", "rau_qua_mua_he", "rau_qua_mua_thu", "rau_qua_5_nhom_mau"], "group": "mo_ho"}
+{"question": "Nên tập cardio bao nhiêu phút?", "expect_docs": ["cam_nang_hoat_dong_the_luc_2026", "who_physical_activity_2020", "van_dong_deu_dang_quy_2025"], "group": "van_dong"}
+{"question": "Trẻ em cần vận động bao nhiêu mỗi ngày?", "expect_docs": ["cam_nang_hoat_dong_the_luc_2026", "who_physical_activity_2020", "van_dong_deu_dang_quy_2025", "thap_dinh_duong_moi"], "group": "van_dong"}
+{"question": "Người cao tuổi nên tập những bài tập nào?", "expect_docs": ["cam_nang_hoat_dong_the_luc_2026", "who_physical_activity_2020", "van_dong_deu_dang_quy_2025"], "group": "van_dong"}
+{"question": "Phụ nữ mang thai có tập thể dục được không?", "expect_docs": ["cam_nang_hoat_dong_the_luc_2026", "who_physical_activity_2020", "van_dong_deu_dang_quy_2025"], "group": "van_dong"}
+{"question": "Ngồi nhiều có hại cho sức khỏe không?", "expect_docs": ["cam_nang_hoat_dong_the_luc_2026", "who_physical_activity_2020", "van_dong_deu_dang_quy_2025"], "group": "van_dong"}
+{"question": "Người bị tiểu đường típ 2 có nên tập thể dục không?", "expect_docs": ["cam_nang_hoat_dong_the_luc_2026", "who_physical_activity_2020"], "group": "van_dong"}
+{"question": "Khởi động trước khi tập như thế nào?", "expect_docs": ["cam_nang_hoat_dong_the_luc_2026"], "group": "van_dong"}
+{"question": "Nên uống bao nhiêu nước khi tập thể thao?", "expect_docs": ["cam_nang_hoat_dong_the_luc_2026", "thap_dinh_duong_moi"], "group": "van_dong"}
+{"question": "Mùa hè nên ăn rau quả gì?", "expect_docs": ["rau_qua_mua_he", "an_rau_qua_dung_cach", "gia_tri_dinh_duong_rau_qua"], "group": "rau_qua"}
+{"question": "Rau quả nào giàu vitamin C?", "expect_docs": ["rau_qua_mua_he", "rau_qua_mua_thu", "gia_tri_dinh_duong_rau_qua", "rau_qua_5_nhom_mau"], "group": "rau_qua"}
+{"question": "Người tiểu đường có ăn được bưởi, cam không?", "expect_docs": ["rau_qua_mua_thu", "gia_tri_dinh_duong_rau_qua"], "group": "rau_qua"}
+{"question": "Cách bảo quản rau lá?", "expect_docs": ["an_rau_qua_dung_cach", "gia_tri_dinh_duong_rau_qua", "rau_qua_5_nhom_mau", "rau_qua_mua_he"], "group": "rau_qua"}
+{"question": "Rau quả màu tím có lợi gì?", "expect_docs": ["rau_qua_5_nhom_mau"], "group": "rau_qua"}
+{"question": "Mướp đắng có tác dụng gì?", "expect_docs": ["rau_qua_mua_thu"], "group": "rau_qua"}
+{"question": "Một tô phở gà có bao nhiêu muối?", "expect_docs": ["giam_muoi_2018"], "group": "dac_thu"}
+{"question": "Trẻ 6-11 tuổi cần bao nhiêu sữa mỗi ngày?", "expect_docs": ["thap_dinh_duong_moi"], "group": "dac_thu"}
+{"question": "BMI bao nhiêu là béo phì?", "expect_docs": ["thua_can_beo_phi_nguoi_lon_2007"], "group": "dac_thu"}
+{"question": "Thiếu i-ốt gây bệnh gì?", "expect_docs": ["hoi_dap_thieu_vi_chat_bot_mi_2012"], "group": "dac_thu"}
+{"question": "Phụ nữ cho con bú cần uống bao nhiêu nước?", "expect_docs": ["thap_dinh_duong_moi"], "group": "dac_thu"}
+{"question": "Đồ uống có đường gây những bệnh gì?", "expect_docs": ["tac_hai_do_uong_co_duong_2025"], "group": "dac_thu"}
+{"question": "Giảm cân mỗi tuần bao nhiêu calo là an toàn?", "expect_docs": ["thua_can_beo_phi_nguoi_lon_2007"], "group": "dac_thu"}
+{"question": "Ăn gì tốt cho người cao tuổi?", "expect_docs": ["thap_dinh_duong_moi", "gia_tri_dinh_duong_rau_qua", "thua_can_beo_phi_nguoi_lon_2007"], "group": "dac_thu"}
+{"question": "Tập gym bao lâu thì thấy cơ bắp?", "expect": "none", "group": "ngoai_kb"}
+{"question": "Chế độ ăn keto có tốt không?", "expect": "none", "group": "ngoai_kb"}
+{"question": "Calo của một bát phở là bao nhiêu?", "expect": "none", "group": "ngoai_kb"}
+{"question": "Người bị gút kiêng ăn gì?", "expect": "none", "group": "ngoai_kb"}
+{"question": "Thực đơn cho người bị suy thận?", "expect": "none", "group": "ngoai_kb"}
+{"question": "Thuốc giảm cân nào hiệu quả?", "expect": "none", "group": "ngoai_kb"}
+{"question": "Ăn chay có đủ vitamin B12 không?", "expect": "none", "group": "ngoai_kb"}
+{"question": "Uống collagen có đẹp da không?", "expect": "none", "group": "ngoai_kb"}
+{"question": "Bé bị tiêu chảy dùng thuốc gì?", "expect": "none", "group": "ngoai_kb_tre_nho"}
+{"question": "Lịch tiêm chủng cho trẻ sơ sinh?", "expect": "none", "group": "ngoai_kb_tre_nho"}
+{"question": "Trẻ sơ sinh bị vàng da phải làm sao?", "expect": "none", "group": "ngoai_kb_tre_nho"}
+{"question": "Nên chọn hãng sữa công thức nào cho bé?", "expect": "none", "group": "ngoai_kb_tre_nho"}
+{"question": "Khi nào dạy bé đi vệ sinh?", "expect": "none", "group": "ngoai_kb_tre_nho"}
+{"question": "Bé quấy khóc ban đêm do đâu?", "expect": "none", "group": "ngoai_kb_tre_nho"}
+{"question": "Thủ đô của nước Pháp là gì?", "expect": "none", "group": "ngoai_chu_de"}
+{"question": "Hôm nay thời tiết thế nào?", "expect": "none", "group": "ngoai_chu_de"}
+{"question": "Giá vàng hôm nay bao nhiêu?", "expect": "none", "group": "ngoai_chu_de"}
+{"question": "Ai vô địch World Cup 2022?", "expect": "none", "group": "ngoai_chu_de"}
+{"question": "Mỗi ngày tôi cần nạp bao nhiêu đạm?", "expect_docs": ["who_healthy_diet", "thap_dinh_duong_moi", "thua_can_beo_phi_nguoi_lon_2007"], "group": "nguoi_lon", "style": "dien_dat_lai"}
+{"question": "Lượng natri khuyến nghị cho một ngày là bao nhiêu?", "expect_docs": ["who_healthy_diet", "giam_muoi_2018", "thap_dinh_duong_moi"], "group": "nguoi_lon", "style": "dien_dat_lai"}
+{"question": "Uống đồ ngọt có đường nhiều thì dễ mắc bệnh gì?", "expect_docs": ["tac_hai_do_uong_co_duong_2025", "who_healthy_diet"], "group": "dac_thu", "style": "dien_dat_lai"}
+{"question": "Tôi nên dành bao nhiêu thời gian mỗi tuần để vận động?", "expect_docs": ["cam_nang_hoat_dong_the_luc_2026", "who_physical_activity_2020", "van_dong_deu_dang_quy_2025"], "group": "van_dong", "style": "dien_dat_lai"}
+{"question": "Con tôi học cấp 2 thì cần vận động mức nào mỗi ngày?", "expect_docs": ["cam_nang_hoat_dong_the_luc_2026", "who_physical_activity_2020", "van_dong_deu_dang_quy_2025", "thap_dinh_duong_moi"], "group": "van_dong", "style": "dien_dat_lai"}
+{"question": "Bà bầu có được tập thể dục không?", "expect_docs": ["cam_nang_hoat_dong_the_luc_2026", "who_physical_activity_2020", "van_dong_deu_dang_quy_2025"], "group": "van_dong", "style": "dien_dat_lai"}
+{"question": "Em bé mấy tháng thì cho ăn thêm ngoài sữa mẹ?", "expect_docs": ["huong_dan_an_bo_sung"], "group": "tre_nho", "style": "dien_dat_lai"}
+{"question": "Làm sao biết mình có bị béo phì không?", "expect_docs": ["thua_can_beo_phi_nguoi_lon_2007"], "group": "dac_thu", "style": "dien_dat_lai"}
+{"question": "Rau củ để trong tủ lạnh được bao lâu?", "expect_docs": ["an_rau_qua_dung_cach", "gia_tri_dinh_duong_rau_qua", "rau_qua_5_nhom_mau", "rau_qua_mua_he"], "group": "rau_qua", "style": "dien_dat_lai"}
+{"question": "Phụ nữ có thai hay thiếu những vi chất nào?", "expect_docs": ["hoi_dap_thieu_vi_chat_bot_mi_2012"], "group": "dac_thu", "style": "dien_dat_lai"}
+{"question": "Ăn mặn có sao không?", "expect_docs": ["giam_muoi_2018", "who_healthy_diet", "thap_dinh_duong_moi"], "group": "nguoi_lon", "style": "doi_thuong"}
+{"question": "Ngồi lì cả ngày làm việc văn phòng có hại không?", "expect_docs": ["cam_nang_hoat_dong_the_luc_2026", "who_physical_activity_2020", "van_dong_deu_dang_quy_2025"], "group": "van_dong", "style": "doi_thuong"}
+{"question": "Uống nước ngọt hoài có tệ không?", "expect_docs": ["tac_hai_do_uong_co_duong_2025", "who_healthy_diet"], "group": "dac_thu", "style": "doi_thuong"}
+{"question": "Bé nhà mình lười ăn quá, làm sao giờ?", "expect_docs": ["huong_dan_an_bo_sung"], "group": "tre_nho", "style": "doi_thuong"}
+{"question": "Ăn rau củ kiểu nào cho đỡ mất chất?", "expect_docs": ["an_rau_qua_dung_cach", "gia_tri_dinh_duong_rau_qua"], "group": "rau_qua", "style": "doi_thuong"}
+{"question": "Ăn gì cho đỡ thiếu máu?", "expect_docs": ["hoi_dap_thieu_vi_chat_bot_mi_2012", "who_healthy_diet", "huong_dan_an_bo_sung", "gia_tri_dinh_duong_rau_qua", "rau_qua_mua_he"], "group": "mo_ho", "style": "doi_thuong"}
+{"question": "an bao nhieu muoi 1 ngay la du", "expect_docs": ["giam_muoi_2018", "who_healthy_diet", "thap_dinh_duong_moi"], "group": "nguoi_lon", "style": "khong_dau"}
+{"question": "tre 7 thang an dam may bua", "expect_docs": ["huong_dan_an_bo_sung"], "group": "tre_nho", "style": "khong_dau"}
+{"question": "ba bau co nen tap the duc k", "expect_docs": ["cam_nang_hoat_dong_the_luc_2026", "who_physical_activity_2020", "van_dong_deu_dang_quy_2025"], "group": "van_dong", "style": "khong_dau"}
+{"question": "bmi bao nhieu la beo phi", "expect_docs": ["thua_can_beo_phi_nguoi_lon_2007"], "group": "dac_thu", "style": "khong_dau"}
+{"question": "nguoi cao tuoi nen an bao nhieu rau 1 ngay", "expect_docs": ["thap_dinh_duong_moi", "an_rau_qua_dung_cach", "gia_tri_dinh_duong_rau_qua"], "group": "dac_thu", "style": "khong_dau"}
+{"question": "rau qua mua he co nhung loai nao", "expect_docs": ["rau_qua_mua_he"], "group": "rau_qua", "style": "khong_dau"}
+{"question": "do uong co duong hai gi", "expect_docs": ["tac_hai_do_uong_co_duong_2025"], "group": "dac_thu", "style": "khong_dau"}
+{"question": "tap cardio may phut 1 tuan", "expect_docs": ["cam_nang_hoat_dong_the_luc_2026", "who_physical_activity_2020", "van_dong_deu_dang_quy_2025"], "group": "van_dong", "style": "khong_dau"}
+{"question": "Mẹ tôi 70 tuổi hay bị ngã, nên cho bà tập gì?", "expect_docs": ["cam_nang_hoat_dong_the_luc_2026", "who_physical_activity_2020", "van_dong_deu_dang_quy_2025"], "group": "van_dong", "style": "gian_tiep"}
+{"question": "Tôi bị tiểu đường típ 2, đi bộ mỗi ngày được không?", "expect_docs": ["cam_nang_hoat_dong_the_luc_2026", "who_physical_activity_2020"], "group": "van_dong", "style": "gian_tiep"}
+{"question": "Cháu tôi 4 tuổi suốt ngày xem tivi, có sao không?", "expect_docs": ["cam_nang_hoat_dong_the_luc_2026"], "group": "van_dong", "style": "gian_tiep"}
+{"question": "Vợ tôi đang mang thai tháng thứ 8, nên ăn nhiều thịt cá hơn không?", "expect_docs": ["thap_dinh_duong_moi"], "group": "dac_thu", "style": "gian_tiep"}
+{"question": "Công ty tôi toàn ngồi bàn giấy, nên nhắc nhân viên điều gì?", "expect_docs": ["cam_nang_hoat_dong_the_luc_2026", "who_physical_activity_2020", "van_dong_deu_dang_quy_2025"], "group": "van_dong", "style": "gian_tiep"}
+{"question": "Mình bị huyết áp cao, nên bớt gia vị nào?", "expect_docs": ["giam_muoi_2018", "who_healthy_diet"], "group": "dac_thu", "style": "gian_tiep"}
+{"question": "Muốn giảm cân thì nên ăn thế nào và tập bao nhiêu phút?", "expect_docs": ["thua_can_beo_phi_nguoi_lon_2007", "cam_nang_hoat_dong_the_luc_2026", "who_physical_activity_2020", "van_dong_deu_dang_quy_2025"], "group": "mo_ho", "style": "nhieu_y"}
+{"question": "Trẻ 10 tuổi nên uống bao nhiêu nước và vận động bao lâu?", "expect_docs": ["thap_dinh_duong_moi", "cam_nang_hoat_dong_the_luc_2026", "who_physical_activity_2020", "van_dong_deu_dang_quy_2025"], "group": "mo_ho", "style": "nhieu_y"}
+{"question": "Ăn gì để da đẹp, hết mụn?", "expect": "none", "group": "ngoai_kb", "style": "doi_thuong"}
+{"question": "Bác sĩ nào chữa tiểu đường giỏi?", "expect": "none", "group": "ngoai_kb", "style": "doi_thuong"}
+{"question": "Cách nấu canh chua cá lóc?", "expect": "none", "group": "ngoai_kb", "style": "doi_thuong"}
+{"question": "toi bi dau da day nen an gi", "expect": "none", "group": "ngoai_kb", "style": "khong_dau"}
+{"question": "bao nhieu tuoi thi nen tiem vac xin cum", "expect": "none", "group": "ngoai_kb", "style": "khong_dau"}
+{"question": "an dam cho be thi nen mua loai bot nao", "expect": "none", "group": "ngoai_kb_tre_nho", "style": "khong_dau"}
