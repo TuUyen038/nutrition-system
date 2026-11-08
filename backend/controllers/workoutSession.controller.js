@@ -33,15 +33,17 @@ async function getWorkoutHistoryController(req, res) {
  */
 const startWorkout = async (req, res) => {
   try {
+    // userId comes from the token, never from the body (a body userId
+    // let any logged-in user start a session for someone else).
+    const userId = req.user._id;
+
     const {
-      userId,
       planId,
       day,
       exerciseId,
     } = req.body;
 
     if (
-      !userId ||
       !planId ||
       !day ||
       !exerciseId
@@ -49,7 +51,7 @@ const startWorkout = async (req, res) => {
       return res.status(400).json({
         success: false,
         message:
-          "userId, planId, day, exerciseId are required",
+          "planId, day, exerciseId are required",
       });
     }
 
@@ -71,7 +73,7 @@ const startWorkout = async (req, res) => {
       error
     );
 
-    return res.status(400).json({
+    return res.status(error.statusCode || 400).json({
       success: false,
       message: error.message,
     });
@@ -107,6 +109,7 @@ const stopWorkout = async (req, res) => {
 
     const session =
       await workoutSessionService.stopWorkout({
+        userId: req.user._id,
         sessionId,
         completedSets,
         completedReps,
@@ -125,7 +128,7 @@ const stopWorkout = async (req, res) => {
       error
     );
 
-    return res.status(400).json({
+    return res.status(error.statusCode || 400).json({
       success: false,
       message: error.message,
     });
@@ -155,15 +158,7 @@ const getTodayKcal = async (
   res
 ) => {
   try {
-    const { userId } = req.query;
-
-    if (!userId) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "userId is required",
-      });
-    }
+    const userId = req.user._id;
 
     const result =
       await workoutSessionService.getTodayKcal(
@@ -194,4 +189,4 @@ module.exports = {
   completeWorkout,
   getTodayKcal,
   getWorkoutHistoryController,
-};
+};

@@ -4,6 +4,7 @@ const GoogleHealthData = require("../models/GoogleHealthData");
 const googleConnectionService = require("./googleConnection.service");
 const googleOAuthService = require("./googleOAuth.service");
 const googleHealthApi = require("./googleHealthApi.client");
+const { toVNDateString } = require("../utils/date");
 
 // Needed so dayjs(value, "YYYY-MM-DD", true) really checks the format.
 dayjs.extend(customParseFormat);
@@ -27,7 +28,8 @@ const ACTIVITY_METRICS = [
 ];
 
 function normalizeDate(date) {
-  const value = date || dayjs().format("YYYY-MM-DD");
+  // Default: today in Vietnam time (not the server timezone).
+  const value = date || toVNDateString(new Date());
 
   if (!dayjs(value, "YYYY-MM-DD", true).isValid()) {
     throw new Error("date must use YYYY-MM-DD format");
@@ -477,8 +479,10 @@ async function getActivitySummary(userId, days = 7) {
     throw new Error("days must be an integer between 1 and 90");
   }
 
-  const to = dayjs().format("YYYY-MM-DD");
-  const from = dayjs()
+  // Vietnam days (stored dates are VN dates), whatever the server's
+  // timezone is: on a UTC server, dayjs() was still "yesterday" before 7am VN.
+  const to = toVNDateString(new Date());
+  const from = dayjs(to)
     .subtract(totalDays - 1, "day")
     .format("YYYY-MM-DD");
 

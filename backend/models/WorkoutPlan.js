@@ -1,5 +1,29 @@
 const mongoose = require("mongoose");
 
+const exerciseDetailSchema = new mongoose.Schema(
+  {
+    exerciseId: Number,
+
+    name: String,
+
+    sets: Number,
+
+    reps: String,
+
+    duration: Number,
+
+    calories: Number,
+
+    intensity: {
+      type: String,
+      enum: ["light", "moderate", "vigorous"],
+    },
+
+    // Weighted score (0-1) from exerciseScoring.service
+    score: Number,
+  },
+);
+
 const WorkoutPlanSchema = new mongoose.Schema(
   {
     userId: {
@@ -25,7 +49,7 @@ const WorkoutPlanSchema = new mongoose.Schema(
 
     // Weekly target calories
     weeklyTargetCalories: { type: Number, default: 0, }, 
-    
+
     weeklyEstimatedCalories: { type: Number, default: 0, },
 
     // Adapative scores
@@ -108,27 +132,39 @@ const WorkoutPlanSchema = new mongoose.Schema(
 
         completedAt: Date,
 
-        exerciseDetails: [
+        exerciseDetails: [exerciseDetailSchema],
+
+        // ----- Step 6: adaptation -----
+        // The day as generated, kept the first time the day is adapted, so
+        // every adaptation is computed from it (never stacked) and can be
+        // undone when the user's state improves.
+        original: {
+          type: { type: String, enum: ["workout", "rest"] },
+          focus: String,
+          estimatedDifficulty: Number,
+          exerciseDetails: [exerciseDetailSchema],
+        },
+
+        adaptation: {
+          action: {
+            type: String,
+            enum: ["increase", "maintain", "reduce_intensity", "light_session", "rest"],
+          },
+          reasons: [String],
+          appliedAt: Date,
+        },
+
+        // ----- Step 7: exercises the user replaced on this day -----
+        // Re-applied by adaptivePlan whenever the day is recomputed, so
+        // the user's choice is not lost when the state changes.
+        substitutions: [
           {
-            exerciseId: Number,
-
-            name: String,
-
-            sets: Number,
-
-            reps: String,
-
-            duration: Number,
-
-            calories: Number,
-
-            intensity: {
-              type: String,
-              enum: ["light", "moderate", "vigorous"],
-            },
-
-            // Weighted score (0-1) from exerciseScoring.service
-            score: Number,
+            fromExerciseId: Number,
+            fromName: String,
+            toExerciseId: Number,
+            toName: String,
+            reason: String,
+            at: Date,
           },
         ],
       },
@@ -143,6 +179,29 @@ const WorkoutPlanSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+
+    // Step 6: last time adaptPlan ran (once a day automatically).
+    lastAdaptedAt: {
+      type: Date,
+      default: null,
+    },
+
+    // Step 6: decision log, newest last.
+    adaptations: [
+      {
+        at: Date,
+        // "generation" (rest-day rules when the week is created) or
+        // "daily" (adaptPlan).
+        source: { type: String, default: "daily" },
+        action: String,
+        reasons: [String],
+        status: String,
+        readinessScore: Number,
+        fatigueScore: Number,
+        recoveryScore: Number,
+        days: [Number],
+      },
+    ],
   },
   {
     timestamps: true,
@@ -159,4 +218,4 @@ WorkoutPlanSchema.index({
 module.exports = mongoose.model(
   "WorkoutPlan",
   WorkoutPlanSchema
-);
+);

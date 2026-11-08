@@ -146,5 +146,109 @@ module.exports = {
 
     // Equipment that never needs to be owned.
     alwaysAvailableEquipment: ["none (bodyweight exercise)", "gym mat"],
+
+    // Feedback from replacing an exercise (step 7).
+    feedback: {
+      // reason "pain": the exercise is not suggested again for N days.
+      painExcludeDays: 28,
+      // reason "dislike": score lowered for N days (still allowed).
+      dislikeDays: 56,
+      dislikePenalty: 0.2,
+    },
+  },
+
+  // ---------- Step 6: adapting the current week ----------
+  adaptivePlan: {
+    // Rules are checked in this order; the first that matches wins.
+    // overreached -> rest, tired -> light_session (see decideAdaptation).
+    reduceWhenFatigueAtLeast: 7,
+    reduceWhenRecoveryAtMost: 4,
+
+    // A lot of activity outside the app today (Google Health) -> reduce.
+    busyDayActiveMinutes: 60,
+    busyDaySteps: 12000,
+
+    // Last night shorter than this (Google Health) -> reduce. One short
+    // night barely moves Recovery (sleep is 40% of it) but already
+    // lowers strength and raises perceived effort the next day.
+    shortSleepMinutes: 300,
+
+    // WHO 2020 guideline for adults: 150-300 min/week of moderate activity.
+    // Below the minimum + ready -> increase; above the maximum + tired
+    // muscles -> reduce.
+    whoWeeklyMinutes: { min: 150, max: 300 },
+    increaseMinPerformance: 7,
+
+    // Skipped workout days this week before volume is lowered.
+    lowAdherenceSkips: 2,
+
+    // What each action changes, always computed from the original day
+    // (so running the adaptation twice never stacks).
+    actions: {
+      increase: { intensityStep: 1, exerciseDelta: 0, setsDelta: 0 },
+      maintain: { intensityStep: 0, exerciseDelta: 0, setsDelta: 0 },
+      reduce_intensity: { intensityStep: -1, exerciseDelta: 0, setsDelta: 0 },
+      light_session: { intensity: "light", exerciseDelta: -1, setsDelta: -1, swapToLight: true },
+      rest: { toRest: true },
+    },
+    lowAdherence: { exerciseDelta: -1 },
+
+    minExercises: 2,
+    minSets: 2,
+
+    // rest / light_session only touch the next workout day; the
+    // following days get the milder action, then are re-checked daily.
+    followUpAction: {
+      rest: "reduce_intensity",
+      light_session: "reduce_intensity",
+    },
+
+    maxHistory: 30,
+  },
+
+  // ---------- Plan generation (week structure) ----------
+  // Generation builds the "base" week (level + goal only). The user's
+  // state is applied once, right after, by adaptivePlan (step 6), so the
+  // two never stack. Only how many days the user trains this week is
+  // decided here.
+  planGeneration: {
+    baseIntensity: "moderate",
+    baseDifficulty: 6,
+
+    // Turn a workout day into rest for the whole week.
+    // pick: "first" = the first workout day (right away),
+    //       "last"  = the last workout day (lowers weekly volume).
+    restDayRules: [
+      { metric: "recoveryScore", atMost: 3, pick: "first", label: "Recovery" },
+      { metric: "fatigueScore", atLeast: 8, pick: "last", label: "Fatigue" },
+    ],
+    // Never go below this many workout days in a week.
+    minWorkoutDays: 2,
+  },
+
+  // ---------- Step 7: exercise substitution ----------
+  exerciseSubstitution: {
+    defaultLimit: 5,
+    maxLimit: 20,
+
+    // final = ranking (step 5 score) x w + similarity x w
+    weights: { ranking: 0.5, similarity: 0.5 },
+
+    similarity: {
+      weights: { muscle: 0.5, difficulty: 0.25, calories: 0.25 },
+      // |calories - original| / original: within this -> 1,
+      // falls linearly to 0 at caloriesZeroAt.
+      caloriesTolerance: 0.2,
+      caloriesZeroAt: 0.6,
+    },
+
+    // Why the user wants to change: narrows the alternatives.
+    reasons: {
+      too_hard: { maxDifficultyGap: 0, maxFatigueGap: 0 },
+      no_equipment: { bodyweightOnly: true },
+      pain: { impactLevels: ["low"] },
+      dislike: {},
+      other: {},
+    },
   },
 };

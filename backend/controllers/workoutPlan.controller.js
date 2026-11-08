@@ -7,6 +7,12 @@ const trainingStateService = require(
 const workoutRecommendationService = require(
   "../services/workoutRecommendation.service"
 );
+const adaptivePlanService = require(
+  "../services/adaptivePlan.service"
+);
+const exerciseSubstitutionService = require(
+  "../services/exerciseSubstitution.service"
+);
 
 // =====================================
 // GET CURRENT WEEK PLAN
@@ -46,15 +52,17 @@ const generateWeeklyPlan = async (req, res) => {
   try {
     const userId = req.user._id;
 
-    const plan =
-      await workoutPlanService.generateWeeklyPlan(
-        userId
-      );
+    // ?force=true rebuilds this week's plan (no exercise started yet).
+    const { plan, regenerated } =
+      await workoutPlanService.regenerateCurrentWeek(userId, {
+        force: req.query.force === "true",
+      });
 
     return res.json({
       success: true,
-      message:
-        "Weekly workout plan generated successfully",
+      message: regenerated
+        ? "Weekly workout plan generated successfully"
+        : "This week already has a plan (use ?force=true to rebuild it)",
       data: plan,
     });
   } catch (error) {
@@ -63,7 +71,7 @@ const generateWeeklyPlan = async (req, res) => {
       error
     );
 
-    return res.status(500).json({
+    return res.status(error.statusCode || 500).json({
       success: false,
       message:
         error.message ||
@@ -308,6 +316,109 @@ const getExerciseRanking = async (req, res) => {
   }
 };
 
+// =====================================
+// ADAPT CURRENT PLAN (step 6)
+// =====================================
+
+const adaptPlan = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    const result = await adaptivePlanService.adaptPlan(userId, {
+      sync: req.query.sync === "true",
+      dryRun: req.query.dryRun === "true",
+    });
+
+    return res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    console.error(
+      "[WorkoutPlan] adaptPlan:",
+      error
+    );
+
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message:
+        error.message ||
+        "Failed to adapt workout plan",
+    });
+  }
+};
+
+// =====================================
+// EXERCISE SUBSTITUTION (step 7)
+// =====================================
+
+const getExerciseAlternatives = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    const result = await exerciseSubstitutionService.getAlternatives(
+      userId,
+      Number(req.params.day),
+      Number(req.params.exerciseId),
+      {
+        limit: Number(req.query.limit) || undefined,
+        reason: req.query.reason || null,
+      }
+    );
+
+    return res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    console.error(
+      "[WorkoutPlan] getExerciseAlternatives:",
+      error
+    );
+
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message:
+        error.message ||
+        "Failed to get alternatives",
+    });
+  }
+};
+
+const replaceExercise = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    const result = await exerciseSubstitutionService.replaceExercise(
+      userId,
+      Number(req.params.day),
+      Number(req.params.exerciseId),
+      {
+        newExerciseId: Number(req.body?.newExerciseId),
+        reason: req.body?.reason || "other",
+      }
+    );
+
+    return res.json({
+      success: true,
+      message: "Exercise replaced",
+      data: result,
+    });
+  } catch (error) {
+    console.error(
+      "[WorkoutPlan] replaceExercise:",
+      error
+    );
+
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message:
+        error.message ||
+        "Failed to replace exercise",
+    });
+  }
+};
+
 module.exports = {
   getCurrentPlan,
   generateWeeklyPlan,
@@ -318,4 +429,7 @@ module.exports = {
   getTodayWorkout,
   getTrainingState,
   getExerciseRanking,
+  adaptPlan,
+  getExerciseAlternatives,
+  replaceExercise,
 };

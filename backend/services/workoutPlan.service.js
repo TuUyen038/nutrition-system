@@ -1,6 +1,8 @@
 const WorkoutPlan = require("../models/WorkoutPlan");
+const WorkoutSession = require("../models/WorkoutSession");
 
-const workoutRecommendationService = require("./workoutRecommendation.service");  
+const workoutRecommendationService = require("./workoutRecommendation.service");
+const adaptivePlanService = require("./adaptivePlan.service");
 
 function getVNDateOnly(date = new Date()) {
   return date.toLocaleDateString("en-CA", {
@@ -11,6 +13,24 @@ function getVNDateOnly(date = new Date()) {
 function toUTCDateOnly(dateString) {
   const [year, month, day] = dateString.split("-").map(Number);
   return Date.UTC(year, month - 1, day);
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * 00:00 (Vietnam time) of the day that contains `date`. Week bounds are
+ * whole VN days: before, weekStartDate kept the hour the plan was made,
+ * so on day 7 after that hour no plan covered "now" and a new week was
+ * generated on every request.
+ */
+function startOfVNDay(date = new Date()) {
+  return new Date(`${getVNDateOnly(new Date(date))}T00:00:00+07:00`);
+}
+
+function httpError(statusCode, message) {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  return error;
 }
 
 function isPastOrTodayDateVN(date) {
@@ -90,6 +110,14 @@ async function getTodayWorkout(userId) {
   
   if (!plan?.weekStartDate) return null;
 
+  // Step 6: re-check the user's state once a day and adapt the days
+  // that have not happened yet, then read the plan again.
+  const adapted = await adaptivePlanService.adaptPlanIfDue(userId);
+
+  if (adapted) {
+    plan = (await WorkoutPlan.findById(plan._id)) || plan;
+  }
+
   const startDateOnly = getVNDateOnly(new Date(plan.weekStartDate));
   const todayDateOnly = getVNDateOnly(new Date());
 
@@ -138,9 +166,16 @@ async function generateWeeklyPlan(
       userId,
       {
         currentWeek,
-        baseDate: startDate,
+        baseDate: startOfVNDay(startDate),
       }
     );
+
+  // Day 1 00:00 -> day 7 23:59:59.999 (VN).
+  generated.weekStartDate = startOfVNDay(startDate);
+  generated.weekEndDate = new Date(generated.weekStartDate.getTime() + 7 * DAY_MS - 1);
+
+  const now = new Date();
+  const { restDecision } = generated;
 
   const plan = await WorkoutPlan.create(
     {
@@ -172,13 +207,101 @@ async function generateWeeklyPlan(
 
       days: generated.days,
 
-      generatedAt: new Date(),
+      generatedAt: now,
 
       isActive: true,
+
+      adaptations: restDecision?.days?.length
+        ? [
+            {
+              at: now,
+              source: "generation",
+              action: "rest",
+              reasons: restDecision.reasons,
+              recoveryScore: generated.recoveryScore,
+              fatigueScore: generated.fatigueScore,
+              readinessScore: generated.readinessScore,
+              days: restDecision.days,
+            },
+          ]
+        : [],
     }
   );
 
-  return plan;
+  // The plan above is the "base" week (level + goal). Apply the user's
+  // state to it once, here, with the step 6 rules; every later
+  // adaptation is computed from the same base, so nothing stacks.
+  // Never fails generation: worst case the base plan is returned and
+  // /today adapts it later.
+  try {
+    const adapted = await adaptivePlanService.adaptPlan(userId, {
+      planId: plan._id,
+      now,
+    });
+
+    return adapted.plan;
+  } catch (error) {
+    console.error("[WorkoutPlan] adapt after generate:", error.message || error);
+
+    return plan;
+  }
+}
+
+// =====================================
+// (RE)GENERATE THE CURRENT WEEK
+// =====================================
+
+/**
+ * POST /generate. Before, it always created week 1, which fails on the
+ * unique (userId, currentWeek) index for anyone who already has a plan.
+ *
+ * - no plan for this week -> same as getCurrentPlan (create it)
+ * - plan exists, force=false -> return it unchanged
+ * - plan exists, force=true -> rebuild it (e.g. after changing goal,
+ *   level or equipment), only if no exercise of it was started yet
+ */
+async function regenerateCurrentWeek(userId, { force = false } = {}) {
+  const today = new Date();
+
+  const current = await WorkoutPlan.findOne({
+    userId,
+    weekStartDate: { $lte: today },
+    weekEndDate: { $gte: today },
+  });
+
+  if (!current) {
+    return { plan: await getCurrentPlan(userId), regenerated: true };
+  }
+
+  if (!force) {
+    return { plan: current, regenerated: false };
+  }
+
+  const started = await WorkoutSession.exists({ userId, planId: current._id });
+
+  if (started) {
+    throw httpError(409, "Tuần này đã có bài tập được bắt đầu, không tạo lại được");
+  }
+
+  const { currentWeek, weekStartDate } = current;
+
+  // (userId, currentWeek) is unique, so the old plan must go first.
+  // If generation fails, put it back instead of leaving the week empty.
+  const backup = current.toObject();
+
+  await WorkoutPlan.deleteOne({ _id: current._id });
+
+  try {
+    const plan = await generateWeeklyPlan(userId, {
+      currentWeek,
+      startDate: weekStartDate,
+    });
+
+    return { plan, regenerated: true };
+  } catch (error) {
+    await WorkoutPlan.collection.insertOne(backup);
+    throw error;
+  }
 }
 
 // =====================================
@@ -243,11 +366,9 @@ async function completeWorkoutDay(userId, day) {
 // =====================================
 
 async function generateNextWeek(userId) {
+  // Highest week number, active or not: (userId, currentWeek) is unique.
   const latestPlan =
-    await WorkoutPlan.findOne({
-      userId,
-      isActive: true,
-    }).sort({ currentWeek: -1 });
+    await WorkoutPlan.findOne({ userId }).sort({ currentWeek: -1 });
 
   let nextWeek = 1;
 
@@ -268,13 +389,14 @@ async function generateNextWeek(userId) {
   }
 
   // week mới bắt đầu sau week cũ
-  const nextStartDate =
-    latestPlan
-      ? new Date(
-          latestPlan.weekEndDate.getTime()
-          + 24 * 60 * 60 * 1000
-        )
-      : new Date();
+  // Day after the previous week, but never in the past: a user back
+  // after 3 weeks away gets a plan starting today, not 3 weeks ago.
+  const today = startOfVNDay(new Date());
+  const afterPrevious = latestPlan
+    ? startOfVNDay(new Date(latestPlan.weekEndDate.getTime() + 1))
+    : today;
+
+  const nextStartDate = afterPrevious > today ? afterPrevious : today;
 
   return await generateWeeklyPlan(
     userId,
@@ -303,6 +425,14 @@ async function skipWorkoutDay(userId, day) {
     throw new Error("Day not found");
   }
 
+  if (targetDay.type !== "workout") {
+    throw new Error("Ngày nghỉ không cần bỏ qua");
+  }
+
+  if (targetDay.completed) {
+    throw new Error("Ngày này đã hoàn thành");
+  }
+
   targetDay.skipped = true;
 
   await plan.save();
@@ -325,25 +455,40 @@ async function getPlanStats(userId) {
     };
   }
 
-  const completedDays = plan.days.filter(
+  // Only workout days count: rest days are auto-completed, so counting
+  // them made a week with no training look 40-60% complete.
+  const workoutDays = plan.days.filter((d) => d.type === "workout");
+
+  const completedDays = workoutDays.filter(
     (d) => d.completed
   ).length;
 
-  const skippedDays = plan.days.filter(
+  const skippedDays = workoutDays.filter(
     (d) => d.skipped
   ).length;
 
-  const totalCalories = plan.days.reduce(
-    (sum, d) => sum + (d.totalCalories || 0),
-    0
+  // days[].totalCalories does not exist (always 0 before): use the
+  // calories actually burned in this plan's sessions.
+  const sessions = await WorkoutSession.find({
+    userId,
+    planId: plan._id,
+    completed: true,
+  })
+    .select("actualCalories")
+    .lean();
+
+  const totalCalories = Math.round(
+    sessions.reduce((sum, s) => sum + (s.actualCalories || 0), 0)
   );
 
-  const completionRate = Math.round(
-    (completedDays / 7) * 100
-  );
+  const completionRate = workoutDays.length
+    ? Math.round((completedDays / workoutDays.length) * 100)
+    : 0;
 
   return {
     currentWeek: plan.currentWeek,
+
+    workoutDays: workoutDays.length,
 
     completedDays,
 
@@ -364,6 +509,7 @@ async function getPlanStats(userId) {
 }
 
 module.exports = {
+  regenerateCurrentWeek,
   getCurrentPlan,
   getTodayWorkout,
   generateWeeklyPlan,
@@ -372,4 +518,4 @@ module.exports = {
   generateNextWeek,
   getPlanStats,
   skipWorkoutDay,
-};
+};

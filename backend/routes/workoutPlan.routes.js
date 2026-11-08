@@ -41,4 +41,20 @@ router.get("/training-state", workoutPlanController.getTrainingState);
 // GET /workout-plan/exercise-ranking?focus=push&limit=10 - Scored exercises
 router.get("/exercise-ranking", workoutPlanController.getExerciseRanking);
 
+// POST /workout-plan/adapt?sync=true&dryRun=true - Adapt the days not done yet
+router.post("/adapt", workoutPlanController.adaptPlan);
+
+// Step 7: replace one exercise of a day
+// GET   /workout-plan/day/3/exercises/91/alternatives?limit=5&reason=too_hard
+// PATCH /workout-plan/day/3/exercises/91/replace  body { newExerciseId, reason }
+// reason: too_hard | no_equipment | pain | dislike | other
+router.get(
+  "/day/:day/exercises/:exerciseId/alternatives",
+  workoutPlanController.getExerciseAlternatives
+);
+router.patch(
+  "/day/:day/exercises/:exerciseId/replace",
+  workoutPlanController.replaceExercise
+);
+
 module.exports = router;
