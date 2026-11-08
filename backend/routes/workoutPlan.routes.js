@@ -35,4 +35,10 @@ router.get("/stats", workoutPlanController.getPlanStats);
 // GET workout ngày hôm nay
 router.get("/today", workoutPlanController.getTodayWorkout);
 
-module.exports = router;
+// GET /workout-plan/training-state?sync=true - Fatigue / Recovery / Performance
+router.get("/training-state", workoutPlanController.getTrainingState);
+
+// GET /workout-plan/exercise-ranking?focus=push&limit=10 - Scored exercises
+router.get("/exercise-ranking", workoutPlanController.getExerciseRanking);
+
+module.exports = router;

@@ -2,8 +2,14 @@ const Exercise = require("../models/Exercise");
 const User = require("../models/User");
 const WorkoutPlan = require("../models/WorkoutPlan");
 const ActivityMet = require("../models/ActivityMet");
-const {calculateUserPerformance} = require("./workoutAnalytics.service");
-const UserExerciseStats = require("../models/UserExerciseStats");
+const { getTrainingState } = require("./trainingState.service");
+const {
+  rankExercises,
+  expandMuscles,
+} = require("./exerciseScoring.service");
+const {
+  exerciseScoring: SCORING_CONFIG,
+} = require("../config/adaptiveWorkout.config");
 
 // ====================
 // MAPPING CONSTANTS
@@ -88,36 +94,19 @@ function getWorkoutLevel(fitnessLevel) {
 // =====================================
 
 async function analyzeUserState(userId) {
-  const analytics =
-    await calculateUserPerformance(
-      userId
-    );
-
-  let recommendedIntensity =
-    "moderate";
-
-  if (analytics.readinessScore <= 4) {
-    recommendedIntensity = "light";
-  }
-
-  if (analytics.readinessScore >= 8) {
-    recommendedIntensity = "vigorous";
-  }
+  // Fatigue / Recovery / Performance are computed in trainingState.service.
+  // Intensity comes from the status (ready/normal/tired/overreached),
+  // not from a single readiness threshold.
+  const state = await getTrainingState(userId);
 
   return {
-    fatigueScore:
-      analytics.fatigueScore,
-
-    recoveryScore:
-      analytics.recoveryScore,
-
-    avgPerformanceScore:
-      analytics.avgPerformanceScore,
-
-    readinessScore:
-      analytics.readinessScore,
-
-    recommendedIntensity,
+    fatigueScore: state.fatigueScore,
+    recoveryScore: state.recoveryScore,
+    avgPerformanceScore: state.performanceScore,
+    readinessScore: state.readinessScore,
+    status: state.status,
+    isColdStart: state.isColdStart,
+    recommendedIntensity: state.recommendedIntensity,
   };
 }
 
@@ -126,7 +115,11 @@ async function analyzeUserState(userId) {
 // =====================================
 
 async function getExercisesByFocus(focus) {
-  const muscles = MUSCLE_GROUP_MAPPINGS[focus] || [];
+  // DB names are e.g. "Chest" / "Pectoralis major": match every alias,
+  // case-insensitive (a plain $in on "chest" would miss "Chest").
+  const muscles = [
+    ...expandMuscles(MUSCLE_GROUP_MAPPINGS[focus] || []),
+  ].map((name) => new RegExp(`^${name}$`, "i"));
 
   let exercises = await Exercise.find({
     $or: [
@@ -148,12 +141,16 @@ async function getExercisesByFocus(focus) {
         "calisthenics",
       ],
     },
-  }).limit(50);
+  })
+    .limit(SCORING_CONFIG.candidatePoolSize)
+    .lean();
 
   if (!exercises.length) {
     exercises = await Exercise.find({
       activityType: "strength_training",
-    }).limit(20);
+    })
+      .limit(20)
+      .lean();
   }
 
   return exercises;
@@ -194,7 +191,8 @@ async function calculateCalories(
 
 async function generateDayExercises({
   userId,
-  fatigueScore,
+  user,
+  state,
   focus,
   level,
   weight,
@@ -202,67 +200,22 @@ async function generateDayExercises({
   intensity,
   recoveryScore,
   recentExerciseIds,
+  weekStartDate,
 }) {
   const exercises = await getExercisesByFocus(focus);
 
-  const stats =
-    await UserExerciseStats.find({
-      userId,
-    });
-
-  const statsMap = {};
-
-  stats.forEach((s) => {
-    statsMap[s.exerciseId] = s;
+  // Step 5: weighted scoring (exerciseScoring.service) replaces the old
+  // ad-hoc score + random shuffle. `ranked` is already in pick order
+  // (best first, with muscle-group diversity).
+  const { ranked } = await rankExercises(exercises, {
+    userId,
+    user,
+    level,
+    focusGroups: MUSCLE_GROUP_MAPPINGS[focus] || [],
+    state,
+    previousDayExerciseIds: recentExerciseIds,
+    variationDate: weekStartDate,
   });
-
-  const shuffled = exercises
-    .map((exercise) => {
-      let score = 0;
-
-      const stat =
-        statsMap[exercise.exerciseId];
-
-      if (stat) {
-        score +=
-          stat.preferenceScore || 0;
-
-        const daysSinceLast =
-          stat.lastPerformedAt
-            ? (
-                Date.now() -
-                new Date(
-                  stat.lastPerformedAt
-                ).getTime()
-              ) /
-              (1000 * 60 * 60 * 24)
-            : 999;
-
-        if (daysSinceLast <= 1) {
-          score -= 100;
-        }
-        else if (daysSinceLast <= 3) {
-          score -= 10;
-        }
-      }
-
-      if (fatigueScore >= 7) {
-        score -= 2;
-      }
-      
-      if (recentExerciseIds.includes(exercise.exerciseId)) {
-        score -= 20;
-      }
-
-      return {
-        exercise,
-        score,
-      };
-    })
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 15)
-    .sort(() => Math.random() - 0.5)
-    .map((s) => s.exercise);
 
   const config = SETS_REPS_BY_LEVEL[level];
 
@@ -300,8 +253,14 @@ async function generateDayExercises({
 
   let totalCalories = 0;
   
-  for (let i = 0; i < Math.min(maxExercises, shuffled.length); i++) {
-    const exercise = shuffled[i];
+  // Walk the whole ranked list: an exercise skipped for calories is
+  // replaced by the next best one instead of leaving the day short.
+  for (const item of ranked) {
+    if (selected.length >= maxExercises) {
+      break;
+    }
+
+    const exercise = item.exercise;
 
     const duration =
       Math.max(
@@ -332,6 +291,7 @@ async function generateDayExercises({
       duration,
       calories,
       intensity,
+      score: item.finalScore,
     });
 
     totalCalories += calories;
@@ -497,7 +457,8 @@ async function generateAdaptiveWorkoutPlan(
 
     const generated = await generateDayExercises({
       userId,
-      fatigueScore: state.fatigueScore,
+      user,
+      state,
       focus: item.focus,
       level: workoutLevel,
       weight: user.weight,
@@ -505,6 +466,7 @@ async function generateAdaptiveWorkoutPlan(
       intensity: state.recommendedIntensity,
       recoveryScore: state.recoveryScore,
       recentExerciseIds,
+      weekStartDate: today,
     });
 
     recentExerciseIds = generated.exercises.map(
@@ -579,6 +541,58 @@ async function generateAdaptiveWorkoutPlan(
   };
 }
 
+// =====================================
+// PREVIEW EXERCISE RANKING (debug / calibration)
+// =====================================
+
+async function previewExerciseRanking(userId, focus, limit = 10) {
+  if (!MUSCLE_GROUP_MAPPINGS[focus]) {
+    const error = new Error(
+      `focus must be one of: ${Object.keys(MUSCLE_GROUP_MAPPINGS).join(", ")}`
+    );
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const user = await User.findById(userId).lean();
+
+  if (!user) {
+    throw new Error("User not found");
+  }
+
+  const level = getWorkoutLevel(user.fitnessLevel);
+  const state = await analyzeUserState(userId);
+  const exercises = await getExercisesByFocus(focus);
+
+  const { ranked, excluded } = await rankExercises(exercises, {
+    userId,
+    user,
+    level,
+    focusGroups: MUSCLE_GROUP_MAPPINGS[focus],
+    state,
+  });
+
+  return {
+    focus,
+    level,
+    status: state.status,
+    readinessScore: state.readinessScore,
+    candidates: exercises.length,
+    excluded,
+    top: ranked.slice(0, limit).map((item) => ({
+      exerciseId: item.exercise.exerciseId,
+      name: item.exercise.name,
+      difficulty: item.exercise.difficulty ?? null,
+      primaryGroups: item.primaryGroups,
+      score: item.score,
+      finalScore: item.finalScore,
+      components: item.components,
+      usedWeights: item.usedWeights,
+    })),
+  };
+}
+
 module.exports = {
   generateAdaptiveWorkoutPlan,
-};
+  previewExerciseRanking,
+};

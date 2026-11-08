@@ -19,7 +19,7 @@ const workoutPlanRoutes = require("./workoutPlan.routes");
 const mealLogRoutes = require("./mealLog.routes");
 const fitnessPlanRoutes = require("./fitnessPlan.routes");
 const chatRoutes = require("./chat.routes");
-
+const googleHealthRoutes = require("./googleHealth.routes");
 
 // Public routes (không cần authentication)
 router.use("/auth", authRoutes);
@@ -39,6 +39,8 @@ router.use("/favorites", favoriteRoutes);
 router.use("/workout-session", workoutSessionRoutes);
 router.use("/workout-plan", workoutPlanRoutes);
 router.use("/fitness-plans", fitnessPlanRoutes);
+router.use("/google-health", googleHealthRoutes);
+
 // Admin only routes
 router.use("/audit-logs", auditLogRoutes);
 router.use("/admin/dashboard", dashboardRoutes);

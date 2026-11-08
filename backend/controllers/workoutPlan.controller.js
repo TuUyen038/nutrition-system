@@ -1,6 +1,12 @@
 const workoutPlanService = require(
   "../services/workoutPlan.service"
 );
+const trainingStateService = require(
+  "../services/trainingState.service"
+);
+const workoutRecommendationService = require(
+  "../services/workoutRecommendation.service"
+);
 
 // =====================================
 // GET CURRENT WEEK PLAN
@@ -235,6 +241,73 @@ const getTodayWorkout = async (req, res) => {
   }
 };
 
+// =====================================
+// GET TRAINING STATE (fatigue / recovery / performance)
+// =====================================
+
+const getTrainingState = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    const state =
+      await trainingStateService.getTrainingState(userId, {
+        sync: req.query.sync === "true",
+      });
+
+    return res.json({
+      success: true,
+      data: state,
+    });
+  } catch (error) {
+    console.error(
+      "[WorkoutPlan] getTrainingState:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        error.message ||
+        "Failed to get training state",
+    });
+  }
+};
+
+// =====================================
+// PREVIEW EXERCISE RANKING
+// =====================================
+
+const getExerciseRanking = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 10));
+
+    const ranking =
+      await workoutRecommendationService.previewExerciseRanking(
+        userId,
+        req.query.focus,
+        limit
+      );
+
+    return res.json({
+      success: true,
+      data: ranking,
+    });
+  } catch (error) {
+    console.error(
+      "[WorkoutPlan] getExerciseRanking:",
+      error
+    );
+
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message:
+        error.message ||
+        "Failed to rank exercises",
+    });
+  }
+};
+
 module.exports = {
   getCurrentPlan,
   generateWeeklyPlan,
@@ -243,4 +316,6 @@ module.exports = {
   getPlanStats,
   skipWorkoutDay,
   getTodayWorkout,
-};
+  getTrainingState,
+  getExerciseRanking,
+};

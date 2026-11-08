@@ -24,6 +24,11 @@ const userSchema = new mongoose.Schema(
       default: "sedentary",
     },
     allergies: [String],
+    // Workout: tags matched against Exercise.avoidFor (e.g. "knee_pain").
+    limitations: { type: [String], default: [] },
+    // Workout: equipment names the user owns, as in Exercise.equipment.name
+    // (e.g. "Dumbbell"). Empty = not filled in -> no equipment filter.
+    equipment: { type: [String], default: [] },
     favoriteRecipes: [
       {
         type: mongoose.Schema.Types.ObjectId,
