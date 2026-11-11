@@ -86,15 +86,17 @@ như nhau. Nếu gộp thẳng, chunk tiếng Anh gần như không bao giờ v�
 
 ## Cài đặt
 
-Project hiện được đặt tại `khuyennghidinhduong/ai-service`. Nếu đã di chuyển thư mục, không nên dùng lại virtualenv cũ vì `venv/bin/activate` có thể chứa đường dẫn tuyệt đối trước đó. Hãy tạo lại virtualenv ở vị trí mới.
+Yêu cầu: Python **3.10–3.12** (khuyên 3.11; `chromadb`/`torch` thường chưa có bản cài sẵn cho Python mới nhất), ~4 GB trống cho model.
+Nếu đã di chuyển thư mục, không dùng lại virtualenv cũ vì script activate chứa đường dẫn tuyệt đối trước đó. Hãy xóa thư mục `venv` và tạo lại.
 
 ### macOS/Linux
 
 ```bash
-cd /Users/tuantq/UyenTTT/khuyennghidinhduong/ai-service
+cd <project>/ai-service
 python3 -m venv venv
 source venv/bin/activate
 python -m pip install -r requirements.txt
+cp .env.example .env
 ```
 
 Có thể chạy mà không activate:
@@ -103,15 +105,32 @@ Có thể chạy mà không activate:
 venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
-### Windows PowerShell
+### Windows (PowerShell)
 
 ```powershell
-cd <project>\ai-service
-py -m venv venv
-venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-copy .env.example .env
+cd D:\Project\nutrition-system\nutrition-system\ai-service
+py -3.11 -m venv venv            # hoặc: py -m venv venv  (xem các bản Python đã cài: py -0)
+.\venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+Copy-Item .env.example .env
 ```
+
+Nếu PowerShell báo `running scripts is disabled on this system` khi activate, chạy một lần rồi activate lại:
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+```
+
+Dùng **CMD** thay cho PowerShell thì activate bằng `venv\Scripts\activate.bat` và copy bằng `copy .env.example .env`.
+
+Có thể chạy mà không activate: `.\venv\Scripts\python.exe ...` (tương đương `venv/bin/python ...` trên macOS/Linux).
+Các mục bên dưới đều có lệnh cho cả hai hệ điều hành. Sau khi activate, lệnh `python scripts/...` chạy giống nhau trên mọi hệ.
+
+Lỗi hay gặp trên Windows:
+- Cài `chromadb` báo cần *Microsoft Visual C++ Build Tools*: cài "Desktop development with C++" từ Visual Studio Build Tools, hoặc đổi sang Python 3.11.
+- Muốn cài torch bản CPU cho nhẹ (không có GPU NVIDIA): `python -m pip install torch --index-url https://download.pytorch.org/whl/cpu` trước khi cài `requirements.txt`.
+- Thư mục model HuggingFace nằm ở `%USERPROFILE%\.cache\huggingface`; xóa thư mục model trong đó nếu tải dở bị lỗi.
 
 Lần chạy đầu tải model embedding `intfloat/multilingual-e5-base` (~1 GB) và model rerank (`BAAI/bge-reranker-v2-m3`, ~2 GB; máy yếu thì đặt
 `RERANK_MODEL=cross-encoder/mmarco-mMiniLMv2-L12-H384-v1`). Nếu `pip`/HuggingFace báo lỗi chứng chỉ SSL (mạng công ty có proxy), cần cấu hình
@@ -126,11 +145,17 @@ Bỏ tài liệu vào `data/raw/`:
 | `.md`, `.txt` | Dùng trực tiếp. Đầu file nên có front matter (xem mẫu ở trên) để citation có tên tài liệu, cơ quan, năm, URL. |
 | `.pdf` | Bỏ thẳng vào, loader tự chuyển sang markdown. PDF scan (ảnh) không đọc được chữ: xử lý như infographic. |
 | trang web | Copy nội dung vào file `.md`, thêm heading `##` cho từng mục (chunk được cắt theo heading). Hoặc lưu `.html`. |
-| infographic (ảnh) | `venv/bin/python scripts/image_to_md.py --image x.jpg --title "..." --org "..." --year 2016 --lang vi` (dùng Gemini vision, cần `GEMINI_API_KEY`) → rà lại file `.md` sinh ra rồi ingest. |
+| infographic (ảnh) | `venv/bin/python scripts/image_to_md.py --image x.jpg --title "..." --org "..." --year 2016 --lang vi` (Windows: `.\venv\Scripts\python.exe scripts\image_to_md.py ...`; dùng Gemini vision, cần `GEMINI_API_KEY`) → rà lại file `.md` sinh ra rồi ingest. |
 
 ```bash
 venv/bin/python scripts/ingest.py --reset
 venv/bin/python scripts/ingest.py --only huong_dan_an_bo_sung.md
+```
+
+```powershell
+# Windows PowerShell
+.\venv\Scripts\python.exe scripts\ingest.py --reset
+.\venv\Scripts\python.exe scripts\ingest.py --only huong_dan_an_bo_sung.md
 ```
 
 Thử nghiệm không đụng collection chính (nạp vào collection riêng rồi truyền `--collection` cho các script eval):
@@ -140,11 +165,29 @@ venv/bin/python scripts/ingest.py --chunk-size 300 --overlap 50 --collection kb_
 venv/bin/python scripts/ingest.py --embed-prefix path --collection kb_path
 ```
 
+```powershell
+# Windows PowerShell
+.\venv\Scripts\python.exe scripts\ingest.py --chunk-size 300 --overlap 50 --collection kb_c300
+.\venv\Scripts\python.exe scripts\ingest.py --embed-prefix path --collection kb_path
+```
+
 ## Chạy service
 
 ```bash
 venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
+
+```powershell
+# Windows PowerShell (chạy trong thư mục ai-service)
+.\venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+# Kiểm tra nhanh ở cửa sổ PowerShell khác:
+Invoke-RestMethod http://localhost:8000/health
+Invoke-RestMethod -Method Post http://localhost:8000/rag/retrieve -ContentType "application/json; charset=utf-8" `
+  -Body ([Text.Encoding]::UTF8.GetBytes('{"query": "Người lớn nên vận động bao nhiêu phút mỗi tuần?", "top_k": 5}'))
+```
+
+Lần đầu khởi động mất vài phút để tải model. Windows Firewall có thể hỏi quyền mở port: chỉ cần cho phép mạng Private,
+hoặc đổi `--host 127.0.0.1` nếu chỉ backend trên cùng máy gọi tới.
 
 - `GET  /health` → `{status, model, chunks, reranker: {enabled, ready, model}}` (`chunks = 0` nghĩa là chưa chạy `ingest.py`)
 - `POST /router/classify` `{"text": "..."}` → `{intent, sub_intent, scores, method, latency_ms}`. `sub_intent` chỉ được giữ cho `chitchat`; các nhóm khác trả `null`.
@@ -196,6 +239,17 @@ venv/bin/python scripts/eval_retrieval.py --ks 1 5 20 --verbose
 venv/bin/python scripts/eval_generic.py --verbose
 venv/bin/python scripts/eval_router.py --verbose
 ```
+
+```powershell
+# Windows PowerShell
+.\venv\Scripts\python.exe scripts\eval_retrieval.py --ks 1 5 20 --verbose
+.\venv\Scripts\python.exe scripts\eval_generic.py --verbose
+.\venv\Scripts\python.exe scripts\eval_router.py --verbose
+# Lưu kết quả ra file để so sánh giữa các lần chỉnh:
+.\venv\Scripts\python.exe scripts\eval_retrieval.py --ks 1 5 20 | Out-File -Encoding utf8 eval_retrieval_result.txt
+```
+
+Nếu console Windows in tiếng Việt bị lỗi font/`UnicodeEncodeError`, đặt `$env:PYTHONIOENCODING="utf-8"` (PowerShell) hoặc `set PYTHONIOENCODING=utf-8` (CMD) trước khi chạy.
 
 Hai script truy xuất có cờ để xem từng thành phần đóng góp bao nhiêu: `--rerank` (bật rerank, mặc định tắt), `--no-lang-offset` (bỏ độ lệch ngôn ngữ),
 `--no-audience-filter` (không lọc đối tượng), `--collection <tên>` (so sánh collection khác).
