@@ -76,7 +76,10 @@ Với các chủ đề sau, PHẢI gọi tool TRƯỚC KHI trả lời — khôn
 4. Chỉ số dinh dưỡng cá nhân / TDEE / nhu cầu calo → get_nutrition_goal
 5. Bài tập thể dục → search_exercises → get_exercise_detail
 
-Nếu tool trả về rỗng hoặc not found → dùng kiến thức chung, thêm tiền tố [Tham khảo bên ngoài].
+Nếu tool database trả về rỗng hoặc not found → dùng kiến thức chung, thêm tiền tố [Tham khảo bên ngoài].
+NGOẠI LỆ: rag_retrieve (kho tài liệu y khoa đã kiểm duyệt) trả về rỗng → KHÔNG dùng kiến thức chung,
+trả lời rằng kho tài liệu chưa có thông tin, không đưa ra con số hay khuyến nghị.
+Khi có kết quả rag_retrieve: chỉ dùng nội dung các nguồn [Sx], chép đúng số liệu, mỗi câu có số liệu kết thúc bằng [Sx].
 
 ## XỬ LÝ HỘI THOẠI LIÊN TỤC
 

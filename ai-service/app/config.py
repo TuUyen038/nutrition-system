@@ -70,6 +70,17 @@ RERANK_MAX_LENGTH = int(os.getenv("RERANK_MAX_LENGTH", "1024"))
 
 INTERNAL_KEY = os.getenv("INTERNAL_KEY", "")
 
+# Kiểm tra chống ảo giác (/rag/verify, app/grounding.py)
+# Bật lớp so khớp ngữ nghĩa câu trả lời <-> chunk được trích (dùng model embedding đã nạp sẵn)
+GROUNDING_SEMANTIC = _flag("GROUNDING_SEMANTIC", "1")
+# Cosine tối thiểu giữa một câu và chunk nó trích (chunk tiếng Anh tự hạ theo LANG_SCORE_OFFSET_EN).
+# Chỉ sinh cảnh báo, không làm câu trả lời bị đánh trượt. Chỉnh theo scripts/eval_grounding.py
+GROUNDING_SIM_THRESHOLD = float(os.getenv("GROUNDING_SIM_THRESHOLD", "0.78"))
+# Các số quá phổ biến không cần nguồn (VD "1 tuần", "0 phút")
+GROUNDING_IGNORE_NUMBERS = [
+    x.strip() for x in os.getenv("GROUNDING_IGNORE_NUMBERS", "0,1").split(",") if x.strip()
+]
+
 RAW_DIR = BASE_DIR / "data" / "raw"
 INTERNAL_DIR = BASE_DIR / "data" / "internal"
 INTENTS_FILE = BASE_DIR / "data" / "intents" / "exemplars.json"

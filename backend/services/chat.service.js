@@ -3,6 +3,12 @@ const { getGeminiToolsForIntent } = require("./chatTools.definition");
 const { executeTool } = require("./chatTools.executor");
 const ragClient = require("./ragClient.service");
 const ChatSession = require("../models/ChatSession");
+const {
+  GROUNDED_RULES,
+  SourceRegistry,
+  groundAnswer,
+  stripGroundingArtifacts,
+} = require("./grounding.service");
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 
@@ -22,6 +28,7 @@ const SYSTEM_PROMPT = `
 
   QUY TẮC:
   - Với kiến thức dinh dưỡng/vận động nói chung, PHẢI gọi rag_retrieve trước khi trả lời.
+    Không trả lời kiến thức chung từ trí nhớ của bạn, kể cả khi bạn "biết" đáp án.
   - Với câu hỏi về trẻ em, ăn dặm, nhu cầu theo lứa tuổi hoặc khuyến nghị WHO/Bộ Y tế,
     PHẢI ưu tiên rag_retrieve; không được dùng search_ingredients.
   - Chỉ dùng search_ingredients khi user hỏi về MỘT nguyên liệu cụ thể như thịt gà,
@@ -98,7 +105,8 @@ const buildGeminiHistory = (messages = []) => {
 
   return normalized.map((m) => ({
     role: m.role,
-    parts: [{ text: m.content }],
+    // Mã [Sx] được đánh lại mỗi lượt -> bỏ khỏi câu trả lời cũ để Gemini không trích nhầm
+    parts: [{ text: m.role === "model" ? stripGroundingArtifacts(m.content) : m.content }],
   }));
 };
 
@@ -122,12 +130,14 @@ const buildUserContext = (ctx = {}) => {
   return `[Thông tin user: ${parts.join(", ")}]`;
 };
 
-const buildResponse = (text, toolsUsed, userMessage) => {
+const buildResponse = (text, toolsUsed, userMessage, extra = {}) => {
   const usedSystemData = toolsUsed.some((t) => t.success);
   const attachDisclaimer =
     !usedSystemData || needsDisclaimer(userMessage) || needsDisclaimer(text);
 
   return {
+    citations: extra.citations || [],
+    grounding: extra.grounding || null,
     text: !usedSystemData
       ? `[Không tìm thấy dữ liệu trong hệ thống]\n\n${text}`
       : text,
@@ -363,7 +373,19 @@ async function _runGeminiWithTools(
       "Hãy tự xác định sub-intent và chỉ chọn tool phù hợp với yêu cầu user."
     : null;
 
-  const finalPrompt = [SYSTEM_PROMPT, contextText, routeHint, shortReplyHint, userMessage]
+  const geminiTools = getGeminiToolsForIntent(routeInfo?.intent);
+  const ragAvailable = geminiTools[0].functionDeclarations.some(
+    (tool) => tool.name === "rag_retrieve",
+  );
+
+  const finalPrompt = [
+    SYSTEM_PROMPT,
+    ragAvailable ? GROUNDED_RULES : null,
+    contextText,
+    routeHint,
+    shortReplyHint,
+    userMessage,
+  ]
     .filter(Boolean)
     .join("\n");
 
@@ -372,7 +394,9 @@ async function _runGeminiWithTools(
   const executedTools = new Set();
   let pendingAction = null; // ← THÊM
   let lastToolResult = null;
-  const geminiTools = getGeminiToolsForIntent(routeInfo?.intent);
+  let sources = new SourceRegistry();
+  // Văn bản được phép chứa số liệu mà không cần nguồn RAG (dữ liệu của chính user)
+  let personalTexts = [];
   console.log("[Gemini] Intent tools:", routeInfo?.intent || "fallback", {
     count: geminiTools[0].functionDeclarations.length,
     names: geminiTools[0].functionDeclarations.map((tool) => tool.name),
@@ -389,6 +413,8 @@ async function _runGeminiWithTools(
     executedTools.clear();
     pendingAction = null; // reset mỗi lần retry
     lastToolResult = null;
+    sources = new SourceRegistry();
+    personalTexts = [];
 
     let result = await chat.sendMessage(finalPrompt);
 
@@ -413,8 +439,13 @@ async function _runGeminiWithTools(
           console.log(`[Gemini] Tool: ${name}`, args);
 
           try {
-            const toolResult = await executeTool(name, args, userId);
+            const toolResult = await executeTool(name, args, userId, { sources });
             lastToolResult = toolResult;
+            if (name !== "rag_retrieve" && toolResult?.success !== false) {
+              personalTexts.push(
+                toolResult?.summary || JSON.stringify(toolResult?.data ?? "").slice(0, 4000),
+              );
+            }
             toolsUsed.push({ name, args, success: toolResult?.success ?? true });
             toolResponses.push({ functionResponse: { name, response: toolResult } });
 
@@ -460,6 +491,26 @@ async function _runGeminiWithTools(
       const textPart = parts.find((p) => p.text?.trim());
       if (textPart?.text?.trim()) {
         console.log(`[Gemini] Done at step ${step}`);
+
+        if (sources.ragCalled) {
+          // Kiểm tra chống ảo giác: số liệu phải có trong nguồn, [Sx] phải tồn tại
+          const grounded = await groundAnswer({
+            chat,
+            text: textPart.text,
+            registry: sources,
+            allowedContext: [
+              userMessage,
+              contextText,
+              ...history.filter((m) => m.role === "user").slice(-3).map((m) => m.content),
+              ...personalTexts,
+            ],
+          });
+          return {
+            ...buildResponse(grounded.text, toolsUsed, userMessage, grounded),
+            pendingAction,
+          };
+        }
+
         return { ...buildResponse(textPart.text, toolsUsed, userMessage), pendingAction }; // ← SỬA
       }
 
@@ -589,6 +640,8 @@ async function sendChatWithTools(userId, userMessage, userContext, sessionId) {
       disclaimer: geminiResult.disclaimer,
       hasDisclaimer: geminiResult.hasDisclaimer,
       dataSource: geminiResult.dataSource,
+      citations: geminiResult.citations || [],
+      grounding: geminiResult.grounding || null,
     },
     toolsUsed: geminiResult.toolsUsed,
   };

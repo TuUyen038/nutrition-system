@@ -22,6 +22,7 @@ const workoutRecommendationService = require("./workoutRecommendation.service");
 const workoutPlanService = require("./workoutPlan.service");
 const fitnessPlanService = require("./fitnessPlan.service");
 const ragClient = require("./ragClient.service");
+const { SourceRegistry, formatSourceBlock } = require("./grounding.service");
 // Helper: lấy ngày hôm nay dạng YYYY-MM-DD theo giờ VN
 function getTodayVN() {
   return new Date().toLocaleDateString("sv-SE", {
@@ -75,9 +76,10 @@ function getToolConfig(toolName) {
  * @param {string} toolName  - tên tool Gemini gọi
  * @param {Object} args      - arguments Gemini truyền vào
  * @param {string} userId    - user hiện tại (từ req.user._id)
+ * @param {Object} [ctx]     - ngữ cảnh của lượt chat, VD { sources: SourceRegistry } để đánh số nguồn RAG
  * @returns {Object}         - { success, data, summary, error? }
  */
-async function executeTool(toolName, args, userId) {
+async function executeTool(toolName, args, userId, ctx = {}) {
   try {
     switch (toolName) {
       case "search_recipes":
@@ -156,7 +158,7 @@ async function executeTool(toolName, args, userId) {
         return await _generateWeeklyFitnessPlan(userId);
 
       case "rag_retrieve":
-        return await _retrieveRag(args);
+        return await _retrieveRag(args, ctx);
 
       default:
         return {
@@ -175,7 +177,7 @@ async function executeTool(toolName, args, userId) {
   }
 }
 
-async function _retrieveRag(args = {}) {
+async function _retrieveRag(args = {}, ctx = {}) {
   const query = String(args.query || "").trim();
   const topK = Math.min(Math.max(Number(args.top_k) || 5, 1), 10);
 
@@ -187,37 +189,39 @@ async function _retrieveRag(args = {}) {
     };
   }
 
+  // Registry dùng chung cả lượt chat để nhiều lần gọi rag_retrieve không bị trùng mã S1
+  const registry = ctx.sources || new SourceRegistry();
+  registry.ragCalled = true;
+
   const result = await ragClient.retrieve(query, topK);
   const chunks = (result.chunks || []).filter((chunk) => chunk.relevant !== false);
 
   if (!chunks.length) {
     return {
       success: false,
-      data: { chunks: [], citations: [] },
-      summary: "Không tìm thấy thông tin phù hợp trong kho kiến thức đã kiểm duyệt.",
+      data: { sources: [], citations: [] },
+      summary:
+        "KHÔNG tìm thấy đoạn tài liệu nào đủ liên quan trong kho kiến thức đã kiểm duyệt. " +
+        "BẮT BUỘC trả lời rằng kho tài liệu hiện chưa có thông tin về nội dung này; " +
+        "KHÔNG dùng kiến thức riêng, KHÔNG đưa ra con số hay khuyến nghị.",
     };
   }
 
-  const citations = chunks.map((chunk) => ({
-    title: chunk.title,
-    org: chunk.org,
-    year: chunk.year,
-    url: chunk.url,
-    section: chunk.section,
+  const ids = chunks.map((chunk) => registry.add(chunk));
+  const sources = ids.map((id) => registry.get(id));
+  const citations = sources.map(({ id, title, org, year, url, section }) => ({
+    id, title, org, year, url, section,
   }));
 
   return {
     success: true,
-    data: { chunks, citations },
+    // Không gửi lại toàn bộ metadata chunk cho Gemini: nội dung đã nằm trong summary
+    data: { citations },
     summary:
-      "Đã tìm thấy thông tin trong kho kiến thức. Hãy trả lời dựa trên các đoạn " +
-      "tài liệu dưới đây và nêu nguồn khi phù hợp:\n\n" +
-      chunks
-        .map(
-          (chunk, index) =>
-            `[Nguồn ${index + 1}: ${chunk.title || "Tài liệu"}]\n${chunk.text}`,
-        )
-        .join("\n\n"),
+      `Tìm thấy ${sources.length} đoạn tài liệu đã kiểm duyệt (mã ${ids.join(", ")}). ` +
+      "Chỉ trả lời bằng thông tin trong các đoạn dưới đây, chép đúng số liệu, " +
+      "mỗi câu có số liệu/khuyến nghị kết thúc bằng mã nguồn [Sx]:\n\n" +
+      sources.map(formatSourceBlock).join("\n\n"),
   };
 }
 
