@@ -39,6 +39,28 @@ Câu hỏi user ─► Node ─► POST /router/classify ─► intent nhóm l�
 Kết quả mỗi chunk: `text`, `score` (cosine thô, hoặc điểm rerank nếu bật), `vector_score` (cosine thô), `rank_score` (điểm dùng để xếp hạng),
 `relevant`, `threshold`, `doc_id`, `title`, `org`, `year`, `url`, `lang`, `heading`, `section`, `h1..h5`.
 
+## Chống ảo giác (`/rag/verify`)
+
+Mọi câu trả lời có gọi `rag_retrieve` đều được kiểm tra trước khi trả cho user (`backend/services/grounding.service.js` → `app/grounding.py`):
+
+1. Node đánh số các chunk trong lượt chat là `[S1]`, `[S2]`... Gemini nhận các chunk kèm `GROUNDED_RULES`: chỉ dùng nội dung nguồn,
+   chép đúng số liệu, mỗi câu có số liệu kết thúc bằng `[Sx]`, nguồn rỗng thì nói chưa có thông tin.
+2. `POST /rag/verify` `{"answer", "sources": [{id, text, title, org, year, lang}], "allowed_context": [...], "semantic": null}`:
+   - **error** (câu trả lời không đạt): `invalid_citation` (`[Sx]` không tồn tại), `unsupported_number` (số không có trong nguồn nào),
+     `uncited_number` (câu có số liệu nhưng không có `[Sx]`).
+   - **warning**: `number_in_other_source`, `low_semantic_support` (cosine câu–chunk < `GROUNDING_SIM_THRESHOLD`), `uncited_recommendation`.
+   - `allowed_context`: câu hỏi, hồ sơ user, kết quả database tool; số trong đó không cần nguồn.
+   - Trả `passed`, `support_ratio`, `errors`, `warnings`, `sentences` và `fixed_answer` (đã bỏ câu có số bịa, tự gắn `[Sx]` cho câu quên trích).
+3. Không đạt → Gemini viết lại 1 lần kèm danh sách lỗi → vẫn không đạt → dùng `fixed_answer` + ghi chú "đã lược bỏ"
+   (không còn gì → câu từ chối cố định). Danh sách "Nguồn tham khảo" do code tạo từ các `[Sx]` thật sự được dùng.
+4. Response chat có thêm `message.citations` và `message.grounding` (`action`: `passed` | `regenerated` | `stripped` | `refused`,
+   `initialErrors` = lỗi của bản nháp đầu, dùng để đo mức "bịa").
+
+Biến `.env`: `GROUNDING_SEMANTIC` (1/0), `GROUNDING_SIM_THRESHOLD` (mặc định 0.78), `GROUNDING_IGNORE_NUMBERS` (mặc định `0,1`).
+Bên Node: `AI_VERIFY_TIMEOUT_MS` (mặc định 6000). ai-service tắt → không kiểm tra được, câu trả lời vẫn trả về với `grounding.checked=false`.
+
+Unit test (không cần model): `venv/bin/python -m unittest tests.test_grounding -v`
+
 ## Chunk và embedding
 
 - **Chunk theo section.** Mỗi chunk là nội dung của MỘT mục; dòng đầu chunk là tiêu đề mục đó (đã bỏ số mục "3.1.3."). Mục dài bị cắt theo token,
@@ -136,6 +158,44 @@ Lần chạy đầu tải model embedding `intfloat/multilingual-e5-base` (~1 GB
 `RERANK_MODEL=cross-encoder/mmarco-mMiniLMv2-L12-H384-v1`). Nếu `pip`/HuggingFace báo lỗi chứng chỉ SSL (mạng công ty có proxy), cần cấu hình
 chứng chỉ của công ty cho pip (`pip config set global.cert <file.pem>`) và cho Hugging Face (`REQUESTS_CA_BUNDLE`/`CURL_CA_BUNDLE`), hoặc cài ở mạng khác.
 
+## Quản lý tài liệu nguồn (`data/sources.yaml`)
+
+Nguyên tắc: nội dung trong `data/raw/*.md` là **nguyên văn** file gốc (PDF/HTML) tải từ trang chính thức. Chỉ được thêm front matter
+và dòng heading `##`; chỉnh sửa đoạn văn duy nhất được phép là bỏ số trích dẫn tham khảo kiểu `(101)` (`--drop-ref-marks`).
+
+```text
+data/
+  sources.yaml            sổ đăng ký: id, file, title, org, year, url, doi, original, sha256, license, status, verified_by...
+  sources/<id>/source.*   file gốc tải về (KHÔNG commit: bản quyền + dung lượng; sha256 trong sources.yaml chứng minh file không đổi)
+  drafts/<id>.md          bản nháp do source_to_md.py sinh (không commit)
+  raw/<id>.md             bản đã kiểm tra, được ingest
+```
+
+`status`: `draft` (ingest bỏ qua) → `checked` (check_sources PASS) → `verified` (người đã đối chiếu file gốc);
+`legacy` = tài liệu cũ chưa có file gốc (vẫn nạp, có cảnh báo); `rejected` = không dùng. File trong `raw/` chưa đăng ký vẫn nạp nhưng bị cảnh báo.
+
+```bash
+# 1. Tải file gốc (trình duyệt, hoặc API chính thức như Europe PMC) -> data/sources/<id>/source.pdf|html|xml
+# 2. Chuyển nguyên văn. Lệnh đầy đủ của từng tài liệu lưu ở trường `convert` trong sources.yaml
+venv/bin/python scripts/source_to_md.py us_physical_activity_guidelines_2018 --pages 29-31,57-63 --skip-headings "Learn More"
+#    PDF:  --pages, --skip-headings, --pdf-engine blocks (mặc định, giữ thứ tự đọc khi trang nhiều cột) | pymupdf4llm
+#    XML (PubMed Central/JATS): --skip-sections, --skip-tables, --max-heading-level
+#    Chung: --drop-ref-marks (bỏ số trích dẫn "(12)"), --exclude-paragraphs REGEX (bỏ đoạn), --stop-at, --out
+# 3. (tùy chọn) thêm/sửa heading ## trong data/drafts/<id>.md, KHÔNG sửa chữ đoạn văn
+# 4. Đối chiếu: mọi câu + mọi con số phải có trong file gốc, sha256 khớp, front matter khớp sources.yaml
+venv/bin/python scripts/check_sources.py us_physical_activity_guidelines_2018 --file data/drafts/us_physical_activity_guidelines_2018.md --verbose
+# 5. PASS -> chép sang data/raw/, status: checked, nạp
+venv/bin/python scripts/ingest.py --only us_physical_activity_guidelines_2018.md
+# Kiểm tra toàn bộ kho bất cứ lúc nào (exit code 1 nếu có FAIL):
+venv/bin/python scripts/check_sources.py
+```
+
+Chỉ bớt nội dung (chọn trang/mục/bảng/đoạn) là được phép; checker chỉ chứng minh "mọi chữ có trong gốc", không chứng minh
+"không thiếu ý", nên sau khi chuyển vẫn cần đọc lướt: bảng nhiều cột có đúng cột không, mục có đúng heading không.
+
+`check_sources.py` báo: số đoạn `exact` / `near` (≥90% trùng, thường do bảng PDF đảo cột, nên xem lại) / `not_found` (FAIL),
+số liệu không có trong gốc (FAIL), heading không có trong gốc (do người/AI thêm, cần duyệt bằng mắt).
+
 ## Nạp tài liệu (knowledge base)
 
 Bỏ tài liệu vào `data/raw/`:
@@ -191,6 +251,7 @@ hoặc đổi `--host 127.0.0.1` nếu chỉ backend trên cùng máy gọi tớ
 
 - `GET  /health` → `{status, model, chunks, reranker: {enabled, ready, model}}` (`chunks = 0` nghĩa là chưa chạy `ingest.py`)
 - `POST /router/classify` `{"text": "..."}` → `{intent, sub_intent, scores, method, latency_ms}`. `sub_intent` chỉ được giữ cho `chitchat`; các nhóm khác trả `null`.
+- `POST /rag/verify` → xem mục "Chống ảo giác"
 - `POST /rag/retrieve` `{"query": "...", "top_k": 5, "audiences": null}` → `{chunks, reranked, threshold, thresholds, audiences}` (`thresholds` = ngưỡng theo từng ngôn ngữ)
 - Tài liệu API tương tác: http://localhost:8000/docs
 

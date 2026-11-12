@@ -4,3 +4,7 @@ __pycache__/
 .env
 chroma_db/
 venv/
+
+# File gốc tài liệu (PDF/HTML) không commit: bản quyền + dung lượng. sha256 nằm trong data/sources.yaml
+data/sources/*/
+data/drafts/
