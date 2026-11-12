@@ -30,7 +30,7 @@ const { authenticate, authorize } = require("../middlewares/auth");
 // search & filter
 router.get("/search", getAllRecipe); // thay cho "/"
 router.get("/search/by-ingredient", searchByIngredientName);
-router.get("/search/by-name", findRecipeByName);
+router.get("/search/by-name/:foodName", findRecipeByName);
 
 // stats
 router.get("/stats", getRecipeStats);

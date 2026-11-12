@@ -135,15 +135,21 @@ exports.saveRecipeToDB = async (recipeData) => {
     };
 
     if (Array.isArray(normalized.ingredients)) {
-      normalized.ingredients = normalized.ingredients.map((ing) => ({
-        ...ing,
-        quantity: {
-          ...ing.quantity,
-          // ✅ Fallback to amount/unit nếu originalAmount/originalUnit không có
-          originalAmount: ing.quantity?.originalAmount ?? ing.quantity?.amount ?? "",
-          originalUnit: ing.quantity?.originalUnit ?? ing.quantity?.unit ?? "g",
-        },
-      }));
+      normalized.ingredients = normalized.ingredients.map((ing) => {
+        const rawName = ing.rawName ?? ing.rawText ?? ing.name ?? "";
+        return {
+          ...ing,
+          rawName,
+          rawText: ing.rawText ?? rawName,
+          name: ing.name ?? rawName,
+          quantity: {
+            ...ing.quantity,
+            // ✅ Fallback to amount/unit nếu originalAmount/originalUnit không có
+            originalAmount: ing.quantity?.originalAmount ?? ing.quantity?.amount ?? "",
+            originalUnit: ing.quantity?.originalUnit ?? ing.quantity?.unit ?? "g",
+          },
+        };
+      });
     }
 
     const newRecipe = new Recipe(normalized);

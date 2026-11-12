@@ -58,8 +58,15 @@ const recipeSchema = new mongoose.Schema(
           originalUnit: String,
         },
         note: String,
-        name: { type: String, required: true, trim: true },
+        source: {
+          type: String,
+          enum: ["ai", "manual"],
+          default: "manual",
+        },
+        // Tên chuẩn trong collection Ingredient. Có thể rỗng khi recipe còn là bản nháp.
+        name: { type: String, trim: true, default: "" },
         rawName: String,
+        rawText: String,
         absorptionRate: Number, //optional override cho tỉ lệ hấp thu
         role: String
       },
@@ -103,6 +110,11 @@ const recipeSchema = new mongoose.Schema(
       type: String,
       enum: ["admin", "user", "ai"],
       default: "admin",
+    },
+    status: {
+      type: String,
+      enum: ["draft", "published"],
+      default: "draft",
     },
     verified: { type: Boolean, default: true },
     // isPublic: { type: Boolean, default: false },

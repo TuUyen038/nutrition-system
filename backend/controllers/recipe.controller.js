@@ -44,6 +44,8 @@ const getAllRecipe = async (req, res) => {
   try {
     const {
       name,
+      search,
+      category,
       page = 1,
       limit = 20,
       sortBy = "createdAt",
@@ -51,13 +53,15 @@ const getAllRecipe = async (req, res) => {
     } = req.query;
 
     const query = {};
-    console.log("Query params:", name); // Log query params for debugging
-    if (name && name.trim()) {
+    const searchTerm = (name || search || "").trim();
+    if (searchTerm) {
       query.$or = [
-        { name: { $regex: name.trim(), $options: "i" } },
-        { description: { $regex: name.trim(), $options: "i" } },
+        { name: { $regex: searchTerm, $options: "i" } },
+        { description: { $regex: searchTerm, $options: "i" } },
       ];
     }
+
+    if (category) query.category = category;
 
     // Build sort
     const sort = {};
@@ -531,13 +535,26 @@ const validateRecipe = (data, isUpdate = false) => {
 
   if (
     data.category &&
-    !["main", "side", "dessert", "drink"].includes(data.category)
+    ![
+      "main",
+      "side",
+      "dessert",
+      "drink",
+      "base_starch",
+      "light_supplement",
+      "one_dish_meal",
+      "soup_veg",
+    ].includes(data.category)
   ) {
     errors.push("Danh mục không hợp lệ");
   }
 
   if (data.ingredients && !Array.isArray(data.ingredients)) {
     errors.push("Nguyên liệu phải là mảng");
+  }
+
+  if (data.status && !["draft", "published"].includes(data.status)) {
+    errors.push("Trạng thái món ăn không hợp lệ");
   }
 
   return errors;
@@ -612,9 +629,12 @@ const updateRecipe = async (req, res) => {
     // IMPORTANT: Match by name, not index! (vì user có thể reorder/delete)
     if (req.body.ingredients !== undefined) {
       updateData.ingredients = req.body.ingredients.map((newIng) => {
-        // Tìm ingredient cũ bằng name (không phải index)
+        // Ưu tiên match theo subdocument _id; fallback theo rawName/name.
         const oldIng = existingRecipe.ingredients?.find(
-          (ing) => ing.name === newIng.name || ing.rawName === newIng.rawName,
+          (ing) =>
+            (newIng._id && String(ing._id) === String(newIng._id)) ||
+            (newIng.rawName && ing.rawName === newIng.rawName) ||
+            ing.name === newIng.name,
         );
 
         // ✅ Merge quantity: lấy từ newIng, fallback to oldIng, fallback to defaults
@@ -637,6 +657,13 @@ const updateRecipe = async (req, res) => {
 
         return {
           ...newIng,
+          rawName: newIng.rawName ?? oldIng?.rawName ?? newIng.rawText ?? newIng.name,
+          rawText: newIng.rawText ?? oldIng?.rawText ?? newIng.rawName ?? newIng.name,
+          name: newIng.name ?? oldIng?.name ?? newIng.rawName,
+          ingredientId:
+            newIng.ingredientId !== undefined
+              ? newIng.ingredientId
+              : oldIng?.ingredientId ?? null,
           quantity: mergedQuantity,
         };
       });
@@ -649,10 +676,7 @@ const updateRecipe = async (req, res) => {
 
     // image
     if (req.body.imageUrl !== undefined) {
-      updateData.imageUrl =
-        req.body.imageUrl ||
-        existingRecipe.imageUrl ||
-        "https://res.cloudinary.com/denhj5ubh/image/upload/v1762249278/foodImages/na8m4c70iiitfjvkie9m.jpg";
+      updateData.imageUrl = req.body.imageUrl || null;
     }
 
     // ✅ chỉ calculate nutrition nếu ingredients hoặc servings thay đổi
