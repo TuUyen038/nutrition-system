@@ -9,6 +9,10 @@ const CATEGORIES = [
   { value: "side", label: "Món phụ" },
   { value: "dessert", label: "Tráng miệng" },
   { value: "drink", label: "Đồ uống" },
+  { value: "base_starch", label: "Tinh bột cơ bản" },
+  { value: "light_supplement", label: "Bổ sung nhẹ" },
+  { value: "one_dish_meal", label: "Món ăn một món" },
+  { value: "soup_veg", label: "Canh rau" },
 ];
 
 export default function RecipeFilters({

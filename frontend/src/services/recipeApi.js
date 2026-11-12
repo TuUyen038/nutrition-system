@@ -19,7 +19,7 @@ export const getRecipesByIngredients = async (keyword, page = 1, limit = 10) => 
       limit: String(limit),
     });
 
-    const response = await fetch(`${API_BASE_URL}/search-by-ingredient?${params.toString()}`, {
+    const response = await fetch(`${API_BASE_URL}/search/by-ingredient?${params.toString()}`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -54,7 +54,7 @@ export const getRecipes = async ({
   try {
     const params = new URLSearchParams();
 
-    if (search && search.trim()) params.append("search", search.trim());
+    if (search && search.trim()) params.append("name", search.trim());
     if (category && category !== "all") params.append("category", category);
     if (page != null) params.append("page", page);
     if (limit != null) params.append("limit", limit);
@@ -62,18 +62,11 @@ export const getRecipes = async ({
     if (sortOrder) params.append("sortOrder", sortOrder);
 
     const queryString = params.toString();
-    const url = queryString ? `${API_BASE_URL}?${queryString}` : API_BASE_URL;
+    const url = `${API_BASE_URL}/search${queryString ? `?${queryString}` : ""}`;
 
     const token = getToken();
     if (!token) {
       throw new Error("Chưa đăng nhập");
-    }
-
-    const headers = {
-      "Content-Type": "application/json",
-    };
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
     }
 
     const response = await fetch(url, {
@@ -184,7 +177,7 @@ export const searchRecipesByImage = async (imageFile, page = 1, limit = 20) => {
       limit: String(limit),
     });
 
-    const response = await fetch(`${API_BASE_URL}/search-by-image?${params.toString()}`, {
+    const response = await fetch(`${API_BASE_URL}/ai/search-by-image?${params.toString()}`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -207,7 +200,9 @@ export const searchRecipesByImage = async (imageFile, page = 1, limit = 20) => {
 
 export const findRecipeByFoodName = async (foodName) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/${encodeURIComponent(foodName)}`);
+    const response = await fetch(
+      `${API_BASE_URL}/search/by-name/${encodeURIComponent(foodName)}`
+    );
 
     if (!response.ok) {
       console.warn(`Không tìm thấy công thức trong DB cho "${foodName}".`);
@@ -234,7 +229,7 @@ export const findRecipeById = async (recipeId) => {
     if (!token) {
       throw new Error("Chưa đăng nhập");
     }
-    const response = await fetch(`${API_BASE_URL}/id/${recipeId}`, {
+    const response = await fetch(`${API_BASE_URL}/${recipeId}`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -260,7 +255,7 @@ export const getBackUpNutrition = async (ingrs) => {
     }
     // chỉ lấy mảng tên string
     const names = ingrs.map((ingr) => ingr.name);
-    const response = await fetch(`${API_BASE_URL}/back-up-nutrition`, {
+    const response = await fetch(`${API_BASE_URL}/nutrition/fallback`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -332,7 +327,7 @@ export const getIngredientSubstitutions = async (
       headers.Authorization = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${API_BASE_URL}/substitutions`, {
+    const response = await fetch(`${API_BASE_URL}/ingredients/substitutions`, {
       method: "POST",
       headers,
       body: JSON.stringify({
@@ -373,7 +368,7 @@ export const getIngredientsInAi = async (recipe, servings = null) => {
       body.servings = servings;
     }
 
-    const response = await fetch(`${API_BASE_URL}/ingredients`, {
+    const response = await fetch(`${API_BASE_URL}/ai/extract-ingredients`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -395,7 +390,7 @@ export const getIngredientsInAi = async (recipe, servings = null) => {
   }
 };
 
-export async function createRecipe(recipeData, token) {
+export async function createRecipe(recipeData) {
   try {
     const token = getToken();
     if (!token) {
@@ -426,7 +421,7 @@ export async function createRecipe(recipeData, token) {
  * 🟡 Lấy danh sách công thức của người dùng
  */
 export async function getUserRecipes(userId, token) {
-  const res = await fetch(`${API_BASE_URL}?ownerId=${userId}`, {
+  const res = await fetch(`${API_BASE_URL}/search?ownerId=${userId}`, {
     headers: {
       "Content-Type": "application/json",
       ...(token && { Authorization: `Bearer ${token}` }),
@@ -450,7 +445,11 @@ export async function getRecipeById(id) {
     if (!token) {
       throw new Error("Chưa đăng nhập");
     }
-  const res = await fetch(`${API_BASE_URL}/${id}`);
+  const res = await fetch(`${API_BASE_URL}/${id}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
   if (!res.ok) throw new Error("Không thể lấy chi tiết công thức.");
   return await res.json();
   } catch (error) {
@@ -562,7 +561,7 @@ export async function checkDuplicateName(name, excludeId = null) {
     if (!token) {
       throw new Error("Chưa đăng nhập");
     }
-    const response = await fetch(`${API_BASE_URL}/check-duplicate?${params}`, {
+    const response = await fetch(`${API_BASE_URL}/validate/duplicate-name?${params}`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",

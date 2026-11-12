@@ -107,25 +107,10 @@ function IngredientManagement() {
     }
   };
 
-  const fetchStats = async () => {
-    try {
-      setStatsLoading(true);
-      const statsData = await getIngredientStats();
-      setStats(statsData);
-    } catch (err) {
-      console.error("Fetch stats error:", err);
-    } finally {
-      setStatsLoading(false);
-    }
-  };
 
   useEffect(() => {
     fetchData();
   }, [search, page, sortBy, sortOrder]);
-
-  useEffect(() => {
-    fetchStats();
-  }, []);
 
   // Reset page khi filter thay đổi
   useEffect(() => {
@@ -156,7 +141,6 @@ function IngredientManagement() {
       await deleteIngredient(ingredientToDelete._id);
       showSuccess(`Đã xóa nguyên liệu "${ingredientToDelete.name}"`);
       await fetchData();
-      await fetchStats();
       setDeleteDialogOpen(false);
       setIngredientToDelete(null);
     } catch (err) {
@@ -218,7 +202,6 @@ function IngredientManagement() {
       }
 
       await fetchData();
-      await fetchStats();
       handleDialogClose();
     } catch (err) {
       const errorMessage = handleError(err);

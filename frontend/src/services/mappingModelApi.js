@@ -10,9 +10,17 @@ export async function fetchIngredientsNutrition(ingredientsArr, topK = 5) {
   try {
     // Chuyển đổi mảng string sang định dạng API yêu cầu
     const payload = {
-      ingredients: ingredientsArr.map(inObj => ({ name: inObj.name })),
+      ingredients: ingredientsArr.map((inObj) => ({
+        // Semantic search phải dùng tên thô từ Gemini, không dùng tên chuẩn đã lưu.
+        name: inObj.rawName || inObj.name || "",
+      })),
       top_k: topK
     };
+
+    console.groupCollapsed("[Mapping] Gọi search service");
+    console.log("URL:", `${API_BASE_URL}/search_batch`);
+    console.log("Payload:", payload);
+    console.groupEnd();
 
     const response = await fetch(`${API_BASE_URL}/search_batch`, {
       method: "POST",
@@ -23,13 +31,15 @@ export async function fetchIngredientsNutrition(ingredientsArr, topK = 5) {
     });
 
     if (!response.ok) {
+      console.error("[Mapping] search service trả lỗi:", response.status, response.statusText);
       throw new Error(`API error: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json();
+    console.log("[Mapping] search service response:", data);
     return data.results; // mảng [{ input, results: [...] }, ...]
   } catch (error) {
-    console.error("Error fetching ingredients nutrition:", error);
+    console.error("[Mapping] Không gọi được search service:", error);
     return [];
   }
 }

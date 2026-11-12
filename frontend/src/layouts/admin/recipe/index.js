@@ -23,20 +23,23 @@ import {
   deleteRecipe,
   checkDuplicateName,
 } from "services/recipeApi";
-import { getIngredients } from "services/ingredientApi";
+import { createIngredient, getIngredients } from "services/ingredientApi";
 
 import { useToast } from "context/ToastContext";
 import { handleError } from "utils/errorHandler";
 
 function toUiIngredientRow(input) {
   const id = input._id?.toString?.() || crypto.randomUUID();
-  console.log(">>>>toUiIngredientRow", input);
   return {
     _id: input._id?.toString?.(),
 
     name: input?.name || "",
 
     rawName: input?.rawName || "",
+
+    rawText: input?.rawText || input?.rawName || input?.name || "",
+
+    source: input?.source || (input?.rawName ? "ai" : "manual"),
 
     quantity: {
       amount: input?.quantity?.amount ?? "",
@@ -104,7 +107,6 @@ function RecipeManagement() {
         sortBy,
         sortOrder,
       });
-
       if (result.data && result.pagination) {
         setRecipes(result.data);
         setPagination(result.pagination);
@@ -155,7 +157,6 @@ function RecipeManagement() {
       }
 
       setAllIngredients(allIngredientsList);
-      console.log(`Đã tải ${allIngredientsList.length} nguyên liệu cho mapping`);
     } catch (err) {
       console.error("Fetch ingredients for mapping error:", err);
       // Fallback: thử lấy với limit nhỏ hơn nếu lỗi
@@ -257,7 +258,7 @@ function RecipeManagement() {
       if (formData.description !== undefined) payload.description = formData.description;
       if (formData.category !== undefined) payload.category = formData.category;
       if (formData.servings !== undefined) payload.servings = formData.servings;
-      if (formData.imageUrl) payload.imageUrl = formData.imageUrl;
+      if (formData.imageUrl !== undefined) payload.imageUrl = formData.imageUrl || "";
       if (formData.status !== undefined) payload.status = formData.status;
 
       if (formData.instructionsText !== undefined) {
@@ -276,7 +277,11 @@ function RecipeManagement() {
         payload.ingredients = formData.ingredients
           .map((row) => {
             const original = originalMap.get(String(row._id));
-            const nameToSave = row.mappingName || row.name;
+            const isManualRow = row.source === "manual";
+            const rawName = isManualRow ? "" : row.rawName || row.rawText || row.name || "";
+            // Chỉ lưu name sau khi admin đã chọn nguyên liệu chuẩn hoá.
+            // mappingName là candidate hiển thị tạm thời, không phải giá trị đã xác nhận.
+            const nameToSave = row.name || "";
 
             const amount = Number(row.quantity?.amount) || 0;
 
@@ -290,8 +295,10 @@ function RecipeManagement() {
 
             return {
               _id: row._id ?? undefined,
-              rawName: original?.rawName ?? null,
-              name: nameToSave ?? null,
+              rawName: original?.rawName ?? rawName,
+              rawText: original?.rawText ?? row.rawText ?? rawName,
+              source: row.source || (rawName ? "ai" : "manual"),
+              name: nameToSave,
               note: row.note ?? null,
 
               ingredientId: row.ingredientId ?? undefined,
@@ -305,20 +312,20 @@ function RecipeManagement() {
                   original?.quantity?.originalUnit ?? row.quantity?.originalUnit ?? null,
               },
 
-              isOptional: Boolean(row?.flags?.optional),
             };
           })
           .filter((ing) => ing.rawName || ing.name);
       }
       // SAVE
+      const isDraft = formData.status === "draft";
       if (editingRecipe?._id) {
         console.log("payload con lai:", payload);
         await updateRecipe(editingRecipe._id, payload);
-        showSuccess("Cập nhật món ăn thành công");
+        showSuccess(isDraft ? "Đã lưu bản nháp món ăn" : "Cập nhật món ăn thành công");
       } else {
         console.log("payload con lai:", payload);
         await createRecipe(payload);
-        showSuccess("Thêm món ăn thành công");
+        showSuccess(isDraft ? "Đã lưu bản nháp món ăn" : "Thêm món ăn thành công");
       }
 
       await fetchRecipes();
@@ -332,6 +339,12 @@ function RecipeManagement() {
   const handleSort = (field, order) => {
     setSortBy(field);
     setSortOrder(order);
+  };
+
+  const handleCreateIngredient = async (ingredientData) => {
+    const created = await createIngredient(ingredientData);
+    setAllIngredients((current) => [...current, created]);
+    return created;
   };
 
   const handlePageChange = (newPage) => {
@@ -397,6 +410,7 @@ function RecipeManagement() {
         onSubmit={handleDialogSubmit}
         recipe={editingRecipe}
         allIngredients={allIngredients}
+        onCreateIngredient={handleCreateIngredient}
       />
 
       <DeleteConfirmDialog
