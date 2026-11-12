@@ -4,7 +4,7 @@ const userSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
     email: { type: String, required: true},
-    password: { type: String, required: true, select: false }, // Không trả về password khi query
+    password: { type: String, required: true }, // Không trả về password khi query
     role: {
       type: String,
       enum: ["USER", "ADMIN"],

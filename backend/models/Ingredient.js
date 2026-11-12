@@ -4,10 +4,10 @@ const externalRefSchema = new mongoose.Schema(
   {
     provider: {
       type: String,
-      enum: ["usda_fdc", "edamam", "openfoodfacts", "fatsecret", "other"],
+      enum: ["usda_fdc", "edamam", "openfoodfacts", "fatsecret", "other", "VTN_FCT_2007"],
       required: true,
     },
-    external_id: { type: String, required: true }, // e.g. USDA fdcId
+    external_id: { type: String}, // e.g. USDA fdcId
 
     confidence: { type: Number, min: 0, max: 1, default: 0 },
     data_type: { type: String, default: "" }, // e.g. USDA: Foundation, SR Legacy, Branded...
@@ -48,7 +48,7 @@ const ingredientSchema = new mongoose.Schema(
       ],
       default: "other",
     },
-    source: { type: String },
+    source: { type: String, default: "other" },
     external_refs: { type: [externalRefSchema], default: [] },
   },
   { timestamps: true }

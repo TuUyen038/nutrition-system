@@ -41,7 +41,7 @@ function IngredientFormDialog({ open, onClose, onSubmit, ingredient }) {
     fiber: "0",
     sugar: "0",
     sodium: "0",
-    source: "",
+    source: "other",
   });
 
   useEffect(() => {
@@ -59,7 +59,7 @@ function IngredientFormDialog({ open, onClose, onSubmit, ingredient }) {
         fiber: n.fiber ?? "0",
         sugar: n.sugar ?? "0",
         sodium: n.sodium ?? "0",
-        source: n.source || "0",
+        source: ingredient.external_refs?.[0]?.provider || "other",
       });
     } else {
       setForm({
@@ -74,7 +74,7 @@ function IngredientFormDialog({ open, onClose, onSubmit, ingredient }) {
         fiber: "",
         sugar: "",
         sodium: "",
-        source: "",
+        source: "other",
       });
     }
   }, [ingredient, open]);
@@ -103,7 +103,7 @@ function IngredientFormDialog({ open, onClose, onSubmit, ingredient }) {
         sugar: form.sugar === "" ? 0 : Number(form.sugar),
         sodium: form.sodium === "" ? 0 : Number(form.sodium),
       },
-      source: form.source.trim() || undefined,
+      source: form.external_refs?.[0]?.provider || "other",
     };
     console.log("Submitting ingredient:", payload);
     onSubmit(payload);
@@ -237,6 +237,12 @@ IngredientFormDialog.propTypes = {
       sugar: PropTypes.number,
       sodium: PropTypes.number,
     }),
+    external_refs: PropTypes.arrayOf(
+      PropTypes.shape({
+        provider: PropTypes.string,
+        external_id: PropTypes.string,
+      })
+    ),
   }),
 };
 

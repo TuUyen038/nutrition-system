@@ -15,6 +15,10 @@ const CATEGORY_LABEL = {
   side: "Món phụ",
   dessert: "Tráng miệng",
   drink: "Đồ uống",
+  base_starch: "Tinh bột cơ bản",
+  light_supplement: "Bổ sung nhẹ",
+  one_dish_meal: "Món ăn một món",
+  soup_veg: "Canh rau",
 };
 
 function Ellipsis({ text, variant = "caption", fontWeight }) {

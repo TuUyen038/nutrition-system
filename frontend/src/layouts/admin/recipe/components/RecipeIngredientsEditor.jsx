@@ -107,6 +107,7 @@ export default function RecipeIngredientsEditor({
   useEffect(() => saveAlias(aliasMap), [aliasMap]);
 
   const [mappingLoading, setMappingLoading] = useState(false);
+  const [mappingSignature, setMappingSignature] = useState("");
   const [mappingVisible, setMappingVisible] = useState(false);
 
   // dialog create ingredient
@@ -126,8 +127,31 @@ export default function RecipeIngredientsEditor({
 
   // raw list = only AI rows (manual rows not shown here to keep "nguồn gốc mapping" rõ ràng)
   const rawRows = useMemo(() => {
-    return rows.filter((r) => r?.source !== "manual" && (r?.name || "").trim());
+    return rows.filter(
+      (r) => r?.source !== "manual" && (r?.rawName || r?.name || "").trim()
+    );
   }, [rows]);
+  // Chỉ những dòng chưa có tên chuẩn mới cần gọi lại semantic search.
+  const pendingRawRows = useMemo(
+    () => rawRows.filter((r) => !(r?.name || "").trim()),
+    [rawRows]
+  );
+  const pendingSignature = useMemo(
+    () => pendingRawRows.map((r) => normalizeText(r.rawName || r.name)).join("|"),
+    [pendingRawRows]
+  );
+  const mappingAlreadyAttempted = useMemo(
+    () =>
+      pendingRawRows.length > 0 &&
+      pendingRawRows.every(
+        (row) =>
+          row.mappingAttempted ||
+          row.mappingName ||
+          row.mappingCandidates?.length > 0 ||
+          typeof row.mappingScore === "number"
+      ),
+    [pendingRawRows]
+  );
   // mapped list = all rows (AI + manual additions)
   const mappedRows = rows;
   // Get mapped rows that correspond to raw rows (for alignment)
@@ -170,23 +194,30 @@ export default function RecipeIngredientsEditor({
   const handlePickIngredient = (index, opt) => {
     const next = [...mappedRows];
     const ingredientName = opt ? opt.name || opt.name_en || "" : "";
+    const isManualRow = next[index]?.source === "manual";
 
     next[index] = {
       ...next[index],
       ingredientId: opt?._id || null,
+      // Khi admin chọn candidate mới, name phải là tên mới; không giữ tên cũ.
+      name: opt ? ingredientName : "",
+      // Dòng thêm thủ công cũng có rawName; với dòng AI, giữ nguyên rawName ban đầu.
+      rawName: isManualRow ? "" : next[index].rawName || next[index].name || ingredientName,
+      rawText: isManualRow
+        ? ""
+        : next[index].rawText || next[index].rawName || next[index].name || ingredientName,
       // hiển thị mappingName theo DB sau khi chọn
-      mappingName: opt ? ingredientName || next[index].mappingName || "" : next[index].mappingName,
-      // Giữ nguyên name hiện tại nếu đã có, chỉ set nếu rỗng
-      name:
-        next[index].name && next[index].name.trim()
-          ? next[index].name
-          : ingredientName || next[index].name || "",
+      mappingName: opt ? ingredientName : "",
+      // Score/candidates cũ thuộc candidate trước, không được giữ lại.
+      mappingScore: null,
+      mappingCandidates: [],
+      mappingAttempted: Boolean(opt),
     };
     onChange(next);
     stopEdit();
 
     // learning alias: raw AI name -> ingredientId
-    const rawName = (next[index]?.name || "").trim();
+    const rawName = (next[index]?.rawName || next[index]?.name || "").trim();
     if (opt?._id && rawName) {
       const key = normalizeText(rawName);
       setAliasMap((p) => ({
@@ -292,20 +323,29 @@ export default function RecipeIngredientsEditor({
 
   // ---- AUTO MAPPING FLOW ----
   const runAutoMapping = async () => {
-    if (!rawRows.length) {
-      console.log("❌ runAutoMapping: No rawRows, returning early");
+    console.log("[Mapping UI] runAutoMapping được gọi", {
+      pendingCount: pendingRawRows.length,
+      pendingRawNames: pendingRawRows.map((row) => row.rawName),
+    });
+    if (!pendingRawRows.length) {
+      console.warn("[Mapping UI] Không có pendingRawRows, bỏ qua search service");
       return;
     }
 
     try {
-      console.log("runAutoMapping: Starting...");
+      console.groupCollapsed("[Mapping UI] Bắt đầu semantic mapping");
+      console.log(
+        "pendingRawRows:",
+        pendingRawRows.map((row) => ({ id: row._id, rawName: row.rawName, name: row.name }))
+      );
+      console.groupEnd();
       setMappingLoading(true);
       setMappingVisible(true);
 
       // map only AI rows, keep manual rows untouched
       const aiIndexes = [];
       const aiPayload = [];
-      rawRows.forEach((r) => {
+      pendingRawRows.forEach((r) => {
         const idx = mappedRows.findIndex((x) => x?._id === r?._id);
         if (idx >= 0) {
           aiIndexes.push(idx);
@@ -314,7 +354,7 @@ export default function RecipeIngredientsEditor({
       });
 
       const results = await fetchIngredientsNutrition(aiPayload, 3);
-      console.log("vao fetchMapping")
+      console.log("[Mapping UI] Kết quả search service:", results);
       const next = [...mappedRows];
       results.forEach((item, i) => {
         const targetIdx = aiIndexes[i];
@@ -326,65 +366,52 @@ export default function RecipeIngredientsEditor({
         const mappingName = top ? extractTopName(top) : "";
         const mappingScore = top ? extractScore(top) : null;
 
+        console.log("[Mapping UI] Mapping row:", {
+          rawName: next[targetIdx]?.rawName,
+          input: item?.input,
+          mappingName,
+          mappingScore,
+          topCandidate: top,
+        });
+
         // set grams from AI quantity if possible (g/kg)
         const q = next[targetIdx]?.quantity || {};
         const grams = toGram(q.amount, q.unit);
 
-        // Auto-select ingredientId from mongo_id if exact match or high score
-        let autoIngredientId = null;
-        let autoIngredientLabel = "";
-        if (top && (top.exact_alias_match || (mappingScore && mappingScore >= 0.9))) {
-          // Use mongo_id if available, fallback to id
-          autoIngredientId = top.mongo_id || null;
-          autoIngredientLabel = top.name_vi || top.name || "";
-        }
-
-        // ✅ Chỉ update mapping fields nếu chưa có ingredientId (chưa được user chọn)
-        // Nếu user đã chọn rồi (có ingredientId), giữ nguyên data đã chỉnh sửa
+        // Candidate và score chỉ để admin xem xét. Không tự ghi candidate thành mapping đã xác nhận.
         const hasUserSelection = !!next[targetIdx].ingredientId;
         next[targetIdx] = {
           ...next[targetIdx],
-          // ✅ Chỉ update mapping fields nếu chưa có user selection
+          mappingAttempted: true,
           mappingName: hasUserSelection ? next[targetIdx].mappingName : mappingName,
-          mappingCandidates: hasUserSelection ? next[targetIdx].mappingCandidates : candidates,
-          mappingScore: hasUserSelection ? next[targetIdx].mappingScore : mappingScore,
-          // Auto-set ingredientId if exact match or high score (chỉ khi chưa có)
-          ingredientId: hasUserSelection
-            ? next[targetIdx].ingredientId
-            : autoIngredientId || next[targetIdx].ingredientId || null,
-          // ingredientLabel: hasUserSelection
-          //   ? next[targetIdx].ingredientLabel
-          //   : autoIngredientLabel || next[targetIdx].ingredientLabel || "",
-          // ✅ Chỉ update quantity nếu chưa có user selection
-          quantity:
-            hasUserSelection && next[targetIdx].quantity?.amount
-              ? next[targetIdx].quantity
-              : {
-                amount: grams !== "" ? grams : q.unit === "g" ? q.amount : "",
-                unit: "g",
-                originalAmount: q.originalAmount ?? null,
-                originalUnit: q.originalUnit ?? null,
-                estimate: Boolean(q.estimate),
-              },
+          mappingCandidates: candidates,
+          mappingScore,
+          quantity: hasUserSelection && next[targetIdx].quantity?.amount
+            ? next[targetIdx].quantity
+            : {
+              amount: grams !== "" ? grams : q.unit === "g" ? q.amount : "",
+              unit: "g",
+              originalAmount: q.originalAmount ?? null,
+              originalUnit: q.originalUnit ?? null,
+              estimate: Boolean(q.estimate),
+            },
         };
-
-        // apply alias auto select if exists (only if not already set from mapping)
-        if (!next[targetIdx].ingredientId) {
-          const key = normalizeText(next[targetIdx].name);
-          const saved = aliasMap[key];
-          if (saved?.ingredientId) {
-            next[targetIdx].ingredientId = saved.ingredientId;
-            // next[targetIdx].mappingName = saved.label || "";
-            // show name in mappingName if mappingName empty
-            if (!next[targetIdx].mappingName) next[targetIdx].mappingName = saved.label || "";
-          }
-        }
       });
 
       onChange(next);
       setEditingIndex(null);
+      console.log(
+        "[Mapping UI] Đã cập nhật state mapping:",
+        next.map((row) => ({
+          rawName: row.rawName,
+          name: row.name,
+          mappingName: row.mappingName,
+          mappingScore: row.mappingScore,
+          ingredientId: row.ingredientId,
+        }))
+      );
     } catch (err) {
-      console.error("Auto mapping error:", err);
+      console.error("[Mapping UI] Lỗi semantic mapping:", err);
     } finally {
       setMappingLoading(false);
     }
@@ -392,45 +419,58 @@ export default function RecipeIngredientsEditor({
 
   // auto trigger mapping when raw names signature changes
   useEffect(() => {
-    const sig = rawRows.map((r) => normalizeText(r.name)).join("|");
+    const sig = pendingSignature;
+    console.log("[Mapping UI] useEffect kiểm tra mapping:", {
+      aiLoading,
+      rowsCount: rows.length,
+      rawRowsCount: rawRows.length,
+      pendingRawRowsCount: pendingRawRows.length,
+      pendingRawNames: pendingRawRows.map((row) => row.rawName),
+      signature: sig,
+      lastSignature: lastRawSigRef.current,
+    });
     if (!sig) {
       // Reset refs when no raw rows
       lastRawSigRef.current = "";
       hasRunMappingRef.current = false;
+      setMappingSignature("");
       return;
     }
 
-    // ✅ Kiểm tra xem đã có mapping data chưa (tránh chạy lại khi remount)
-    const hasMappingData = mappedRows.some(
-      (r) => r.mappingName || r.mappingCandidates?.length > 0 || r.mappingScore !== null
-    );
+    // Bước 3 có thể mount trong lúc Gemini vẫn đang chạy. Chờ đến khi
+    // danh sách raw hoàn tất rồi mới đánh dấu signature và gọi semantic search.
+    if (aiLoading) {
+      console.log("[Mapping UI] Chưa gọi search_batch vì Gemini vẫn loading");
+      return;
+    }
 
-    // ✅ Chỉ chạy mapping khi:
-    // 1. Signature thay đổi (rawRows từ AI mới) và không đang loading
-    // 2. Chưa có mapping data (lần đầu) và không đang loading
-    // 3. KHÔNG chạy lại khi remount với cùng signature và đã có mapping data
-    if (sig !== lastRawSigRef.current && !aiLoading) {
-      // Signature thay đổi: chỉ chạy khi thực sự có thay đổi từ AI
+    // Component bước 3 có thể bị unmount khi người dùng quay lại bước 2.
+    // Nếu kết quả mapping đã có trong form state thì dùng lại, không gọi API lần nữa.
+    if (mappingAlreadyAttempted) {
       lastRawSigRef.current = sig;
       hasRunMappingRef.current = true;
-      runAutoMapping();
-    } else if (
-      sig === lastRawSigRef.current &&
-      !hasMappingData &&
-      !hasRunMappingRef.current &&
-      !aiLoading
-    ) {
-      // Lần đầu mount với signature này và chưa có mapping data: chạy mapping một lần
-      hasRunMappingRef.current = true;
-      runAutoMapping();
-    } else if (sig === lastRawSigRef.current) {
-      // Signature giống: cập nhật ref để giữ sync, nhưng không chạy mapping lại
-      // (tránh overwrite data đã chỉnh sửa khi remount)
-      if (!hasRunMappingRef.current && hasMappingData) {
-        hasRunMappingRef.current = true; // Đánh dấu đã có mapping data
-      }
+      setMappingSignature(sig);
+      console.log("[Mapping UI] Dùng lại mapping đã lưu trong frontend, không gọi lại search_batch");
+      return;
     }
-  }, [aiLoading]);
+
+    // Chỉ chạy một lần cho mỗi danh sách rawName.
+    if (sig !== lastRawSigRef.current) {
+      console.log("[Mapping UI] Trigger search_batch với signature:", sig);
+      lastRawSigRef.current = sig;
+      hasRunMappingRef.current = true;
+      setMappingSignature(sig);
+      runAutoMapping();
+    } else {
+      console.log("[Mapping UI] Không gọi lại search_batch vì signature đã được xử lý");
+    }
+  }, [aiLoading, pendingSignature]);
+
+  const mappingWaiting = Boolean(
+    pendingSignature &&
+      !mappingAlreadyAttempted &&
+      mappingSignature !== pendingSignature
+  );
 
   return (
     <MDBox>
@@ -581,7 +621,7 @@ export default function RecipeIngredientsEditor({
 
             <Divider sx={{ mb: 1.5 }} />
 
-            {mappingLoading ? (
+            {mappingLoading || mappingWaiting ? (
               <MDBox display="flex" flexDirection="column" gap={1.25}>
                 <LinearProgress />
                 <MDTypography variant="caption" color="text" sx={{ textAlign: "center" }}>
@@ -673,7 +713,7 @@ export default function RecipeIngredientsEditor({
                                 fullWidth
                                 size="small"
                                 label="Tên nguyên liệu mapping"
-                                value={row.mappingName || row.name || ""}
+                                value={row.mappingName || row.name || "Chưa có kết quả mapping"}
                                 InputProps={{ readOnly: true }}
                                 placeholder="Chưa có gợi ý mapping - Click để chọn"
                                 onClick={() => startEdit(actualIndex)}
@@ -693,26 +733,10 @@ export default function RecipeIngredientsEditor({
                               gap={0.5}
                               flexWrap="wrap"
                             >
-                              {onCreateIngredient ? (
-                                <Chip
-                                  size="small"
-                                  variant="outlined"
-                                  clickable
-                                  onClick={() => openCreateDialog(actualIndex)}
-                                  label="+ Tạo mới"
-                                  color="info"
-                                  sx={{ height: 20, fontSize: "0.65rem" }}
-                                />
-                              ) : null}
                               {/* Score text - góc dưới bên trái */}
-                              {(isMapped || typeof row.mappingScore === "number") &&
+                              {typeof row.mappingScore === "number" &&
                                 (() => {
-                                  let scorePercent;
-                                  if (isMapped && typeof row.mappingScore === "number") {
-                                    scorePercent = Math.round(row.mappingScore * 100);
-                                  } else {
-                                    return null;
-                                  }
+                                  const scorePercent = Math.round(row.mappingScore * 100);
                                   const isGreen = scorePercent >= 90;
                                   return (
                                     <MDTypography
@@ -833,7 +857,7 @@ export default function RecipeIngredientsEditor({
                                     fullWidth
                                     size="small"
                                     label="Tên nguyên liệu mapping"
-                                    value={row.mappingName || ""}
+                                    value={row.mappingName || row.name || "Chưa có kết quả mapping"}
                                     InputProps={{ readOnly: true }}
                                     placeholder="Chưa có gợi ý mapping - Click để chọn"
                                     onClick={() => startEdit(actualIndex)}
@@ -852,17 +876,6 @@ export default function RecipeIngredientsEditor({
                                   gap={0.5}
                                   flexWrap="wrap"
                                 >
-                                  {onCreateIngredient ? (
-                                    <Chip
-                                      size="small"
-                                      variant="outlined"
-                                      clickable
-                                      onClick={() => openCreateDialog(actualIndex)}
-                                      label="+ Tạo mới"
-                                      color="info"
-                                      sx={{ height: 20, fontSize: "0.65rem" }}
-                                    />
-                                  ) : null}
                                   {/* Score text - góc dưới bên trái */}
                                   {(isMapped || typeof row.mappingScore === "number") &&
                                     (() => {

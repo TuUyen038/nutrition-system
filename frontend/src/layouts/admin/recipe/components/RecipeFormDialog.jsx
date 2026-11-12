@@ -41,6 +41,10 @@ const CATEGORY_OPTIONS = [
   { value: "side", label: "Món phụ" },
   { value: "dessert", label: "Tráng miệng" },
   { value: "drink", label: "Đồ uống" },
+  { value: "base_starch", label: "Tinh bột cơ bản" },
+  { value: "light_supplement", label: "Bổ sung nhẹ" },
+  { value: "one_dish_meal", label: "Món ăn một món" },
+  { value: "soup_veg", label: "Canh rau" },
 ];
 
 const STEPS = [
@@ -225,11 +229,21 @@ export default function RecipeFormDialog({
       const aiResult = await getIngredientsInAi(text);
       const aiIngredients = aiResult?.ingredients || [];
 
+      console.log("[Recipe AI] Kết quả extract ingredients:", aiResult);
+      console.log(
+        "[Recipe AI] Số raw ingredients tạo ra:",
+        aiIngredients.length,
+        aiIngredients
+      );
+
       const rows = aiIngredients.map((item) => ({
         _id: new ObjectId().toString(),
         source: "ai",
-        name: item?.name || "",
-        rawText: item?.rawText || "",
+        // Gemini chỉ tạo nguyên liệu thô. Tên chuẩn sẽ được gán sau khi admin
+        // chọn kết quả semantic search.
+        name: "",
+        rawName: item?.rawName || item?.name || "",
+        rawText: item?.rawText || item?.rawName || item?.name || "",
         note: item?.note || "",
         quantity: {
           amount: item?.quantity?.amount ?? "",
@@ -250,6 +264,7 @@ export default function RecipeFormDialog({
       }));
 
       setForm((p) => ({ ...p, ingredients: rows }));
+      console.log("[Recipe AI] Đã set ingredients vào form và chuyển sang bước 3:", rows);
       setActiveStep(2);
     } catch (err) {
       console.error("AI analyze ingredients error:", err);
@@ -329,7 +344,9 @@ export default function RecipeFormDialog({
                         type="number"
                         label="Khẩu phần *"
                         value={form.servings}
-                        onChange={(e) => handleChange("servings", Number(e.target.value))}
+                        onChange={(e) =>
+                          handleChange("servings", e.target.value === "" ? "" : Number(e.target.value))
+                        }
                       />
                     </Grid>
 
