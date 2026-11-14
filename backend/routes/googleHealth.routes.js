@@ -11,6 +11,7 @@ const {
   getHealthDataByDate,
   getHealthData,
   getActivitySummary,
+  getWhoComparison,
 } = require("../controllers/googleHealth.controller");
 
 const { authenticate } = require("../middlewares/auth");
@@ -86,5 +87,14 @@ router.get("/data", getHealthData);
  * Metrics without data are null and are not counted in the averages.
  */
 router.get("/activity/summary", getActivitySummary);
+
+/**
+ * GET /api/google-health/who-comparison?sync=1
+ *
+ * 7 ngày gần nhất so với chuẩn WHO theo nhóm tuổi (aerobic quy đổi cường độ vừa,
+ * tăng cơ, thăng bằng cho người cao tuổi), khuyến nghị bài tập + nguồn trích dẫn.
+ * sync=1 -> đồng bộ Google Health trước (bỏ qua nếu chưa kết nối).
+ */
+router.get("/who-comparison", getWhoComparison);
 
 module.exports = router;

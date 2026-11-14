@@ -24,10 +24,13 @@ async function classify(text) {
   return response.data;
 }
 
-async function retrieve(query, topK = 5, audiences = null) {
+/**
+ * @param {string[]|null} docIds chỉ tìm trong các tài liệu này (doc_id trong ai-service/data/sources.yaml)
+ */
+async function retrieve(query, topK = 5, audiences = null, docIds = null) {
   const response = await axios.post(
     `${baseURL}/rag/retrieve`,
-    { query, top_k: topK, audiences },
+    { query, top_k: topK, audiences, doc_ids: docIds },
     { timeout, headers: headers() },
   );
   return response.data;

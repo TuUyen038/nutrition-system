@@ -1,4 +1,5 @@
 const googleHealthService = require("../services/googleHealth.service");
+const activityGuidelineService = require("../services/activityGuideline.service");
 const googleConnectionService = require("../services/googleConnection.service");
 
 async function mockSyncHealthData(req, res) {
@@ -263,7 +264,23 @@ async function disconnectGoogle(req, res) {
   }
 }
 
+/**
+ * GET /api/google-health/who-comparison?sync=1
+ * So sánh 7 ngày gần nhất với chuẩn WHO + khuyến nghị bài tập + trích dẫn.
+ */
+async function getWhoComparison(req, res) {
+  try {
+    const sync = ["1", "true"].includes(String(req.query.sync || "").toLowerCase());
+    const data = await activityGuidelineService.getWhoComparison(req.user._id, { sync });
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    console.error("[Google Health Controller] getWhoComparison error:", error.message || error);
+    return res.status(400).json({ success: false, message: error.message || "Failed to compare with WHO" });
+  }
+}
+
 module.exports = {
+  getWhoComparison,
   syncHealthData,
   connectGoogle,
   googleCallback,

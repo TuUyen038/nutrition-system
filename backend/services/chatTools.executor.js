@@ -23,6 +23,7 @@ const workoutPlanService = require("./workoutPlan.service");
 const fitnessPlanService = require("./fitnessPlan.service");
 const ragClient = require("./ragClient.service");
 const { SourceRegistry, formatSourceBlock } = require("./grounding.service");
+const activityGuidelineService = require("./activityGuideline.service");
 // Helper: lấy ngày hôm nay dạng YYYY-MM-DD theo giờ VN
 function getTodayVN() {
   return new Date().toLocaleDateString("sv-SE", {
@@ -144,6 +145,9 @@ async function executeTool(toolName, args, userId, ctx = {}) {
 
       case "get_workout_stats":
         return await _getWorkoutStats(userId);
+
+      case "get_activity_vs_who":
+        return await _getActivityVsWho(args, userId, ctx);
 
       case "get_favorite_recipes":
         return await _getFavoriteRecipes(args, userId);
@@ -1105,6 +1109,50 @@ async function _getWorkoutStats(userId) {
 
     summary:
       `Bạn đã hoàn thành ${stats.completedDays} buổi tập.`,
+  };
+}
+
+// ─── WHO COMPARISON ─────────────────────────────────────────────────────────
+
+/**
+ * So sánh Google Health với chuẩn WHO. Các chunk WHO/HHS/ACSM được đăng ký vào SourceRegistry của lượt chat
+ * (mã [Sx]) để câu trả lời đi qua kiểm tra chống ảo giác như rag_retrieve.
+ * `allowedContext` chỉ chứa số liệu của user + đề xuất của hệ thống: số CHUẨN WHO vẫn phải có [Sx].
+ */
+async function _getActivityVsWho(args = {}, userId, ctx = {}) {
+  const result = await activityGuidelineService.getWhoComparison(userId, { sync: args.sync !== false });
+
+  const registry = ctx.sources || new SourceRegistry();
+  const idByKey = {};
+  if (result.sources.length) {
+    registry.ragCalled = true;
+    result.sources.forEach((src) => {
+      idByKey[src.key] = registry.add(src);
+    });
+  }
+
+  const { personal, standards } = activityGuidelineService.formatForChat(result, (key) => idByKey[key]);
+  const blocks = [...new Set(Object.values(idByKey))].map((id) => formatSourceBlock(registry.get(id)));
+
+  return {
+    success: result.comparison.supported,
+    data: {
+      window: result.window,
+      group: result.comparison.group || null,
+      recommendations: result.recommendations.map(({ type, title, exercises }) => ({ type, title, exercises })),
+      citations: Object.entries(idByKey).map(([key, id]) => {
+        const s = registry.get(id);
+        return { key, id, title: s.title, org: s.org, year: s.year, url: s.url, section: s.section };
+      }),
+      citationsAvailable: result.citationsAvailable,
+    },
+    allowedContext: [personal],
+    summary:
+      `${personal}\n\n${standards}\n\n` +
+      (blocks.length ? `[NGUỒN]\n${blocks.join("\n\n")}\n\n` : "") +
+      "HƯỚNG DẪN TRẢ LỜI: so sánh số liệu thực tế với chuẩn WHO (số chuẩn kèm mã nguồn), nêu các đề xuất theo đúng thứ tự, " +
+      "giữ nguyên mọi con số, nói rõ đề xuất số buổi/phút là của hệ thống (không phải của WHO). " +
+      `Kết thúc bằng lưu ý: ${result.disclaimer}`,
   };
 }
 
