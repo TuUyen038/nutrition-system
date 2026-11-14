@@ -1,0 +1,89 @@
+
+Collection: nutrition_kb | model: BAAI/bge-m3 | files: retrieval_exercise.jsonl, retrieval_qa.jsonl
+Câu có đáp án: 88 | câu ngoài kho: 8 | chỉ vector
+
+  -- Chất lượng xếp hạng (câu có đáp án)
+  Hit@1         0.739  (+0.068)
+  Hit@3         0.932  (+0.057)
+  Hit@5         0.943  (+0.000)
+  Hit@10        0.955  (+0.000)
+  Recall@1      0.739  (+0.068)
+  Recall@3      0.932  (+0.057)
+  Recall@5      0.943  (+0.000)
+  Recall@10     0.955  (+0.000)
+  Precision@1   0.739  (+0.068)
+  Precision@3   0.481  (+0.023)
+  Precision@5   0.375  (+0.009)
+  Precision@10  0.244  (+0.004)
+  nDCG@1        0.595  (+0.038)
+  nDCG@3        0.622  (+0.029)
+  nDCG@5        0.641  (+0.018)
+  nDCG@10       0.666  (+0.018)
+  MAP@10        0.592  (+0.017)
+  MRR           0.834  (+0.048)
+  -- Ngưỡng relevant (cái LLM thật sự nhận được)
+  Usable@5      0.864  (+0.159)
+  Reject@5      1.000  (+0.625)
+  -- Khác: chunk tiếng Anh trong top-5 71% | độ trễ p50 73.5ms p95 81.5ms
+
+  Theo nguồn / chủ đề:
+    nhóm               n  Hit@1   Hit@5   nDCG@5  MRR    Usable@5
+    acsm               8  0.625  1.000  0.390  0.812  0.625
+    hhs               20  0.800  1.000  0.701  0.892  1.000
+    moh_vn             3  0.667  1.000  0.693  0.833  1.000
+    qa                42  0.738  0.905  0.686  0.817  0.833
+    who               12  0.667  0.917  0.534  0.771  0.833
+    who_factsheet      3  1.000  1.000  0.666  1.000  1.000
+
+  Theo kiểu câu hỏi ('goc' = sát chữ tài liệu):
+    nhóm               n  Hit@1   Hit@5   nDCG@5  MRR    Usable@5
+    dien_dat_lai       6  0.667  1.000  0.660  0.833  1.000
+    doi_thuong         7  0.714  1.000  0.533  0.833  0.857
+    gian_tiep          9  0.556  1.000  0.612  0.759  0.778
+    goc               59  0.848  1.000  0.718  0.917  0.966
+    khong_dau          7  0.143  0.286  0.127  0.232  0.000
+
+  Theo đối tượng:
+    nhóm               n  Hit@1   Hit@5   nDCG@5  MRR    Usable@5
+    adult             33  0.697  1.000  0.572  0.836  0.909
+    child              3  1.000  1.000  0.701  1.000  0.667
+    chronic            3  0.667  1.000  0.809  0.833  1.000
+    disability         1  1.000  1.000  0.804  1.000  1.000
+    older              4  1.000  1.000  0.678  1.000  1.000
+    pregnant           2  0.500  0.500  0.341  0.500  0.500
+
+  Câu top-1 KHÔNG đúng nguồn (23):
+    - Nếu chỉ tập cường độ mạnh thì người lớn cần bao nhiêu phút một hạng đúng=2 | top-1: us_physical_activity_guideli / Chapter 4. Active Adults > Active Adults (0.716)
+    - Ngồi nhiều có hại gì, WHO khuyên gì về thời gian ngồi một chỗ? hạng đúng=4 | top-1: who_physical_activity_fact_s / How much physical activity is recommended? (0.656)
+    - bau bi co nen tap the duc khong, tap bao nhieu                 hạng đúng=>10 | top-1: acsm_resistance_training_202 / RESULTS > Timed Up-and-Go (0.351)
+    - Người mắc bệnh mạn tính như tăng huyết áp có cần vận động theo hạng đúng=2 | top-1: us_physical_activity_guideli /  and Safe > Advice From Health Care Providers (0.682)
+    - Nên tập bài sức mạnh ở đầu hay cuối buổi tập?                  hạng đúng=2 | top-1: us_physical_activity_guideli / -strengthening activity has three components: (0.592)
+    - Tập kháng lực có giúp cải thiện thăng bằng và tốc độ đi bộ khô hạng đúng=2 | top-1: us_physical_activity_guideli / ical Activity and Health > Balance Activities (0.637)
+    - tap ta moi tuan may buoi de tang suc manh                      hạng đúng=2 | top-1: us_physical_activity_guideli / Chapter 4. Active Adults > Talk Test (0.404)
+    - Đi bộ nhanh được xếp là hoạt động cường độ vừa hay mạnh?       hạng đúng=2 | top-1: us_physical_activity_guideli / essing Aerobic Intensity > Absolute Intensity (0.671)
+    - Chạy bộ và nhảy dây là hoạt động cường độ gì?                  hạng đúng=2 | top-1: us_physical_activity_guideli / essing Aerobic Intensity > Absolute Intensity (0.653)
+    - Có cần khởi động và thả lỏng khi tập thể dục không?            hạng đúng=2 | top-1: cam_nang_hoat_dong_the_luc_2 / ực > Hoạt động mềm dẻo, khởi động và thư giãn (0.690)
+    - Tập thể dục có giúp giảm cân không, cần tập bao nhiêu phút?    hạng đúng=3 | top-1: us_physical_activity_guideli / ic Activity > How Much Total Activity a Week? (0.645)
+    - Đang tập mà thấy chóng mặt, đau ngực thì phải làm sao?         hạng đúng=2 | top-1: cam_nang_hoat_dong_the_luc_2 /  từ 18 - 59 tuổi: lưu ý khi hoạt động thể lực (0.677)
+    - Người lớn nên tập thể dục bao nhiêu phút mỗi tuần?             hạng đúng=2 | top-1: us_physical_activity_guideli / Chapter 4. Active Adults > Active Adults (0.755)
+    - an bao nhieu muoi 1 ngay la toi da                             hạng đúng=>10 | top-1: thap_dinh_duong_moi / i 1 đơn vị ăn: ngũ cốc, khoai củ và nước uống (0.485)
+    - Một người trưởng thành tập bao nhiêu phút mỗi tuần là đủ?      hạng đúng=2 | top-1: us_physical_activity_guideli / Chapter 4. Active Adults > Active Adults (0.730)
+    - Mẹ tôi lớn tuổi, bài tập nào giúp bà đỡ té ngã?                hạng đúng=2 | top-1: us_physical_activity_guideli / mples of Physical Activities for Older Adults (0.624)
+    - Đang bầu thì tập luyện cần tránh gì?                           hạng đúng=2 | top-1: us_physical_activity_guideli /  and Safe > Advice From Health Care Providers (0.658)
+    - tho pho ga chua bao nhieu g muoi                               hạng đúng=>10 | top-1: thap_dinh_duong_moi / i 1 đơn vị ăn: ngũ cốc, khoai củ và nước uống (0.392)
+    - Bé gái 13 tuổi mỗi ngày nên uống mấy ly nước?                  hạng đúng=2 | top-1: huong_dan_an_bo_sung / Cung cấp nước trong chế độ ăn bổ sung của trẻ (0.650)
+    - thieu vitamin A thi bi gi                                      hạng đúng=8 | top-1: rau_qua_5_nhom_mau / của 5 nhóm màu rau quả > Rau quả màu vàng/cam (0.586)
+    - uong nuoc ngot nhieu hai nhu the nao                           hạng đúng=>10 | top-1: who_healthy_diet / y diet > WHO guidance on healthy diets > Fats (0.363)
+    - Ngồi văn phòng cả ngày thì nên làm gì cho đỡ hại?              hạng đúng=3 | top-1: us_physical_activity_guideli / ts > Inactive or Insufficiently Active Adults (0.574)
+    - Tập xong nên làm gì để cơ thể hạ nhiệt dần?                    hạng đúng=3 | top-1: us_physical_activity_guideli / pter 4. Active Adults > Warm-Up and Cool-Down (0.659)
+
+  Câu ngoài kho nhưng vẫn có chunk vượt ngưỡng (0):
+
+  Câu tìm ĐÚNG trong top-5 nhưng chunk đúng bị ngưỡng loại -> LLM không nhận được (7):
+    - tre em 5 den 17 tuoi can van dong bao nhieu phut moi ngay      who_physical_activity_2020 (en, cos 0.531)
+    - Nên tập bài sức mạnh ở đầu hay cuối buổi tập?                  acsm_resistance_training_202 (en, cos 0.572)
+    - tap ta moi tuan may buoi de tang suc manh                      acsm_resistance_training_202 (en, cos 0.382)
+    - Tập với dây kháng lực hay tập ở nhà có tăng cơ được không?     acsm_resistance_training_202 (en, cos 0.557)
+    - Kali giúp ích gì cho huyết áp và nên bổ sung bao nhiêu?        who_healthy_diet (en, cos 0.571)
+    - Bé gái 13 tuổi mỗi ngày nên uống mấy ly nước?                  thap_dinh_duong_moi (vi, cos 0.595)
+    - Ngồi văn phòng cả ngày thì nên làm gì cho đỡ hại?              who_physical_activity_2020 (en, cos 0.554)

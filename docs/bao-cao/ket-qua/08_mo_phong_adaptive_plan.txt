@@ -1,0 +1,75 @@
+=== TRƯỚC khi thống nhất (tổng phút Google + mọi buổi tập trong app)
+┌─────────┬─────────────────────┬─────┬─────┬─────┬───────┬───────────────┬───────┬───────────────────┬─────────────────────┬────────────────────────────────────────────────┐
+│ (index) │ scenario            │ F   │ R   │ P   │ Ready │ status        │ cold  │ restWhenGenerated │ action              │ expected                                       │
+├─────────┼─────────────────────┼─────┼─────┼─────┼───────┼───────────────┼───────┼───────────────────┼─────────────────────┼────────────────────────────────────────────────┤
+│ 0       │ 'new_user'          │ 0   │ 10  │ 5   │ 6.5   │ 'normal'      │ 'yes' │ '-'               │ 'maintain'          │ 'maintain (moderate), không tăng'              │
+│ 1       │ 'regular'           │ 3.3 │ 9.5 │ 8   │ 8.1   │ 'ready'       │ ''    │ '-'               │ 'maintain'          │ 'maintain (đã > 300 phút/tuần WHO)'            │
+│ 2       │ 'regular_no_google' │ 3.3 │ 10  │ 8   │ 8.3   │ 'ready'       │ ''    │ '-'               │ 'increase'          │ 'increase (chỉ thấy phút tập trong app < 300)' │
+│ 3       │ 'strong_low_volume' │ 2.8 │ 10  │ 8.5 │ 8.6   │ 'ready'       │ ''    │ '-'               │ 'increase'          │ 'increase'                                     │
+│ 4       │ 'busy_day'          │ 3.7 │ 9.5 │ 8   │ 8     │ 'ready'       │ ''    │ '-'               │ 'reduce_intensity'  │ 'reduce_intensity (ngày bận)'                  │
+│ 5       │ 'short_night'       │ 3.3 │ 6   │ 8   │ 6.7   │ 'normal'      │ ''    │ '-'               │ 'reduce_intensity'  │ 'reduce_intensity (ngủ < 5h)'                  │
+│ 6       │ 'overload'          │ 8.9 │ 2.8 │ 6.6 │ 3.2   │ 'overreached' │ ''    │ '1'               │ 'rest'              │ 'rest (overreached)'                           │
+│ 7       │ 'skipping'          │ 0.4 │ 9   │ 3.1 │ 7.7   │ 'normal'      │ ''    │ '-'               │ 'maintain (-1 bài)' │ 'không tăng, bớt 1 bài'                        │
+└─────────┴─────────────────────┴─────┴─────┴─────┴───────┴───────────────┴───────┴───────────────────┴─────────────────────┴────────────────────────────────────────────────┘
+
+new_user: User mới, chưa tập, không Google
+  -> Trạng thái normal (Readiness 6.5): giữ nguyên plan.
+
+regular: Tập đều 3 buổi/tuần, ngủ 7.5h
+  -> Trạng thái ready (Readiness 8.1): giữ nguyên plan.
+
+regular_no_google: Tập đều, không cấp quyền Google
+  -> Sẵn sàng (Readiness 8.3), tập tốt (Performance 8), mới vận động 90/150–300 phút/tuần theo WHO: tăng 1 mức cường độ.
+
+strong_low_volume: Tập tốt (perf 9, RPE 5), ít vận động ngoài app
+  -> Sẵn sàng (Readiness 8.6), tập tốt (Performance 8.5), mới vận động 160/150–300 phút/tuần theo WHO: tăng 1 mức cường độ.
+
+busy_day: Tập đều, hôm nay đi bộ 90 phút / 15.000 bước
+  -> Hôm nay đã vận động nhiều ngoài app (90 phút, 15000 bước): giảm 1 mức cường độ.
+
+short_night: Tập đều, đêm qua ngủ 4h
+  -> Đêm qua ngủ 4h (< 5h): giảm 1 mức cường độ.
+
+overload: Quá tải: 5 ngày liền 60 phút RPE 9, ngủ 5h
+  -> Quá tải: Fatigue 8.9, Recovery 2.8, Readiness 3.2. Nghỉ buổi kế tiếp.
+
+skipping: Bỏ 2 buổi tuần này, perf giảm
+  -> Trạng thái normal (Readiness 7.7): giữ nguyên plan. | Đã bỏ 2 buổi tuần này: bớt 1 bài mỗi buổi để dễ hoàn thành hơn.
+
+=== SAU khi thống nhất (phút quy đổi theo WHO, dùng chung với màn hình so sánh WHO)
+┌─────────┬─────────────────────┬─────┬─────┬─────┬───────┬───────────────┬───────┬───────────────────┬─────────────────────┬────────────────────────────────────────────────────┐
+│ (index) │ scenario            │ F   │ R   │ P   │ Ready │ status        │ cold  │ restWhenGenerated │ action              │ expected                                           │
+├─────────┼─────────────────────┼─────┼─────┼─────┼───────┼───────────────┼───────┼───────────────────┼─────────────────────┼────────────────────────────────────────────────────┤
+│ 0       │ 'new_user'          │ 0   │ 10  │ 5   │ 6.5   │ 'normal'      │ 'yes' │ '-'               │ 'maintain'          │ 'maintain (moderate), không tăng'                  │
+│ 1       │ 'regular'           │ 3.3 │ 9.5 │ 8   │ 8.1   │ 'ready'       │ ''    │ '-'               │ 'increase'          │ 'increase (210 phút/tuần quy đổi < 300, sẵn sàng)' │
+│ 2       │ 'regular_no_google' │ 3.3 │ 10  │ 8   │ 8.3   │ 'ready'       │ ''    │ '-'               │ 'increase'          │ 'increase (chỉ thấy phút tập trong app < 300)'     │
+│ 3       │ 'strong_low_volume' │ 2.8 │ 10  │ 8.5 │ 8.6   │ 'ready'       │ ''    │ '-'               │ 'increase'          │ 'increase'                                         │
+│ 4       │ 'busy_day'          │ 3.7 │ 9.5 │ 8   │ 8     │ 'ready'       │ ''    │ '-'               │ 'reduce_intensity'  │ 'reduce_intensity (ngày bận)'                      │
+│ 5       │ 'short_night'       │ 3.3 │ 6   │ 8   │ 6.7   │ 'normal'      │ ''    │ '-'               │ 'reduce_intensity'  │ 'reduce_intensity (ngủ < 5h)'                      │
+│ 6       │ 'overload'          │ 8.9 │ 2.8 │ 6.6 │ 3.2   │ 'overreached' │ ''    │ '1'               │ 'rest'              │ 'rest (overreached)'                               │
+│ 7       │ 'skipping'          │ 0.4 │ 9   │ 3.1 │ 7.7   │ 'normal'      │ ''    │ '-'               │ 'maintain (-1 bài)' │ 'không tăng, bớt 1 bài'                            │
+└─────────┴─────────────────────┴─────┴─────┴─────┴───────┴───────────────┴───────┴───────────────────┴─────────────────────┴────────────────────────────────────────────────────┘
+
+new_user: User mới, chưa tập, không Google
+  -> Trạng thái normal (Readiness 6.5): giữ nguyên plan.
+
+regular: Tập đều 3 buổi/tuần, ngủ 7.5h
+  -> Sẵn sàng (Readiness 8.1), tập tốt (Performance 8), mới vận động aerobic 210 phút/tuần (quy đổi cường độ vừa), chưa vượt 300 phút của WHO: tăng 1 mức cường độ.
+
+regular_no_google: Tập đều, không cấp quyền Google
+  -> Sẵn sàng (Readiness 8.3) và tập tốt (Performance 8): tăng 1 mức cường độ.
+
+strong_low_volume: Tập tốt (perf 9, RPE 5), ít vận động ngoài app
+  -> Sẵn sàng (Readiness 8.6), tập tốt (Performance 8.5), mới vận động aerobic 70 phút/tuần (quy đổi cường độ vừa), chưa vượt 300 phút của WHO: tăng 1 mức cường độ.
+
+busy_day: Tập đều, hôm nay đi bộ 90 phút / 15.000 bước
+  -> Hôm nay đã vận động nhiều ngoài app (90 phút, 15000 bước): giảm 1 mức cường độ.
+
+short_night: Tập đều, đêm qua ngủ 4h
+  -> Đêm qua ngủ 4h (< 5h): giảm 1 mức cường độ.
+
+overload: Quá tải: 5 ngày liền 60 phút RPE 9, ngủ 5h
+  -> Quá tải: Fatigue 8.9, Recovery 2.8, Readiness 3.2. Nghỉ buổi kế tiếp.
+
+skipping: Bỏ 2 buổi tuần này, perf giảm
+  -> Trạng thái normal (Readiness 7.7): giữ nguyên plan. | Đã bỏ 2 buổi tuần này: bớt 1 bài mỗi buổi để dễ hoàn thành hơn.

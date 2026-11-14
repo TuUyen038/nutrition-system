@@ -1,0 +1,15 @@
+ok - nhóm tuổi
+ok - quy đổi WHO: vừa + 2 × mạnh, bỏ phút nhẹ
+ok - thiếu ngày -> ngoại suy + đánh dấu ước lượng
+ok - không đếm hai lần: ngày có Google thì bỏ buổi app của ngày đó
+ok - dữ liệu cũ chỉ có tổng phút -> cảnh báo có thể gồm vận động nhẹ
+ok - người lớn thiếu aerobic + thiếu tăng cơ -> khuyến nghị đúng số
+ok - người mới tập: tăng dần tối đa 60 phút/tuần
+ok - đạt chuẩn -> duy trì, không thêm buổi aerobic
+ok - quá tải -> chỉ khuyên hồi phục, không tăng lượng tập
+ok - người cao tuổi: thêm chỉ tiêu thăng bằng 3 ngày
+ok - trẻ em: trung bình 60 phút/ngày, vừa + mạnh không nhân đôi
+ok - thiếu dữ liệu / thiếu tuổi -> không kết luận
+ok - HIIT chỉ gợi ý khi đã quen tập, đang sung sức, không phải người cao tuổi
+
+13 test đạt
