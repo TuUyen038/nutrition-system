@@ -85,7 +85,15 @@
     "Tôi bị đau lưng thì nên tập gì cho an toàn?",
     "Mình đang nhịn ăn gián đoạn, nên tập vào lúc nào?",
     "Em là nữ 20 tuổi, em cần bao nhiêu sắt mỗi ngày?",
-    "Với cơ thể của mình, bữa sáng nên chiếm bao nhiêu phần trăm calo cả ngày?"
+    "Với cơ thể của mình, bữa sáng nên chiếm bao nhiêu phần trăm calo cả ngày?",
+    "Tôi vận động như hiện nay đã đủ chuẩn WHO chưa?",
+    "Theo dữ liệu Google Health thì tuần này tôi tập đủ chưa?",
+    "Mức vận động của tôi so với khuyến nghị WHO thế nào?",
+    "Tôi còn thiếu bao nhiêu phút vận động mỗi tuần?",
+    "Số bước chân hằng ngày của tôi như vậy đã ổn chưa?",
+    "Dựa trên dữ liệu đồng hồ của tôi, nên tập thêm gì?",
+    "Tôi tập tăng cơ mỗi tuần như vậy có đủ không?",
+    "Kiểm tra giúp tôi lượng vận động tuần qua so với chuẩn"
   ],
   "personal": {
     "workout": [
@@ -228,7 +236,7 @@
       "Chào buổi tối",
       "chao ban",
       "Xin chao ban",
-      "Xin chào, bạn khỏe không?", 
+      "Xin chào, bạn khỏe không?",
       "Chào bạn, hôm nay bạn thế nào?",
       "Chào bạn, mình có thể giúp gì cho bạn?"
     ],

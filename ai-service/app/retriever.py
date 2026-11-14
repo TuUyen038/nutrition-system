@@ -70,12 +70,14 @@ def detect_audiences(query: str, audiences: Optional[List[str]] = None) -> Optio
     return ["general"]
 
 
-def _where(lang: Optional[str], allowed: Optional[List[str]]) -> Optional[Dict[str, Any]]:
+def _where(lang: Optional[str], allowed: Optional[List[str]], doc_ids: Optional[List[str]] = None) -> Optional[Dict[str, Any]]:
     conds: List[Dict[str, Any]] = []
     if lang is not None:
         conds.append({"lang": lang})
     if allowed is not None:
         conds.append({"audience_group": {"$in": allowed}})
+    if doc_ids:
+        conds.append({"doc_id": {"$in": list(doc_ids)}})
     if not conds:
         return None
     return conds[0] if len(conds) == 1 else {"$and": conds}
@@ -91,6 +93,7 @@ def retrieve(
     per_lang: Optional[int] = None,
     lang_offset: bool = True,
     audience_penalty: Optional[float] = None,
+    doc_ids: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """Trả {"chunks": [...], "reranked": bool, "threshold": float, "thresholds": dict, "audiences": list|None}.
 
@@ -99,6 +102,7 @@ def retrieve(
     cùng metadata (doc_id, title, org, year, url, lang, section, heading, h1..h5, audience_group...).
     `lang_offset=False` bỏ độ lệch theo ngôn ngữ khi xếp hạng (để so sánh trong eval).
     `audience_penalty` ghi đè SECTION_AUDIENCE_PENALTY (0 = tắt).
+    `doc_ids` chỉ tìm trong các tài liệu này (VD trích dẫn khuyến nghị WHO cho một chỉ số cụ thể).
     """
     top_k = top_k or config.TOP_K
     collection = collection or config.CHROMA_COLLECTION
@@ -113,7 +117,7 @@ def retrieve(
     def gather(audience_list: Optional[List[str]]) -> Dict[str, Dict[str, Any]]:
         found: Dict[str, Dict[str, Any]] = {}
         for lang in langs:
-            for chunk in vector_store.search(qvec, n_each, collection, where=_where(lang, audience_list)):
+            for chunk in vector_store.search(qvec, n_each, collection, where=_where(lang, audience_list, doc_ids)):
                 found[chunk["id"]] = chunk
         return found
 

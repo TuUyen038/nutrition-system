@@ -36,6 +36,8 @@ class RetrieveRequest(BaseModel):
     top_k: int = Field(default=config.TOP_K, ge=1, le=20)
     # Tùy chọn: ép danh sách audience_group được tìm (VD ["general", "infant"]); bỏ trống = tự phát hiện
     audiences: Optional[List[str]] = None
+    # Tùy chọn: chỉ tìm trong các tài liệu này (doc_id trong data/sources.yaml), VD ["who_physical_activity_2020"]
+    doc_ids: Optional[List[str]] = Field(default=None, max_length=20)
 
 
 class VerifySource(BaseModel):
@@ -91,7 +93,7 @@ def classify(req: ClassifyRequest):
 def retrieve(req: RetrieveRequest):
     
     t0 = time.perf_counter()
-    result = retriever.retrieve(req.query, req.top_k, audiences=req.audiences)
+    result = retriever.retrieve(req.query, req.top_k, audiences=req.audiences, doc_ids=req.doc_ids)
     return {
         "query": req.query,
         "chunks": result["chunks"],
