@@ -252,7 +252,7 @@ hoặc đổi `--host 127.0.0.1` nếu chỉ backend trên cùng máy gọi tớ
 - `GET  /health` → `{status, model, chunks, reranker: {enabled, ready, model}}` (`chunks = 0` nghĩa là chưa chạy `ingest.py`)
 - `POST /router/classify` `{"text": "..."}` → `{intent, sub_intent, scores, method, latency_ms}`. `sub_intent` chỉ được giữ cho `chitchat`; các nhóm khác trả `null`.
 - `POST /rag/verify` → xem mục "Chống ảo giác"
-- `POST /rag/retrieve` `{"query": "...", "top_k": 5, "audiences": null}` → `{chunks, reranked, threshold, thresholds, audiences}` (`thresholds` = ngưỡng theo từng ngôn ngữ)
+- `POST /rag/retrieve` `{"query": "...", "top_k": 5, "audiences": null, "doc_ids": null}` (`doc_ids`: chỉ tìm trong các tài liệu này) → `{chunks, reranked, threshold, thresholds, audiences}` (`thresholds` = ngưỡng theo từng ngôn ngữ)
 - Tài liệu API tương tác: http://localhost:8000/docs
 
 ## Cấu hình phía Node (`backend/.env`)
@@ -292,6 +292,21 @@ Log mong đợi với câu hỏi kiến thức:
 ```
 
 Nếu log hiện `Intent tools: fallback`, backend không gọi được `/router/classify`; hãy kiểm tra service có chạy ở port 8000 hay không và kiểm tra `INTERNAL_KEY`/`AI_INTERNAL_KEY`.
+
+## So sánh dữ liệu Google Health với chuẩn WHO (backend)
+
+`GET /api/google-health/who-comparison?sync=1` và tool chat `get_activity_vs_who` (intent `mixed`/`personal`):
+
+1. Dữ liệu 7 ngày: Google Health (`moderateMinutes`, `vigorousMinutes` lấy từ active-minutes theo mức LIGHT/MODERATE/VIGOROUS;
+   phút NHẸ không tính theo WHO) + buổi tập hoàn thành trong app (phân loại theo `Exercise.activityType`).
+2. `backend/services/activityGuideline.rules.js` (thuần, có test `node scripts/test_activity_guideline.js`):
+   nhóm tuổi -> chuẩn WHO (`backend/config/whoGuidelines.config.js`, số lấy nguyên văn WHO 2020);
+   aerobic = vừa + 2 × mạnh (phút/tuần, trẻ em: trung bình phút/ngày); tăng cơ ≥ 2 ngày; người ≥ 65 tuổi thêm thăng bằng ≥ 3 ngày;
+   < 4/7 ngày có dữ liệu -> không kết luận; bước chân chỉ tham khảo (WHO không đặt chỉ tiêu).
+3. Khuyến nghị theo luật: thiếu bao nhiêu -> số buổi × phút (người mới: tăng tối đa 60 phút/tuần), quá tải -> chỉ hồi phục,
+   bài tập chọn trong DB bằng `rankExercises` (loại chấn thương / thiết bị / độ khó / va chạm mạnh; HIIT chỉ khi đã quen tập).
+4. Trích dẫn: `/rag/retrieve` với truy vấn cố định + `doc_ids` (WHO / HHS / ACSM) cho từng chỉ tiêu; chunk đăng ký vào
+   `SourceRegistry` nên câu trả lời chatbot đi qua `/rag/verify`: số liệu của user được dùng tự do, số CHUẨN phải có `[Sx]`.
 
 ## Đánh giá
 
