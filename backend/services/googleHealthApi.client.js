@@ -155,6 +155,35 @@ function fetchDailyActiveMinutes(client, from, to, debugLog) {
 }
 
 /**
+ * Active minutes split by level: { total, light, moderate, vigorous }.
+ * Google levels: LIGHT | MODERATE | VIGOROUS (ActiveMinutes.ActivityLevel).
+ * WHO guidelines only count moderate + vigorous (1 vigorous minute = 2 moderate),
+ * so `total` (which includes LIGHT) must not be compared with WHO directly.
+ * A level missing from the response counts as 0 when the day has a rollup.
+ */
+function fetchDailyActiveMinutesByLevel(client, from, to, debugLog) {
+  return dailyRollUp(client, "active-minutes", from, to, (point) => {
+    const levels = point.activeMinutes?.activeMinutesRollupByActivityLevel;
+
+    if (!levels) return null;
+
+    const out = { total: 0, light: 0, moderate: 0, vigorous: 0 };
+    levels.forEach((level) => {
+      const minutes = toNumber(level.activeMinutesSum) || 0;
+      const key = String(level.activityLevel || "").toLowerCase();
+      out.total += minutes;
+      if (key === "light" || key === "moderate" || key === "vigorous") out[key] += minutes;
+    });
+    // Some minutes with an unknown / unspecified level: the split is not
+    // reliable -> null (unknown), never a misleading 0.
+    if (out.light + out.moderate + out.vigorous < out.total) {
+      return { total: out.total, light: null, moderate: null, vigorous: null };
+    }
+    return out;
+  }, debugLog);
+}
+
+/**
  * Sleep is a session type: no dailyRollUp, use list() with a filter.
  * A sleep belongs to the day it ENDS (night of 25 -> morning of 26 = day 26),
  * which is "last night's sleep" for that day's training decision.
@@ -319,6 +348,7 @@ module.exports = {
   fetchDailySteps,
   fetchDailyActiveCalories,
   fetchDailyActiveMinutes,
+  fetchDailyActiveMinutesByLevel,
   fetchDailySleep,
   splitIntoChunks,
 };

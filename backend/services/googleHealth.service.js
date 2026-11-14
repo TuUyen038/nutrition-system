@@ -15,7 +15,8 @@ const MAX_SYNC_DAYS = 90;
 const METRIC_FETCHERS = {
   steps: googleHealthApi.fetchDailySteps,
   caloriesBurned: googleHealthApi.fetchDailyActiveCalories,
-  activeMinutes: googleHealthApi.fetchDailyActiveMinutes,
+  // { total, light, moderate, vigorous } per day (one API call for both uses)
+  activeMinutes: googleHealthApi.fetchDailyActiveMinutesByLevel,
   sleep: googleHealthApi.fetchDailySleep,
   exercise: googleHealthApi.fetchDailyExercise,
 };
@@ -24,6 +25,8 @@ const ACTIVITY_METRICS = [
   "steps",
   "caloriesBurned",
   "activeMinutes",
+  "moderateMinutes",
+  "vigorousMinutes",
   "sleepMinutes",
 ];
 
@@ -107,6 +110,14 @@ function normalizeHealthPayload(payload = {}) {
       payload.activeMinutes,
       "activeMinutes"
     ),
+    moderateMinutes: toOptionalNonNegativeNumber(
+      payload.moderateMinutes,
+      "moderateMinutes"
+    ),
+    vigorousMinutes: toOptionalNonNegativeNumber(
+      payload.vigorousMinutes,
+      "vigorousMinutes"
+    ),
     sleep: normalizeSleep(payload.sleep),
   };
 }
@@ -125,7 +136,7 @@ function buildHealthUpdate(normalized, source, confirmedFields = []) {
     syncedAt: new Date(),
   };
 
-  ["steps", "caloriesBurned", "activeMinutes"].forEach((field) => {
+  ["steps", "caloriesBurned", "activeMinutes", "moderateMinutes", "vigorousMinutes"].forEach((field) => {
     if (normalized[field] !== null || confirmedFields.includes(field)) {
       update[field] = normalized[field];
     }
@@ -146,6 +157,8 @@ function buildDefaultMockData() {
     steps: 8234,
     caloriesBurned: 612.45,
     activeMinutes: 74,
+    moderateMinutes: 38,
+    vigorousMinutes: 12,
     sleep: {
       durationMinutes: 432,
       startTime: `${dayjs().subtract(1, "day").format("YYYY-MM-DD")}T23:18:00.000Z`,
@@ -356,7 +369,9 @@ async function syncGoogleHealthData(userId, { from, to, debug = false } = {}) {
 
   if (isOk("steps")) confirmedFields.push("steps");
   if (isOk("caloriesBurned") && isOk("exercise")) confirmedFields.push("caloriesBurned");
-  if (isOk("activeMinutes") && isOk("exercise")) confirmedFields.push("activeMinutes");
+  if (isOk("activeMinutes") && isOk("exercise")) {
+    confirmedFields.push("activeMinutes", "moderateMinutes", "vigorousMinutes");
+  }
   if (isOk("sleep")) confirmedFields.push("sleep");
 
   const syncedDates = [];
@@ -365,6 +380,7 @@ async function syncGoogleHealthData(userId, { from, to, debug = false } = {}) {
   for (const date of listDates(fromDate, toDate)) {
     const sleep = metricValues.sleep?.[date];
     const exercise = metricValues.exercise?.[date];
+    const minutesByLevel = metricValues.activeMinutes?.[date];
 
     const normalized = normalizeHealthPayload({
       date,
@@ -375,10 +391,21 @@ async function syncGoogleHealthData(userId, { from, to, debug = false } = {}) {
         exercise?.manualCaloriesBurned
       ),
       activeMinutes: combineWithExercise(
-        metricValues.activeMinutes?.[date],
+        minutesByLevel?.total,
         exercise?.activeMinutes,
         exercise?.manualActiveMinutes
       ),
+      // Exercise sessions have no activity level: counted as moderate
+      // (conservative: a vigorous session would count double for WHO).
+      moderateMinutes:
+        minutesByLevel && minutesByLevel.moderate === null
+          ? null // rollup exists but its split is unknown
+          : combineWithExercise(
+              minutesByLevel?.moderate,
+              exercise?.activeMinutes,
+              exercise?.manualActiveMinutes
+            ),
+      vigorousMinutes: minutesByLevel ? minutesByLevel.vigorous : null,
       sleep: sleep || {},
     });
 
@@ -450,6 +477,8 @@ function toDailyActivity(doc) {
     steps: doc.steps ?? null,
     caloriesBurned: doc.caloriesBurned ?? null,
     activeMinutes: doc.activeMinutes ?? null,
+    moderateMinutes: doc.moderateMinutes ?? null,
+    vigorousMinutes: doc.vigorousMinutes ?? null,
     sleepMinutes: doc.sleep?.durationMinutes ?? null,
     source: doc.source,
   };
