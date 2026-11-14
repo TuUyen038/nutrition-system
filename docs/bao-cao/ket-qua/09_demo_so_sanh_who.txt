@@ -1,0 +1,59 @@
+
+================ Hồ sơ 1: Nhân viên văn phòng 30 tuổi, mới tập, chủ yếu đi bộ (Google: bước chân + phút theo mức)
+Tổng phút Google (kể cả vận động nhẹ): 336 phút/tuần
+[DỮ LIỆU CỦA USER]
+Khoảng thời gian: 2026-11-09 đến 2026-11-15; ngày có dữ liệu vận động: 7/7.
+Aerobic thực tế: 114 phút/tuần (quy đổi cường độ vừa: vừa + 2 × mạnh) (vừa 84 phút, mạnh 15 phút) -> CHƯA ĐẠT, còn thiếu 36.
+Tăng cơ thực tế: 1 ngày/tuần (buổi tập tăng cơ hoàn thành trong app) -> CHƯA ĐẠT.
+Bước chân trung bình: 5650 bước/ngày (7 ngày có dữ liệu).
+Trạng thái tập luyện: normal (readiness 6).
+Lưu ý dữ liệu: Số ngày tăng cơ/thăng bằng chỉ tính buổi tập trong app (Google không phân biệt loại bài tập).
+
+[ĐỀ XUẤT DO HỆ THỐNG TÍNH]
+1. Thêm 2 buổi aerobic × 20 phút cường độ vừa trong tuần tới.
+2. Thêm 1 buổi tập tăng cơ toàn thân (các nhóm cơ lớn) mỗi tuần.
+3. Trung bình 5650 bước/ngày: chỉ để theo dõi, số bước không phải chỉ tiêu của WHO.
+[CHUẨN KHUYẾN NGHỊ - khi nêu số chuẩn PHẢI kèm mã nguồn]
+Nhóm: Người trưởng thành (18–64 tuổi).
+Chuẩn WHO aerobic: 150–300 phút/tuần cường độ vừa (hoặc tương đương) [S1].
+Chuẩn WHO tăng cơ: ít nhất 2 ngày/tuần [S1].
+
+================ Hồ sơ 2: Người 35 tuổi tập đều: chạy bộ nhập tay + 2 buổi tạ trong app
+Tổng phút Google (kể cả vận động nhẹ): 490 phút/tuần
+[DỮ LIỆU CỦA USER]
+Khoảng thời gian: 2026-11-09 đến 2026-11-15; ngày có dữ liệu vận động: 7/7.
+Aerobic thực tế: 255 phút/tuần (quy đổi cường độ vừa: vừa + 2 × mạnh) (vừa 175 phút, mạnh 40 phút) -> ĐẠT.
+Tăng cơ thực tế: 2 ngày/tuần (buổi tập tăng cơ hoàn thành trong app) -> ĐẠT.
+Bước chân trung bình: 9000 bước/ngày (7 ngày có dữ liệu).
+Trạng thái tập luyện: ready (readiness 8).
+Lưu ý dữ liệu: Số ngày tăng cơ/thăng bằng chỉ tính buổi tập trong app (Google không phân biệt loại bài tập).
+
+[ĐỀ XUẤT DO HỆ THỐNG TÍNH]
+1. Lượng aerobic đã đạt khuyến nghị: duy trì, có thể tăng dần tới mức trên của khuyến nghị.
+2. Trung bình 9000 bước/ngày: chỉ để theo dõi, số bước không phải chỉ tiêu của WHO.
+[CHUẨN KHUYẾN NGHỊ - khi nêu số chuẩn PHẢI kèm mã nguồn]
+Nhóm: Người trưởng thành (18–64 tuổi).
+Chuẩn WHO aerobic: 150–300 phút/tuần cường độ vừa (hoặc tương đương) [S1].
+Chuẩn WHO tăng cơ: ít nhất 2 ngày/tuần [S1].
+
+================ Hồ sơ 3: Người 70 tuổi, đi bộ đều, chưa tập thăng bằng, chỉ có 5/7 ngày dữ liệu
+Tổng phút Google (kể cả vận động nhẹ): 175 phút/tuần
+[DỮ LIỆU CỦA USER]
+Khoảng thời gian: 2026-11-09 đến 2026-11-15; ngày có dữ liệu vận động: 5/7.
+Aerobic thực tế: 140 phút/tuần (quy đổi cường độ vừa: vừa + 2 × mạnh) (vừa 100 phút, mạnh 0 phút) -> CHƯA ĐẠT, còn thiếu 10.
+Tăng cơ thực tế: 2 ngày/tuần (buổi tập tăng cơ hoàn thành trong app) -> ĐẠT.
+Thăng bằng thực tế: 0 ngày/tuần (buổi thăng bằng / đa thành phần trong app) -> CHƯA ĐẠT.
+Bước chân trung bình: 4000 bước/ngày (5 ngày có dữ liệu).
+Trạng thái tập luyện: normal (readiness 6).
+Lưu ý dữ liệu: Có 5/7 ngày có dữ liệu, số phút cả tuần là ước lượng.
+Lưu ý dữ liệu: Số ngày tăng cơ/thăng bằng chỉ tính buổi tập trong app (Google không phân biệt loại bài tập).
+
+[ĐỀ XUẤT DO HỆ THỐNG TÍNH]
+1. Thêm 1 buổi aerobic × 10 phút cường độ vừa trong tuần tới.
+2. Thêm 3 buổi vận động đa thành phần (thăng bằng + sức mạnh) mỗi tuần để phòng ngã.
+3. Trung bình 4000 bước/ngày: chỉ để theo dõi, số bước không phải chỉ tiêu của WHO.
+[CHUẨN KHUYẾN NGHỊ - khi nêu số chuẩn PHẢI kèm mã nguồn]
+Nhóm: Người cao tuổi (từ 65 tuổi).
+Chuẩn WHO aerobic: 150–300 phút/tuần cường độ vừa (hoặc tương đương) [S1].
+Chuẩn WHO tăng cơ: ít nhất 2 ngày/tuần [S1].
+Chuẩn WHO thăng bằng / đa thành phần: ít nhất 3 ngày/tuần [S2].

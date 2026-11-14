@@ -232,10 +232,16 @@ function calculateCompletionRate(plan, now) {
 
   const today = toVNDateString(now);
 
-  // Only workout days that already happened (today included).
-  const pastWorkoutDays = plan.days.filter(
-    (d) => d.type === "workout" && toVNDateString(d.date) <= today
-  );
+  // Workout days that already happened. Today only counts once it is
+  // done: before, today's workout counted as missed until the user
+  // trained, so performance dropped every morning (step 8 scenarios).
+  const pastWorkoutDays = plan.days.filter((d) => {
+    if (d.type !== "workout") return false;
+
+    const date = toVNDateString(d.date);
+
+    return date < today || (date === today && d.completed);
+  });
 
   if (!pastWorkoutDays.length) return null;
 
@@ -367,6 +373,18 @@ async function getTrainingState(userId, { now = new Date(), sync = false } = {})
     googleHealthService.getActivitySummary(userId, 7),
   ]);
 
+  return computeTrainingState({ sessions, plan, activity, now, syncStatus });
+}
+
+/**
+ * Pure part of getTrainingState (no database): used by getTrainingState
+ * and by the step 8 scenario script, so both run exactly the same logic.
+ *
+ * sessions: completed WorkoutSessions of the last 28 days, newest first
+ * plan: active WorkoutPlan (or null)
+ * activity: googleHealthService.getActivitySummary() result
+ */
+function computeTrainingState({ sessions, plan, activity, now = new Date(), syncStatus = "skipped" }) {
   const fatigue = calculateFatigue({ sessions, activity, now });
   const recovery = calculateRecovery({ sessions, activity, now });
   const performance = calculatePerformance({ sessions, plan, now });
@@ -429,6 +447,7 @@ async function getTrainingState(userId, { now = new Date(), sync = false } = {})
 
 module.exports = {
   getTrainingState,
+  computeTrainingState,
   // exported for unit tests / step 8 calibration
   weightedScore,
   calculateFatigue,

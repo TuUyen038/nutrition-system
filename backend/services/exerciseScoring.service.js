@@ -93,7 +93,18 @@ function primaryGroups(exercise) {
  * Hard filters are about safety / feasibility, so they are never
  * traded off against a high score.
  */
+function daysSince(date, now) {
+  return date ? (now.getTime() - new Date(date).getTime()) / DAY_MS : Infinity;
+}
+
 function getExclusionReason(exercise, ctx) {
+  const stat = ctx.statsMap?.[exercise.exerciseId];
+
+  // The user replaced it recently because it hurt.
+  if (daysSince(stat?.painReportedAt, ctx.now) <= CONFIG.feedback.painExcludeDays) {
+    return "reported_pain";
+  }
+
   const limitations = (ctx.user.limitations || []).map(lower);
   const avoidFor = (exercise.avoidFor || []).map(lower);
 
@@ -228,7 +239,16 @@ function scoreExercise(exercise, ctx) {
   };
 
   // weightedScore works on any scale; components are 0-1 here.
-  const { score, usedWeights } = weightedScore(components, CONFIG.weights);
+  const { score: rawScore, usedWeights } = weightedScore(components, CONFIG.weights);
+
+  // The user replaced it recently because they did not like it.
+  const disliked =
+    daysSince(stat?.dislikedAt, ctx.now) <= CONFIG.feedback.dislikeDays;
+
+  const score =
+    rawScore === null
+      ? null
+      : Math.max(0, rawScore - (disliked ? CONFIG.feedback.dislikePenalty : 0));
 
   return {
     exercise,
@@ -237,6 +257,7 @@ function scoreExercise(exercise, ctx) {
       Object.entries(components).map(([k, v]) => [k, round2(v)])
     ),
     usedWeights,
+    disliked,
     primaryGroups: primaryGroups(exercise),
     // Only used to break ties: differs per user and per week, but is
     // stable when the same plan is generated again.
@@ -356,4 +377,7 @@ module.exports = {
   getExclusionReason,
   scoreExercise,
   orderWithDiversity,
+  // used by exerciseSubstitution (step 7)
+  primaryGroups,
+  LEVEL_RANK,
 };

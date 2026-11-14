@@ -320,7 +320,7 @@ From the International Classification of Functioning, Disability and Health, an 
 
 ### Glossary: Domains of physical activity
 
-Physical activity levels can be assessed in various domains, including one or more of the following: leisure-time, occupation, education, household and/or transportation.
+Physical activity levels can be assessed in various domains, including one of more of the following: leisure-time, occupation, education, household and/or transportation.
 
 ### Glossary: Exercise
 

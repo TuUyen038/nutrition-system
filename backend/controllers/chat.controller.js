@@ -140,6 +140,13 @@ exports.sendMessageV2 = async (req, res) => {
     return res.status(200).json({ success: true, data: result });
   } catch (error) {
     console.error("[Chat v2] sendMessageV2 error:", error.message);
+    if (error.code === "GEMINI_UNREACHABLE") {
+      return res.status(503).json({
+        success: false,
+        code: error.code,
+        message: error.message,
+      });
+    }
     return res.status(500).json({
       success: false,
       message: "Lỗi khi xử lý tin nhắn: " + error.message,

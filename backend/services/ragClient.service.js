@@ -24,13 +24,37 @@ async function classify(text) {
   return response.data;
 }
 
-async function retrieve(query, topK = 5, audiences = null) {
+/**
+ * @param {string[]|null} docIds chỉ tìm trong các tài liệu này (doc_id trong ai-service/data/sources.yaml)
+ */
+async function retrieve(query, topK = 5, audiences = null, docIds = null) {
   const response = await axios.post(
     `${baseURL}/rag/retrieve`,
-    { query, top_k: topK, audiences },
+    { query, top_k: topK, audiences, doc_ids: docIds },
     { timeout, headers: headers() },
   );
   return response.data;
 }
 
-module.exports = { classify, retrieve };
+/**
+ * Kiểm tra câu trả lời có bám nguồn không (ai-service app/grounding.py).
+ * sources: [{ id: "S1", text, title, org, year, section, lang }]
+ * allowedContext: các đoạn văn bản được phép chứa số liệu mà không cần nguồn (câu hỏi, hồ sơ user, kết quả DB tool)
+ */
+async function verify(answer, sources = [], allowedContext = [], semantic = null) {
+  const response = await axios.post(
+    `${baseURL}/rag/verify`,
+    {
+      answer,
+      sources: sources.map(({ id, text, title, org, year, section, lang }) => ({
+        id, text, title, org, year, section, lang,
+      })),
+      allowed_context: allowedContext.filter(Boolean).map((t) => String(t).slice(0, 4000)),
+      semantic,
+    },
+    { timeout: Number(process.env.AI_VERIFY_TIMEOUT_MS || 6000), headers: headers() },
+  );
+  return response.data;
+}
+
+module.exports = { classify, retrieve, verify };

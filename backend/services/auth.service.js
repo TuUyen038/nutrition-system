@@ -238,11 +238,7 @@ async function signup(data) {
 ========================= */
 
 async function login(email, password) {
-  const user =
-    await User.findOne({
-      email,
-    });
-
+  const user = await User.findOne({ email }).select("+password");
   if (!user) {
     throw new ServiceError(
       401,

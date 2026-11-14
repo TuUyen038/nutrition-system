@@ -56,6 +56,10 @@ VECTOR_RELEVANCE_THRESHOLDS = _by_lang("VECTOR_RELEVANCE_THRESHOLD_")
 # Đặt LANG_SCORE_OFFSET_EN=0 để tắt.
 LANG_SCORE_OFFSETS = _by_lang("LANG_SCORE_OFFSET_", {"en": 0.05})
 
+# Trừ điểm xếp hạng chunk thuộc mục dành riêng cho một nhóm (người cao tuổi, trẻ em, bà bầu, người khuyết tật)
+# khi câu hỏi không nhắc nhóm đó. 0 = tắt. Chọn theo scripts/eval_ablation.py
+SECTION_AUDIENCE_PENALTY = float(os.getenv("SECTION_AUDIENCE_PENALTY", "0.04"))
+
 ROUTER_KEYWORD_BOOST = float(os.getenv("ROUTER_KEYWORD_BOOST", "0.05"))
 ROUTER_MARGIN = float(os.getenv("ROUTER_MARGIN", "0.015"))
 ROUTER_SUB_MARGIN = float(os.getenv("ROUTER_SUB_MARGIN", "0.01"))
@@ -69,6 +73,17 @@ RERANK_MAX_LENGTH = int(os.getenv("RERANK_MAX_LENGTH", "1024"))
 
 
 INTERNAL_KEY = os.getenv("INTERNAL_KEY", "")
+
+# Kiểm tra chống ảo giác (/rag/verify, app/grounding.py)
+# Bật lớp so khớp ngữ nghĩa câu trả lời <-> chunk được trích (dùng model embedding đã nạp sẵn)
+GROUNDING_SEMANTIC = _flag("GROUNDING_SEMANTIC", "1")
+# Cosine tối thiểu giữa một câu và chunk nó trích (chunk tiếng Anh tự hạ theo LANG_SCORE_OFFSET_EN).
+# Chỉ sinh cảnh báo, không làm câu trả lời bị đánh trượt. Chỉnh theo scripts/eval_grounding.py
+GROUNDING_SIM_THRESHOLD = float(os.getenv("GROUNDING_SIM_THRESHOLD", "0.78"))
+# Các số quá phổ biến không cần nguồn (VD "1 tuần", "0 phút")
+GROUNDING_IGNORE_NUMBERS = [
+    x.strip() for x in os.getenv("GROUNDING_IGNORE_NUMBERS", "0,1").split(",") if x.strip()
+]
 
 RAW_DIR = BASE_DIR / "data" / "raw"
 INTERNAL_DIR = BASE_DIR / "data" / "internal"

@@ -9,6 +9,7 @@ const {
 } = require("./exerciseScoring.service");
 const {
   exerciseScoring: SCORING_CONFIG,
+  planGeneration: GENERATION_CONFIG,
 } = require("../config/adaptiveWorkout.config");
 
 // ====================
@@ -198,7 +199,6 @@ async function generateDayExercises({
   weight,
   dailyTargetCalories,
   intensity,
-  recoveryScore,
   recentExerciseIds,
   weekStartDate,
 }) {
@@ -229,25 +229,9 @@ async function generateDayExercises({
     maxExercises = 6;
   }
 
-  // Adaptive volume
-  if (intensity === "light") {
-    maxExercises -= 1;
-  }
-
-  if (intensity === "vigorous") {
-    maxExercises += 1;
-  }
-
-  // Recovery-aware adjustment
-  if (recoveryScore <= 4) {
-    maxExercises -= 1;
-  }
-
-  if (recoveryScore <= 2) {
-    intensity = "light";
-  }
-
-  maxExercises = Math.max(2, maxExercises);
+  // Volume / intensity are NOT adjusted to the user's state here any
+  // more: adaptivePlan (step 6) does it once, right after generation,
+  // from this base day. Doing it in both places stacked the reductions.
 
   const selected = [];
 
@@ -346,6 +330,60 @@ function createWeeklyStructure(level) {
 }
 
 // =====================================
+// REST-DAY RULES (week level)
+// =====================================
+
+/**
+ * Turns workout days into rest days when the user's state is very poor
+ * at generation time (config planGeneration.restDayRules):
+ *   Recovery <= 3 -> the first workout day becomes rest,
+ *   Fatigue  >= 8 -> the last workout day becomes rest.
+ * Changes `structure` in place. Never drops below minWorkoutDays and
+ * never picks the same day twice.
+ *
+ * These decide how OFTEN the user trains this week. How HARD each
+ * remaining day is stays with adaptivePlan (step 6), so they do not
+ * overlap.
+ *
+ * -> { days: [day numbers], reasons: [string] }
+ */
+function applyRestDayRules(structure, state) {
+  const result = { days: [], reasons: [] };
+
+  for (const rule of GENERATION_CONFIG.restDayRules) {
+    const value = state[rule.metric];
+
+    if (typeof value !== "number") continue;
+
+    const matches =
+      (rule.atMost !== undefined && value <= rule.atMost) ||
+      (rule.atLeast !== undefined && value >= rule.atLeast);
+
+    if (!matches) continue;
+
+    const workoutDays = structure.filter((d) => d.type === "workout");
+
+    if (workoutDays.length <= GENERATION_CONFIG.minWorkoutDays) break;
+
+    const target = rule.pick === "last" ? workoutDays[workoutDays.length - 1] : workoutDays[0];
+
+    const reason =
+      rule.atMost !== undefined
+        ? `${rule.label} ${value} ≤ ${rule.atMost}: tuần này bớt 1 buổi tập (ngày ${target.day} thành ngày nghỉ).`
+        : `${rule.label} ${value} ≥ ${rule.atLeast}: tuần này bớt 1 buổi tập (ngày ${target.day} thành ngày nghỉ).`;
+
+    target.type = "rest";
+    target.focus = "recovery";
+    target.restReason = reason;
+
+    result.days.push(target.day);
+    result.reasons.push(reason);
+  }
+
+  return result;
+}
+
+// =====================================
 // GENERATE ADAPTIVE WEEKLY PLAN
 // =====================================
 
@@ -368,61 +406,10 @@ async function generateAdaptiveWorkoutPlan(
 
   const state = await analyzeUserState(userId);
 
-  let weeklyStructure = createWeeklyStructure(
-    workoutLevel
-  );
+  const weeklyStructure = createWeeklyStructure(workoutLevel);
 
-  // Recovery-aware adjustment
-  if (state.recoveryScore <= 3) {
-
-    // Convert 1 workout day to rest
-    const workoutIndex =
-      weeklyStructure.findIndex(
-        (d) => d.type === "workout"
-      );
-
-    if (workoutIndex !== -1) {
-      weeklyStructure[
-        workoutIndex
-      ] = {
-        ...weeklyStructure[
-          workoutIndex
-        ],
-        type: "rest",
-        focus: "recovery",
-      };
-    }
-  }
-
-  // High fatigue -> reduce training frequency
-  if (state.fatigueScore >= 8) {
-
-    const lastWorkoutIndex =
-      weeklyStructure
-        .map((d, index) => ({
-          ...d,
-          index,
-        }))
-        .reverse()
-        .find(
-          (d) =>
-            d.type === "workout"
-        )?.index;
-
-    if (
-      lastWorkoutIndex !== undefined
-    ) {
-      weeklyStructure[
-        lastWorkoutIndex
-      ] = {
-        ...weeklyStructure[
-          lastWorkoutIndex
-        ],
-        type: "rest",
-        focus: "recovery",
-      };
-    }
-  }
+  // Week-level rules: how many days to train this week.
+  const restDecision = applyRestDayRules(weeklyStructure, state);
 
   const today = new Date(baseDate);
 
@@ -450,6 +437,15 @@ async function generateAdaptiveWorkoutPlan(
         estimatedDifficulty: 1,
         completed: false,
         skipped: false,
+        // Set when a rest-day rule turned this workout day into rest,
+        // so the app can say why.
+        ...(item.restReason && {
+          adaptation: {
+            action: "rest",
+            reasons: [item.restReason],
+            appliedAt: new Date(),
+          },
+        }),
       });
 
       continue;
@@ -463,8 +459,7 @@ async function generateAdaptiveWorkoutPlan(
       level: workoutLevel,
       weight: user.weight,
       dailyTargetCalories,
-      intensity: state.recommendedIntensity,
-      recoveryScore: state.recoveryScore,
+      intensity: GENERATION_CONFIG.baseIntensity,
       recentExerciseIds,
       weekStartDate: today,
     });
@@ -476,22 +471,7 @@ async function generateAdaptiveWorkoutPlan(
     weeklyEstimatedCalories += generated.estimatedCalories;
     weeklyTargetCalories += dailyTargetCalories;
 
-    let estimatedDifficulty = 6;
-
-    if (state.recommendedIntensity === "light") {
-      estimatedDifficulty = 4;
-    }
-
-    if (state.recommendedIntensity === "vigorous") {
-      estimatedDifficulty = 8;
-    }
-
-    estimatedDifficulty += Math.floor(Math.random() * 3) - 1;
-
-    estimatedDifficulty = Math.max(
-      1,
-      Math.min(10, estimatedDifficulty)
-    );
+    const estimatedDifficulty = GENERATION_CONFIG.baseDifficulty;
 
     days.push({
       day: item.day,
@@ -530,6 +510,10 @@ async function generateAdaptiveWorkoutPlan(
     avgPerformanceScore: state.avgPerformanceScore,
 
     readinessScore: state.readinessScore,
+
+    // Rest-day rules applied to this week (empty when none matched),
+    // stored in plan.adaptations by workoutPlan.service.
+    restDecision,
 
     weekStartDate: today,
 
@@ -595,4 +579,11 @@ async function previewExerciseRanking(userId, focus, limit = 10) {
 module.exports = {
   generateAdaptiveWorkoutPlan,
   previewExerciseRanking,
+  // used by adaptivePlan.service (step 6)
+  getExercisesByFocus,
+  calculateCalories,
+  getWorkoutLevel,
+  MUSCLE_GROUP_MAPPINGS,
+  // exported for unit tests / step 8 calibration
+  applyRestDayRules,
 };

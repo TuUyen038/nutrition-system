@@ -1,0 +1,100 @@
+
+=== an_rau_qua_dung_cach  [legacy]  data/raw/an_rau_qua_dung_cach.md
+  SKIP: chưa có file gốc (không khai báo) -> không chứng minh được nguồn
+
+=== cam_nang_hoat_dong_the_luc_2026  [legacy]  data/raw/cam_nang_hoat_dong_the_luc_2026.md
+  SKIP: chưa có file gốc (không khai báo) -> không chứng minh được nguồn
+
+=== gia_tri_dinh_duong_rau_qua  [legacy]  data/raw/gia_tri_dinh_duong_rau_qua.md
+  SKIP: chưa có file gốc (không khai báo) -> không chứng minh được nguồn
+
+=== giam_muoi_2018  [legacy]  data/raw/giam_muoi_2018.md
+  SKIP: chưa có file gốc (không khai báo) -> không chứng minh được nguồn
+
+=== hoi_dap_thieu_vi_chat_bot_mi_2012  [legacy]  data/raw/hoi_dap_thieu_vi_chat_bot_mi_2012.md
+  SKIP: chưa có file gốc (không khai báo) -> không chứng minh được nguồn
+
+=== huong_dan_an_bo_sung  [legacy]  data/raw/huong_dan_an_bo_sung.md
+  SKIP: chưa có file gốc (không khai báo) -> không chứng minh được nguồn
+
+=== rau_qua_5_nhom_mau  [legacy]  data/raw/rau_qua_5_nhom_mau.md
+  SKIP: chưa có file gốc (không khai báo) -> không chứng minh được nguồn
+
+=== rau_qua_mua_he  [legacy]  data/raw/rau_qua_mua_he.md
+  SKIP: chưa có file gốc (không khai báo) -> không chứng minh được nguồn
+
+=== rau_qua_mua_thu  [legacy]  data/raw/rau_qua_mua_thu.md
+  SKIP: chưa có file gốc (không khai báo) -> không chứng minh được nguồn
+
+=== tac_hai_do_uong_co_duong_2025  [legacy]  data/raw/tac_hai_do_uong_co_duong_2025.md
+  SKIP: chưa có file gốc (không khai báo) -> không chứng minh được nguồn
+
+=== thap_dinh_duong_moi  [legacy]  data/raw/thap_dinh_duong_moi.md
+  SKIP: chưa có file gốc (không khai báo) -> không chứng minh được nguồn
+
+=== thua_can_beo_phi_nguoi_lon_2007  [legacy]  data/raw/thua_can_beo_phi_nguoi_lon_2007.md
+  SKIP: chưa có file gốc (không khai báo) -> không chứng minh được nguồn
+
+=== van_dong_deu_dang_quy_2025  [legacy]  data/raw/van_dong_deu_dang_quy_2025.md
+  SKIP: chưa có file gốc (không khai báo) -> không chứng minh được nguồn
+
+=== who_healthy_diet  [checked]  data/raw/who_healthy_diet.md
+  đoạn: 130 (+8 đoạn ngắn) | exact 130 (100.0%) | near 0 | not_found 0
+  số liệu: 24 số, không có trong gốc: 0
+  heading: 13, không có trong gốc (do người/AI thêm, cần duyệt): 0
+  => PASS
+
+=== who_physical_activity_2020  [checked]  data/raw/who_physical_activity_2020.md
+  đoạn: 321 (+2 đoạn ngắn) | exact 320 (99.7%) | near 1 | not_found 0
+  số liệu: 18 số, không có trong gốc: 0
+  heading: 61, không có trong gốc (do người/AI thêm, cần duyệt): 52
+      + Overview of the WHO guidelines on physical activity and sedentary behaviour (executive summary)
+      + Summary of recommendations by population
+      + Children and adolescents (aged 5–17 years) – physical activity recommendation
+      + Adults (aged 18–64 years) – physical activity recommendation
+      + Adults (aged 18–64 years) – sedentary behaviour recommendation
+      + Older adults (aged 65 years and older) – physical activity recommendation
+      + Older adults (aged 65 years and older) – sedentary behaviour recommendation
+      + Pregnant and postpartum women – physical activity recommendation
+      + Pregnant and postpartum women – sedentary behaviour recommendation
+      + Adults and older adults with chronic conditions (aged 18 years and older) – physical activity recommendation
+      + Adults and older adults with chronic conditions (aged 18 years and older) – sedentary behaviour recommendation
+      + Children, adolescents and adults living with disability – physical activity: overview
+      + Children and adolescents (aged 5–17 years) living with disability – physical activity recommendation
+      + Adults (aged 18 years and older) living with disability – physical activity recommendation
+      + Children, adolescents and adults living with disability – sedentary behaviour: definition
+      + Children and adolescents (aged 5–17 years) living with disability – sedentary behaviour recommendation
+      + Adults (aged 18 years and older) living with disability – sedentary behaviour recommendation
+      + Glossary: Aerobic physical activity
+      + Glossary: Anaerobic physical activity
+      + Glossary: Balance training
+  => PASS
+
+=== who_physical_activity_2020_evidence  [rejected]  data/optional/who_physical_activity_2020_evidence.md
+  SKIP: chưa có file gốc (không khai báo) -> không chứng minh được nguồn
+
+=== who_physical_activity_fact_sheet  [checked]  data/raw/who_physical_activity_fact_sheet.md
+  đoạn: 77 (+6 đoạn ngắn) | exact 77 (100.0%) | near 0 | not_found 0
+  số liệu: 36 số, không có trong gốc: 0
+  heading: 7, không có trong gốc (do người/AI thêm, cần duyệt): 0
+  => PASS
+
+=== acsm_quantity_quality_2011  [rejected]  data/raw/acsm_quantity_quality_2011.md
+  SKIP: chưa có file gốc (sources/acsm_quantity_quality_2011/source.pdf) -> không chứng minh được nguồn
+
+=== acsm_resistance_training_2026  [checked]  data/raw/acsm_resistance_training_2026.md
+  đoạn: 328 (+26 đoạn ngắn) | exact 328 (100.0%) | near 0 | not_found 0
+  số liệu: 46 số, không có trong gốc: 0
+  heading: 21, không có trong gốc (do người/AI thêm, cần duyệt): 0
+  => PASS
+
+=== acsm_preparticipation_screening_2015  [rejected]  data/raw/acsm_preparticipation_screening_2015.md
+  SKIP: chưa có file gốc (sources/acsm_preparticipation_screening_2015/source.pdf) -> không chứng minh được nguồn
+
+=== us_physical_activity_guidelines_2018  [checked]  data/raw/us_physical_activity_guidelines_2018.md
+  đoạn: 661 (+15 đoạn ngắn) | exact 661 (100.0%) | near 0 | not_found 0
+  số liệu: 46 số, không có trong gốc: 0
+  heading: 98, không có trong gốc (do người/AI thêm, cần duyệt): 0
+  => PASS
+
+Tổng: 21 tài liệu, FAIL 0

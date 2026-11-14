@@ -4,14 +4,19 @@ const User = require("../models/User");
 const Exercise = require("../models/Exercise");
 const ActivityMet = require("../models/ActivityMet");
 const UserExerciseStats = require("../models/UserExerciseStats");
+const { toVNDateString } = require("../utils/date");
 
 function calculatePerformanceScore({
   completedSets,
   targetSets,
   perceivedDifficulty,
 }) {
-  let score =
-    (completedSets / targetSets) * 10;
+  // No target (old data) -> did something = full, nothing = 0.
+  const ratio = targetSets > 0
+    ? completedSets / targetSets
+    : completedSets > 0 ? 1 : 0;
+
+  let score = ratio * 10;
 
   if (perceivedDifficulty >= 8) {
     score -= 2;
@@ -156,12 +161,67 @@ async function getWorkoutHistory(userId, options = {}) {
   }
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+// A session left open longer than this (app closed, phone died...) is
+// closed as abandoned instead of blocking every later workout.
+const STALE_SESSION_HOURS = 3;
+
+// Same default as workoutRecommendation.calculateCalories.
+const DEFAULT_MET = 5;
+
+function httpError(statusCode, message) {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  return error;
+}
+
+async function getMet(activityType, intensity) {
+  try {
+    const metData = await ActivityMet.findOne({ activityType }).lean();
+
+    return metData?.mets?.[intensity] || DEFAULT_MET;
+  } catch (err) {
+    return DEFAULT_MET;
+  }
+}
+
+async function closeStaleSessions(userId, now) {
+  await WorkoutSession.updateMany(
+    {
+      userId,
+      endTime: null,
+      startTime: { $lt: new Date(now.getTime() - STALE_SESSION_HOURS * 60 * 60 * 1000) },
+    },
+    [
+      {
+        $set: {
+          endTime: "$startTime",
+          completed: false,
+          skipped: true,
+          userFeedback: "auto-closed: abandoned session",
+        },
+      },
+    ]
+  );
+}
+
+/**
+ * userId always comes from the token (req.user), never from the body:
+ * the plan must belong to that user.
+ */
 async function startWorkout({
   userId,
   planId,
   day,
   exerciseId,
 }) {
+  const now = new Date();
+  const dayNumber = Number(day);
+  const exerciseNumber = Number(exerciseId);
+
+  await closeStaleSessions(userId, now);
+
   const active =
     await WorkoutSession.findOne({
       userId,
@@ -169,64 +229,78 @@ async function startWorkout({
     });
 
   if (active) {
-    throw new Error(
-      "Workout session already active"
-    );
+    throw httpError(409, "Workout session already active");
   }
 
   const plan =
-    await WorkoutPlan.findById(planId);
+    await WorkoutPlan.findOne({ _id: planId, userId });
 
   if (!plan) {
-    throw new Error("Plan not found");
+    throw httpError(404, "Plan not found");
   }
 
   const dayData = plan.days.find(
-    (d) => d.day === day
+    (d) => d.day === dayNumber
   );
+
+  if (!dayData) {
+    throw httpError(404, `Day ${dayNumber} not found`);
+  }
+
+  if (dayData.type !== "workout") {
+    throw httpError(400, "Ngày này là ngày nghỉ");
+  }
+
+  if (dayData.completed || dayData.skipped) {
+    throw httpError(400, "Ngày này đã hoàn thành hoặc đã bỏ qua");
+  }
 
   const exerciseData =
     dayData.exerciseDetails.find(
-      (e) => e.exerciseId === exerciseId
+      (e) => e.exerciseId === exerciseNumber
     );
+
+  if (!exerciseData) {
+    throw httpError(404, `Exercise ${exerciseNumber} is not in day ${dayNumber}`);
+  }
 
   const exercise =
     await Exercise.findOne({
-      exerciseId,
-    });
+      exerciseId: exerciseNumber,
+    }).lean();
 
   const session = new WorkoutSession({
     userId,
 
-    planId,
+    planId: plan._id,
 
-    day,
+    day: dayNumber,
 
     focus: dayData.focus,
 
-    exerciseId,
+    exerciseId: exerciseNumber,
 
     exerciseName:
       exerciseData.name,
 
     intensity:
-      exerciseData.intensity,
+      exerciseData.intensity || "moderate",
 
     targetSets:
-      exerciseData.sets,
+      exerciseData.sets || 0,
 
     targetReps:
-      exerciseData.reps,
+      exerciseData.reps || "",
 
     estimatedCalories:
-      exerciseData.calories,
+      exerciseData.calories || 0,
 
     muscleGroups:
       exercise?.muscles?.map(
-        (m) => m.name_en
+        (m) => m.name_en || m.name
       ) || [],
 
-    startTime: new Date(),
+    startTime: now,
   });
 
   await session.save();
@@ -235,18 +309,28 @@ async function startWorkout({
 }
 
 async function stopWorkout({
+  userId,
   sessionId,
   completedSets,
   completedReps,
   perceivedDifficulty,
 }) {
   const session =
-    await WorkoutSession.findById(
-      sessionId
-    );
+    await WorkoutSession.findOne({
+      _id: sessionId,
+      userId,
+    });
 
   if (!session || session.endTime) {
-    throw new Error("Session invalid");
+    throw httpError(400, "Session invalid");
+  }
+
+  const sets = Math.max(0, Number(completedSets) || 0);
+  const reps = Math.max(0, Number(completedReps) || 0);
+  const rpe = Number(perceivedDifficulty);
+
+  if (!Number.isFinite(rpe) || rpe < 1 || rpe > 10) {
+    throw httpError(400, "perceivedDifficulty must be between 1 and 10");
   }
 
   const endTime = new Date();
@@ -258,55 +342,37 @@ async function stopWorkout({
 
   const user = await User.findById(
     session.userId
-  );
+  ).lean();
 
   const exercise =
     await Exercise.findOne({
       exerciseId:
         session.exerciseId,
-    });
+    }).lean();
 
-  const metData =
-    await ActivityMet.findOne({
-      activityType:
-        exercise.activityType,
-    });
-
-  if (!metData) {
-    throw new Error(
-      `MET data not found for ${exercise.activityType}`
-    );
-  }
-
-  const met =
-    metData.mets?.[
-      session.intensity
-    ];
-
-  if (!met) {
-    throw new Error(
-      `MET intensity not found for ${session.intensity}`
-    );
-  }
+  const met = await getMet(
+    exercise?.activityType,
+    session.intensity
+  );
 
   const kcalBurned =
     met *
-    user.weight *
+    (user?.weight || 60) *
     (durationMinutes / 60);
 
   const performanceScore =
     calculatePerformanceScore({
-      completedSets,
+      completedSets: sets,
       targetSets:
         session.targetSets,
-      perceivedDifficulty,
+      perceivedDifficulty: rpe,
     });
 
   const fatigueImpact =
     calculateFatigue({
       intensity: session.intensity,
       duration: durationMinutes,
-      perceivedDifficulty,
+      perceivedDifficulty: rpe,
     });
 
   session.endTime = endTime;
@@ -317,14 +383,11 @@ async function stopWorkout({
   session.actualCalories =
     Math.round(kcalBurned);
 
-  session.completedSets =
-    completedSets;
+  session.completedSets = sets;
 
-  session.completedReps =
-    completedReps;
+  session.completedReps = reps;
 
-  session.perceivedDifficulty =
-    perceivedDifficulty;
+  session.perceivedDifficulty = rpe;
 
   session.performanceScore =
     performanceScore;
@@ -341,24 +404,28 @@ async function stopWorkout({
     exerciseId:
       session.exerciseId,
     performanceScore,
-    perceivedDifficulty,
+    perceivedDifficulty: rpe,
   });
 
   return session;
 }
 
+/**
+ * Calories of today's sessions. "Today" is the Vietnam day, whatever
+ * the server's timezone is.
+ */
 async function getTodayKcal(userId) {
-  const start = new Date();
-
-  start.setHours(0, 0, 0, 0);
+  const today = toVNDateString(new Date());
+  const start = new Date(`${today}T00:00:00+07:00`);
 
   const sessions =
     await WorkoutSession.find({
       userId,
       startTime: {
         $gte: start,
+        $lt: new Date(start.getTime() + DAY_MS),
       },
-    });
+    }).lean();
 
   const totalKcal =
     sessions.reduce(
@@ -378,4 +445,4 @@ module.exports = {
   stopWorkout,
   getTodayKcal,
   getWorkoutHistory,
-};
+};

@@ -1,0 +1,27 @@
+Nguồn [S1]: WHO guidelines on physical activity and sedentary behaviour (World Health Organization (WHO), 2020) - mục: Adults (aged 18–64 years) – physical activity recommendation
+
+=== Trả lời đúng nguồn
+Câu trả lời : Người trưởng thành nên vận động 150–300 phút cường độ vừa mỗi tuần [S1]. Ngoài ra nên tập tăng cơ từ 2 ngày mỗi tuần [S1].
+Kết quả     : ĐẠT | tỷ lệ câu có căn cứ 1.00
+  - cảnh báo [low_semantic_support]: cosine 0.6062 < 0.73
+
+=== Bịa số liệu
+Câu trả lời : WHO khuyến nghị người trưởng thành vận động 200 phút mỗi tuần [S1].
+Kết quả     : KHÔNG ĐẠT | tỷ lệ câu có căn cứ 0.00
+  - lỗi [unsupported_number]: số 200 không có trong nguồn nào
+  - cảnh báo [low_semantic_support]: cosine 0.7167 < 0.73
+Bản đã sửa  : (bỏ toàn bộ -> chatbot trả lời: chưa có thông tin đủ tin cậy)
+
+=== Có số nhưng quên trích dẫn + trích nguồn không tồn tại
+Câu trả lời : Người lớn nên vận động 75–150 phút cường độ mạnh mỗi tuần. Nên tập 5 ngày mỗi tuần [S4].
+Kết quả     : KHÔNG ĐẠT | tỷ lệ câu có căn cứ 0.00
+  - lỗi [uncited_number]: câu có số liệu nhưng không có [Sx]
+  - lỗi [invalid_citation]: [S4] không tồn tại
+  - lỗi [unsupported_number]: số 5 không có trong nguồn nào
+Bản đã sửa  : Người lớn nên vận động 75–150 phút cường độ mạnh mỗi tuần [S1].
+
+=== Số liệu cá nhân của user (được phép, không cần nguồn)
+Câu trả lời : Tuần này bạn mới vận động 90 phút, chưa đạt mức 150 phút mỗi tuần [S1].
+Kết quả     : ĐẠT | tỷ lệ câu có căn cứ 1.00
+  - cảnh báo [low_semantic_support]: cosine 0.5714 < 0.73
+

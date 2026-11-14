@@ -16,7 +16,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app import config, embedding, vector_store  # noqa: E402
+from app import config, embedding, source_registry, vector_store  # noqa: E402
 from app.chunking import chunk_document, load_profiles, resolve_settings  # noqa: E402
 from app.loaders import SUPPORTED, load_document, load_internal_jsonl  # noqa: E402
 
@@ -60,6 +60,26 @@ def main():
         )
 
     files = sorted({p.resolve(): p for p in files}.values(), key=lambda p: str(p))
+
+    # Kiểm soát nguồn: chỉ nạp tài liệu đã đăng ký trong data/sources.yaml với status cho phép
+    registry = source_registry.entry_by_file(source_registry.load_registry())
+    if registry:
+        kept = []
+        for p in files:
+            if p.suffix.lower() == ".jsonl":
+                kept.append(p)
+                continue
+            entry = registry.get(p.name.lower())
+            status = (entry or {}).get("status")
+            if entry is None:
+                print(f"[warn] {p.name}: chưa đăng ký trong data/sources.yaml (vẫn nạp; nên đăng ký)")
+            elif status in source_registry.SKIP_STATUSES:
+                print(f"[skip] {p.name}: status={status} trong sources.yaml")
+                continue
+            elif status == "legacy":
+                print(f"[warn] {p.name}: status=legacy (chưa có file gốc để đối chiếu)")
+            kept.append(p)
+        files = kept
 
     if args.only:
         wanted = {n.lower() for n in args.only}

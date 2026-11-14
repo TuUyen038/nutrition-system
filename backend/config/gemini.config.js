@@ -47,6 +47,21 @@ const RETRYABLE_ERRORS = new Set([
   "INTERNAL",
 ]);
 
+/**
+ * Lỗi mạng (không tới được máy chủ Gemini): đổi key/model không giúp gì vì cùng một máy chủ,
+ * thử lại chỉ làm user chờ thêm vài chục giây -> dừng ngay, báo lỗi rõ ràng.
+ */
+const NETWORK_ERROR_CODES = new Set([
+  "UND_ERR_CONNECT_TIMEOUT", "UND_ERR_SOCKET", "ECONNREFUSED", "ECONNRESET",
+  "ETIMEDOUT", "ENOTFOUND", "EAI_AGAIN", "ENETUNREACH", "EHOSTUNREACH",
+]);
+
+const isNetworkError = (err) => {
+  const code = err?.cause?.code || err?.code;
+  if (NETWORK_ERROR_CODES.has(code)) return true;
+  return /fetch failed|network|socket hang up/i.test(err?.message || "");
+};
+
 const isRetryable = (err) => {
   if (!err) return false;
   const status = err.status ?? err.httpStatus ?? err.code;
@@ -76,7 +91,10 @@ Với các chủ đề sau, PHẢI gọi tool TRƯỚC KHI trả lời — khôn
 4. Chỉ số dinh dưỡng cá nhân / TDEE / nhu cầu calo → get_nutrition_goal
 5. Bài tập thể dục → search_exercises → get_exercise_detail
 
-Nếu tool trả về rỗng hoặc not found → dùng kiến thức chung, thêm tiền tố [Tham khảo bên ngoài].
+Nếu tool database trả về rỗng hoặc not found → dùng kiến thức chung, thêm tiền tố [Tham khảo bên ngoài].
+NGOẠI LỆ: rag_retrieve (kho tài liệu y khoa đã kiểm duyệt) trả về rỗng → KHÔNG dùng kiến thức chung,
+trả lời rằng kho tài liệu chưa có thông tin, không đưa ra con số hay khuyến nghị.
+Khi có kết quả rag_retrieve: chỉ dùng nội dung các nguồn [Sx], chép đúng số liệu, mỗi câu có số liệu kết thúc bằng [Sx].
 
 ## XỬ LÝ HỘI THOẠI LIÊN TỤC
 
@@ -173,6 +191,16 @@ async function withFallback(operation, type = "chat") {
         console.log(`[Gemini] Success: ${label}`);
         return result;
       } catch (err) {
+        if (isNetworkError(err)) {
+          console.error(`[Gemini] Network error ${label}: ${err.message} (${err?.cause?.code || "no code"})`);
+          const netErr = new Error(
+            "Không kết nối được tới máy chủ Gemini (generativelanguage.googleapis.com). " +
+            "Kiểm tra kết nối mạng, VPN, tường lửa hoặc thử mạng khác."
+          );
+          netErr.code = "GEMINI_UNREACHABLE";
+          netErr.cause = err;
+          throw netErr;
+        }
         const retryable = isRetryable(err);
         console.warn(
           `[Gemini] Failed ${label}: ${err.message} | retryable=${retryable}`
@@ -206,6 +234,7 @@ const getChatModel = () => makeChatModel(API_KEYS[0], MODEL_CHAIN[0]);
 const getVisionModel = () => makeVisionModel(API_KEYS[0], MODEL_CHAIN[0]);
 
 module.exports = {
+  isNetworkError,
   getChatModel,
   getVisionModel,
   withFallback,

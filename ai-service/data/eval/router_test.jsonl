@@ -132,3 +132,9 @@
 {"text": "Làm sao bây giờ?", "label": "ambiguous"}
 {"text": "Giúp mình với", "label": "ambiguous"}
 {"text": "Hôm nay mình nên làm gì?", "label": "ambiguous"}
+{"text": "Tuần vừa rồi tôi vận động có đủ theo khuyến nghị WHO không?", "label": "mixed"}
+{"text": "Dữ liệu Google Fit của mình đã đạt chuẩn vận động chưa?", "label": "mixed"}
+{"text": "So với WHO thì mức tập của tôi đang thiếu hay thừa?", "label": "mixed"}
+{"text": "Mình cần tập thêm bao nhiêu nữa mới đủ chuẩn?", "label": "mixed"}
+{"text": "Đồng hồ ghi tôi đi 6000 bước mỗi ngày, vậy có đủ không?", "label": "mixed"}
+{"text": "Với số phút vận động tuần này, tôi nên bổ sung bài tập gì?", "label": "mixed"}

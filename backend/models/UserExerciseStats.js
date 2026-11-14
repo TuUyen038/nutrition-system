@@ -58,6 +58,18 @@ const UserExerciseStatsSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+
+    // Step 7/8: set when the user replaces this exercise with reason
+    // "dislike" / "pain"; used by exerciseScoring.
+    dislikedAt: {
+      type: Date,
+      default: null,
+    },
+
+    painReportedAt: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,
@@ -77,4 +89,4 @@ UserExerciseStatsSchema.index(
 module.exports = mongoose.model(
   "UserExerciseStats",
   UserExerciseStatsSchema
-);
+);
