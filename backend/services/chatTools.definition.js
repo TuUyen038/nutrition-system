@@ -260,6 +260,32 @@ const CHAT_TOOLS = [
     },
   },
 
+  {
+    name: "get_activity_vs_who",
+
+    description:
+      "So sánh hoạt động thể lực THỰC TẾ của user (dữ liệu Google Health 7 ngày gần nhất + buổi tập trong app) " +
+      "với chuẩn khuyến nghị WHO theo nhóm tuổi, và đưa ra khuyến nghị bài tập cá nhân hóa kèm nguồn trích dẫn. " +
+      "BẮT BUỘC dùng khi user hỏi: " +
+      "'tôi vận động đã đủ chưa', " +
+      "'tuần này tôi tập đủ theo WHO chưa', " +
+      "'so với khuyến nghị thì tôi vận động thế nào', " +
+      "'dữ liệu Google Fit / Google Health của tôi có đạt chuẩn không', " +
+      "'tôi nên tập thêm gì để đủ khuyến nghị', " +
+      "'số bước chân của tôi như vậy có đủ không'. " +
+      "Mọi con số trong kết quả do hệ thống tính: KHÔNG tự tính lại, KHÔNG đổi số.",
+
+    parameters: {
+      type: "object",
+      properties: {
+        sync: {
+          type: "boolean",
+          description: "true = đồng bộ dữ liệu Google Health mới nhất trước khi so sánh (mặc định true)",
+        },
+      },
+    },
+  },
+
   // ─── FAVORITE ────────────────────────────────────────────────────────────────
   {
     name: "get_favorite_recipes",

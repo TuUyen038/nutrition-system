@@ -52,6 +52,21 @@ const googleHealthDataSchema = new mongoose.Schema(
       min: 0,
     },
 
+    // Moderate / vigorous minutes (Google active-minutes by level). Used for
+    // the WHO comparison; activeMinutes above also includes LIGHT minutes.
+    // null = no breakdown (old documents, mock data without these fields).
+    moderateMinutes: {
+      type: Number,
+      default: null,
+      min: 0,
+    },
+
+    vigorousMinutes: {
+      type: Number,
+      default: null,
+      min: 0,
+    },
+
     sleep: {
       type: sleepSchema,
       default: () => ({}),

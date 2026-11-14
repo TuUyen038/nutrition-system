@@ -374,8 +374,9 @@ async function _runGeminiWithTools(
     : null;
 
   const geminiTools = getGeminiToolsForIntent(routeInfo?.intent);
+  // Tool có trả nguồn tài liệu [Sx] -> cần quy tắc trích dẫn + kiểm tra chống ảo giác
   const ragAvailable = geminiTools[0].functionDeclarations.some(
-    (tool) => tool.name === "rag_retrieve",
+    (tool) => tool.name === "rag_retrieve" || tool.name === "get_activity_vs_who",
   );
 
   const finalPrompt = [
@@ -442,8 +443,11 @@ async function _runGeminiWithTools(
             const toolResult = await executeTool(name, args, userId, { sources });
             lastToolResult = toolResult;
             if (name !== "rag_retrieve" && toolResult?.success !== false) {
+              // Tool có cả số liệu cá nhân lẫn nguồn tài liệu khai báo riêng phần được dùng không cần [Sx]
               personalTexts.push(
-                toolResult?.summary || JSON.stringify(toolResult?.data ?? "").slice(0, 4000),
+                ...(toolResult?.allowedContext || [
+                  toolResult?.summary || JSON.stringify(toolResult?.data ?? "").slice(0, 4000),
+                ]),
               );
             }
             toolsUsed.push({ name, args, success: toolResult?.success ?? true });
