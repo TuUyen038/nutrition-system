@@ -56,6 +56,10 @@ VECTOR_RELEVANCE_THRESHOLDS = _by_lang("VECTOR_RELEVANCE_THRESHOLD_")
 # Đặt LANG_SCORE_OFFSET_EN=0 để tắt.
 LANG_SCORE_OFFSETS = _by_lang("LANG_SCORE_OFFSET_", {"en": 0.05})
 
+# Trừ điểm xếp hạng chunk thuộc mục dành riêng cho một nhóm (người cao tuổi, trẻ em, bà bầu, người khuyết tật)
+# khi câu hỏi không nhắc nhóm đó. 0 = tắt. Chọn theo scripts/eval_ablation.py
+SECTION_AUDIENCE_PENALTY = float(os.getenv("SECTION_AUDIENCE_PENALTY", "0.04"))
+
 ROUTER_KEYWORD_BOOST = float(os.getenv("ROUTER_KEYWORD_BOOST", "0.05"))
 ROUTER_MARGIN = float(os.getenv("ROUTER_MARGIN", "0.015"))
 ROUTER_SUB_MARGIN = float(os.getenv("ROUTER_SUB_MARGIN", "0.01"))
