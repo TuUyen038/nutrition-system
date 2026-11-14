@@ -295,38 +295,51 @@ Nếu log hiện `Intent tools: fallback`, backend không gọi được `/route
 
 ## Đánh giá
 
+### Truy xuất (định lượng, không gọi LLM)
+
 ```bash
-venv/bin/python scripts/eval_retrieval.py --ks 1 5 20 --verbose
-venv/bin/python scripts/eval_generic.py --verbose
+venv/bin/python scripts/eval_retrieval.py --verbose                    # bộ vận động + bộ cũ, K = 1 3 5 10
+venv/bin/python scripts/eval_retrieval.py --thresholds vi=0.64 en=0.58 # thử ngưỡng khác, không cần sửa .env
+venv/bin/python scripts/eval_retrieval.py --save before                # lưu data/eval/results/before.json
+venv/bin/python scripts/eval_retrieval.py --compare data/eval/results/before.json   # in chênh lệch
+venv/bin/python scripts/eval_ablation.py                               # bảng ablation + quét ngưỡng -> results/ablation.md
+venv/bin/python scripts/eval_generic.py --verbose                      # độ nhiễu với câu hỏi chung chung
 venv/bin/python scripts/eval_router.py --verbose
+venv/bin/python -m unittest tests.test_evaluation tests.test_grounding -v
 ```
 
-```powershell
-# Windows PowerShell
-.\venv\Scripts\python.exe scripts\eval_retrieval.py --ks 1 5 20 --verbose
-.\venv\Scripts\python.exe scripts\eval_generic.py --verbose
-.\venv\Scripts\python.exe scripts\eval_router.py --verbose
-# Lưu kết quả ra file để so sánh giữa các lần chỉnh:
-.\venv\Scripts\python.exe scripts\eval_retrieval.py --ks 1 5 20 | Out-File -Encoding utf8 eval_retrieval_result.txt
-```
+Bộ câu hỏi (`data/eval/`):
 
-Nếu console Windows in tiếng Việt bị lỗi font/`UnicodeEncodeError`, đặt `$env:PYTHONIOENCODING="utf-8"` (PowerShell) hoặc `set PYTHONIOENCODING=utf-8` (CMD) trước khi chạy.
+| File | Nội dung |
+|---|---|
+| `retrieval_exercise.jsonl` | 46 câu vận động có đáp án (WHO 2020, WHO fact sheet, ACSM 2026, HHS 2018, Bộ Y tế) + 8 câu ngoài kho; gắn `topic`, `audience`, `style` |
+| `retrieval_qa.jsonl` | 42 câu dinh dưỡng + vận động (bộ cũ; nhãn có trước khi thêm HHS/ACSM nên đánh giá thấp các câu HHS trả lời đúng) |
+| `retrieval_generic.jsonl` | câu chung chung theo tài liệu (`expect_docs`) + 24 câu ngoài kho; dùng cho eval_generic và quét ngưỡng |
 
-Hai script truy xuất có cờ để xem từng thành phần đóng góp bao nhiêu: `--rerank` (bật rerank, mặc định tắt), `--no-lang-offset` (bỏ độ lệch ngôn ngữ),
-`--no-audience-filter` (không lọc đối tượng), `--collection <tên>` (so sánh collection khác).
+Nhãn: `relevant` (nguồn chính, mức 2) và `accept` (nguồn khác cũng trả lời đúng, mức 1); `section` là chuỗi con của đường dẫn mục.
+Script báo nhãn không khớp chunk nào ("dangling") -> sửa nhãn trước khi tin số liệu.
 
-`eval_retrieval.py` đọc `data/eval/retrieval_qa.jsonl`. Mỗi câu có `relevant` (mục cần tìm thấy) và tùy chọn `accept` (mục thay thế cũng chấp nhận,
-VD cùng đáp án ở tài liệu tiếng Việt). In thêm tỷ lệ chunk tiếng Anh trong top-5.
+Chỉ số (định nghĩa trong `app/evaluation.py`):
 
-`eval_generic.py` đọc `data/eval/retrieval_generic.jsonl` (câu hỏi chung chung, không cần đáp án đến từng mục). Chạy sau mỗi lần thêm tài liệu mới.
-Các nhóm câu hỏi: `nguoi_lon`, `tre_nho`, `mo_ho` (nhiều tài liệu chấp nhận), `van_dong`, `rau_qua`, `dac_thu` (chỉ một tài liệu tiếng Việt trả lời được),
-`chi_tieng_anh` (chỉ tài liệu tiếng Anh trả lời được, để theo dõi tiếng Anh có bị lấn át), `ngoai_kb`, `ngoai_kb_tre_nho`, `ngoai_chu_de` (KB không có đáp án).
-Mỗi câu có thể gắn thẻ `style` (không có thẻ = `goc`, tức sát chữ trong tài liệu): `dien_dat_lai`, `doi_thuong`, `khong_dau`, `gian_tiep`, `nhieu_y`.
-Báo cáo in kết quả riêng từng kiểu; nếu `goc` cao mà các kiểu khác thấp nhiều thì truy xuất đang dựa vào trùng chữ hơn là hiểu nghĩa. Nên viết thêm câu
-theo cách người dùng thật hỏi, đừng chỉ chép từ tiêu đề tài liệu.
-Chỉ số: top-1 đúng nguồn, **từ chối nhầm** (đúng nguồn nhưng điểm dưới ngưỡng), nhiễu@K, từ chối đúng câu ngoài KB, thống kê theo ngôn ngữ, và dòng
-**gợi ý ngưỡng riêng cho từng ngôn ngữ** để đặt vào `.env`. Khi thêm tài liệu, sửa `expect_docs` cho khớp `id` thật và đổi nhãn các câu `none`
-mà tài liệu mới đã trả lời được.
+| Chỉ số | Ý nghĩa |
+|---|---|
+| Hit@K, Recall@K | top-K có chunk liên quan / tỷ lệ mục `relevant` được phủ |
+| Precision@K | tỷ lệ chunk liên quan trong top-K |
+| nDCG@K | chất lượng thứ tự có xét mức liên quan (2/1); IDCG tính từ mọi chunk liên quan có trong kho |
+| MAP@K, MRR | average precision; 1/hạng chunk liên quan đầu tiên |
+| **Usable@5** | chunk đúng trong top-5 **và** vượt ngưỡng `relevant` -> LLM thật sự nhận được (Node bỏ chunk dưới ngưỡng) |
+| **Reject@5** | câu ngoài kho: không chunk nào vượt ngưỡng -> chatbot từ chối thay vì trả lời bằng tài liệu không liên quan |
+
+Kết quả gần nhất: `data/eval/results/ablation.md` (bge-m3): ngưỡng vi=0.64 en=0.58 + `SECTION_AUDIENCE_PENALTY=0.04`
+-> Hit@1 0.670 -> 0.739, MRR 0.785 -> 0.834, Usable@5 0.705 -> 0.864, Reject@5 0.375 -> 1.000 (8 câu ngoài kho của bộ vận động).
+Ngưỡng được chọn bằng quét lưới + kiểm định chéo 2-fold (vùng VI 0.60-0.64, EN 0.56-0.58 ổn định giữa hai fold);
+số câu ngoài kho còn ít (32) nên Reject@5 dao động, cần thêm câu khi có thể. Điểm yếu còn lại: câu không dấu (Hit@5 0.29).
+
+Các cờ của eval_retrieval/eval_generic: `--rerank`, `--no-lang-offset`, `--no-audience-filter`, `--audience-penalty X`,
+`--per-lang N`, `--collection <tên>`. Nếu console Windows lỗi tiếng Việt: `$env:PYTHONIOENCODING="utf-8"`.
+
+`eval_generic.py` (độ nhiễu): nhóm `nguoi_lon`, `tre_nho`, `mo_ho`, `van_dong`, `rau_qua`, `dac_thu`, `chi_tieng_anh`, `ngoai_kb`...;
+in top-1 đúng nguồn, từ chối nhầm, nhiễu@K, từ chối đúng câu ngoài KB, gợi ý ngưỡng theo ngôn ngữ.
 
 Nhãn trong `data/eval/router_test.jsonl` vẫn có thể chứa các nhãn chi tiết cũ để đánh giá chất lượng embedding nội bộ. API public hiện định tuyến theo nhóm lớn:
 `knowledge`, `mixed`, `personal`, `chitchat`, `out_of_scope`, `ambiguous`.
@@ -335,7 +348,7 @@ Nhãn trong `data/eval/router_test.jsonl` vẫn có thể chứa các nhãn chi 
 
 | File | Cập nhật khi |
 |---|---|
-| `data/eval/retrieval_qa.jsonl` | Thêm tài liệu mới (thêm câu hỏi + đáp án cho tài liệu đó) hoặc đổi tên tài liệu/heading |
+| `data/eval/retrieval_exercise.jsonl`, `retrieval_qa.jsonl` | Thêm tài liệu mới (thêm câu hỏi + đáp án; thêm `accept` cho câu cũ mà tài liệu mới cũng trả lời được) hoặc đổi tên tài liệu/heading. Đổi nhãn -> hash bộ câu hỏi đổi, không so sánh với kết quả cũ |
 | `data/eval/retrieval_generic.jsonl` | Thêm tài liệu mới: thêm vài câu chung chung và sửa `expect_docs`; đổi nhãn câu `none` mà tài liệu mới đã trả lời được |
 | `data/optional/*.md` | Tài liệu/phần dài chưa nạp mặc định; chép sang `data/raw/` khi muốn dùng |
 | `data/intents/exemplars.json` | Router phân loại sai nhiều, hoặc thêm chủ đề mới (VD thêm tài liệu về vận động → thêm câu mẫu `knowledge.exercise`) |
@@ -344,5 +357,5 @@ Nhãn trong `data/eval/router_test.jsonl` vẫn có thể chứa các nhãn chi 
 
 Sửa `exemplars.json` hoặc `.env` xong phải **restart uvicorn**. Sửa cách chunk/embedding xong phải `ingest.py` lại (`--reset` hoặc `--only`).
 Tham số cần chỉnh theo kết quả eval (`ai-service/.env`): `VECTOR_RELEVANCE_THRESHOLD`, `VECTOR_RELEVANCE_THRESHOLD_<LANG>`, `LANG_SCORE_OFFSET_<LANG>`,
-`RELEVANCE_THRESHOLD` (chỉ khi bật rerank), `RERANK_CANDIDATES_PER_LANG`,
+`RELEVANCE_THRESHOLD` (chỉ khi bật rerank), `RERANK_CANDIDATES_PER_LANG`, `SECTION_AUDIENCE_PENALTY`,
 `ROUTER_MARGIN`, `ROUTER_SUB_MARGIN`, `ROUTER_OOS_MARGIN`, `ROUTER_KEYWORD_BOOST`.

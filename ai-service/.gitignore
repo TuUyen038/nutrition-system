@@ -8,3 +8,7 @@ venv/
 # File gốc tài liệu (PDF/HTML) không commit: bản quyền + dung lượng. sha256 nằm trong data/sources.yaml
 data/sources/*/
 data/drafts/
+
+# Kết quả eval từng câu (lớn, sinh lại được); chỉ commit báo cáo tổng hợp
+data/eval/results/*.json
+!data/eval/results/ablation.json
