@@ -13,6 +13,8 @@ const {
 } = require("./workoutRecommendation.service");
 const { toVNDateString } = require("../utils/date");
 const { adaptivePlan: CONFIG } = require("../config/adaptiveWorkout.config");
+const { loadAppSessions } = require("./activityGuideline.service");
+const { weeklyWhoMinutes } = require("./activityGuideline.rules");
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -52,7 +54,7 @@ function toPlain(detail) {
  * input: {
  *   state: getTrainingState() result,
  *   todayActivity: { activeMinutes, steps, sleepMinutes } | null  (Google Health),
- *   weeklyActiveMinutes: number | null,
+ *   weeklyActiveMinutes: number | null  (WHO-style: moderate + 2 x vigorous, see getWeeklyWhoMinutes),
  *   weekProgress: { skippedWorkoutDays, completedWorkoutDays },
  * }
  * -> { action, reasons[], lowAdherence }
@@ -110,7 +112,7 @@ function decideAdaptation({ state, todayActivity, weeklyActiveMinutes, weekProgr
     reasons.push(
       weeklyActiveMinutes === null
         ? `Sẵn sàng (Readiness ${state.readinessScore}) và tập tốt (Performance ${performance}): tăng 1 mức cường độ.`
-        : `Sẵn sàng (Readiness ${state.readinessScore}), tập tốt (Performance ${performance}), mới vận động ${weeklyActiveMinutes}/${who.min}–${who.max} phút/tuần theo WHO: tăng 1 mức cường độ.`
+        : `Sẵn sàng (Readiness ${state.readinessScore}), tập tốt (Performance ${performance}), mới vận động aerobic ${weeklyActiveMinutes} phút/tuần (quy đổi cường độ vừa), chưa vượt ${who.max} phút của WHO: tăng 1 mức cường độ.`
     );
   } else {
     reasons.push(`Trạng thái ${state.status} (Readiness ${state.readinessScore}): giữ nguyên plan.`);
@@ -166,26 +168,16 @@ function getWeekProgress(plan, today) {
 }
 
 /**
- * Minutes of activity in the last 7 days: Google Health active minutes
- * (which already include manual exercise sessions, step 3) + workouts
- * done in the app. null when neither source has anything.
+ * Weekly aerobic minutes counted the WHO way, shared with the WHO
+ * comparison (activityGuideline): moderate + 2 x vigorous from Google
+ * Health (LIGHT minutes excluded), app aerobic sessions only on days
+ * without Google data (no double counting), strength sessions not counted
+ * (WHO counts them as days, not minutes). null when fewer than
+ * minDaysWithData days have data -> the WHO rule is skipped.
  */
-async function getWeeklyActiveMinutes(userId, activity, now) {
-  const googleValues = activity.daily
-    .map((d) => d.activeMinutes)
-    .filter((v) => v !== null);
-
-  const sessions = await WorkoutSession.find({
-    userId,
-    completed: true,
-    endTime: { $gte: new Date(now.getTime() - 7 * DAY_MS), $lte: now },
-  })
-    .select("durationMinutes")
-    .lean();
-
-  if (!googleValues.length && !sessions.length) return null;
-
-  return Math.round(sum(googleValues) + sum(sessions.map((s) => s.durationMinutes || 0)));
+async function getWeeklyWhoMinutes(userId, activity) {
+  const app = await loadAppSessions(userId, activity.from, activity.to);
+  return weeklyWhoMinutes(activity.daily, app.appAerobicByDate);
 }
 
 // =====================================
@@ -391,7 +383,8 @@ async function adaptPlan(
   ]);
 
   const todayRecord = activity.daily.find((d) => d.date === today) || null;
-  const weeklyActiveMinutes = await getWeeklyActiveMinutes(userId, activity, now);
+  const who = await getWeeklyWhoMinutes(userId, activity);
+  const weeklyActiveMinutes = who.minutes;
   const weekProgress = getWeekProgress(plan, today);
 
   const decision = decideAdaptation({
@@ -491,8 +484,16 @@ async function adaptPlan(
       today: todayRecord
         ? { activeMinutes: todayRecord.activeMinutes, steps: todayRecord.steps, sleepMinutes: todayRecord.sleepMinutes }
         : null,
+      // WHO-style minutes (same number as GET /google-health/who-comparison)
       weeklyActiveMinutes,
       whoWeeklyMinutes: CONFIG.whoWeeklyMinutes,
+      weeklyAerobic: {
+        daysWithData: who.measure.daysWithData,
+        moderateMinutes: who.measure.moderateMinutes,
+        vigorousMinutes: who.measure.vigorousMinutes,
+        estimated: who.measure.estimated,
+        includesLight: who.measure.includesLight,
+      },
     },
     weekProgress,
     changes,

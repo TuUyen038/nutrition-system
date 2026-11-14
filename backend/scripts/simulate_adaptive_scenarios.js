@@ -17,6 +17,7 @@ const { computeTrainingState } = require("../services/trainingState.service");
 const { applyRestDayRules } = require("../services/workoutRecommendation.service");
 const { decideAdaptation, getWeekProgress } = require("../services/adaptivePlan.service");
 const { toVNDateString } = require("../utils/date");
+const { weeklyWhoMinutes } = require("../services/activityGuideline.rules");
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -96,16 +97,10 @@ function plan(workoutDays, { done = [], skipped = [] } = {}) {
   };
 }
 
-// Minutes moved in the last 7 days, like adaptivePlan.getWeeklyActiveMinutes.
+// WHO-style weekly aerobic minutes, same function as adaptivePlan.getWeeklyWhoMinutes.
+// Scenario workouts are strength sessions -> not counted as aerobic minutes.
 function weeklyActiveMinutes(sessions, act) {
-  const google = act.daily.map((d) => d.activeMinutes).filter((v) => v !== null);
-  const recent = sessions.filter((s) => NOW - s.endTime <= 7 * DAY_MS);
-
-  if (!google.length && !recent.length) return null;
-
-  return Math.round(
-    google.reduce((a, b) => a + b, 0) + recent.reduce((a, s) => a + s.durationMinutes, 0)
-  );
+  return weeklyWhoMinutes(act.daily, {}).minutes;
 }
 
 // =====================================
@@ -127,7 +122,7 @@ const SCENARIOS = [
   {
     id: "regular",
     title: "Tập đều 3 buổi/tuần, ngủ 7.5h",
-    expect: "maintain (đã > 300 phút/tuần WHO)",
+    expect: "increase (210 phút/tuần quy đổi < 300, sẵn sàng)",
     sessions: workouts(REGULAR_DAYS, { rpe: 6, performance: 8 }),
     activity: activity({ steps: 8000, activeMinutes: 30, sleepMinutes: 450 }),
     plan: plan([1, 3, 5], { done: [1] }),

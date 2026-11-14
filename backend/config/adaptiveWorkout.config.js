@@ -173,10 +173,15 @@ module.exports = {
     // lowers strength and raises perceived effort the next day.
     shortSleepMinutes: 300,
 
-    // WHO 2020 guideline for adults: 150-300 min/week of moderate activity.
-    // Below the minimum + ready -> increase; above the maximum + tired
-    // muscles -> reduce.
-    whoWeeklyMinutes: { min: 150, max: 300 },
+    // WHO 2020 guideline for adults: 150-300 min/week of moderate activity
+    // (single source: config/whoGuidelines.config.js). Compared with the
+    // WHO-style weekly minutes (moderate + 2 x vigorous, light minutes not
+    // counted) from activityGuideline.rules.weeklyWhoMinutes, the same number
+    // the WHO comparison screen shows. Below the maximum + ready -> increase.
+    whoWeeklyMinutes: {
+      min: require("./whoGuidelines.config").groups.adult.aerobic.min,
+      max: require("./whoGuidelines.config").groups.adult.aerobic.max,
+    },
     increaseMinPerformance: 7,
 
     // Skipped workout days this week before volume is lowered.
