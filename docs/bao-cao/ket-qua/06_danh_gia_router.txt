@@ -1,0 +1,41 @@
+
+140 câu | margin=0.015 sub=0.01 oos=0.005 boost=0.05
+Nhóm con (trên các câu đúng nhóm cha): đúng 51/58 = 0.879, bỏ trống 0 (an toàn, cấp đủ tool), sai hẳn 7
+
+=== STRICT (phân biệt knowledge và mixed) ===
+Accuracy: 0.693  (97/140)
+
+intent             P      R     F1  support
+knowledge       0.62   0.50   0.55       26
+mixed           1.00   0.75   0.86       24
+personal        0.90   0.78   0.83       58
+chitchat        0.80   1.00   0.89       12
+out_of_scope    1.00   0.57   0.73       14
+ambiguous       0.04   0.17   0.06        6
+
+Confusion matrix (hàng = nhãn đúng, cột = dự đoán)
+                knowledge       mixed    personal    chitchat out_of_scop   ambiguous
+knowledge              13           0           0           0           0          13
+mixed                   2          18           1           0           0           3
+personal                5           0          45           0           0           8
+chitchat                0           0           0          12           0           0
+out_of_scope            1           0           2           0           8           3
+ambiguous               0           0           2           3           0           1
+
+=== THEO HÀNH VI (gộp knowledge + mixed = rag) ===
+Accuracy: 0.707  (99/140)
+
+intent             P      R     F1  support
+rag             0.85   0.66   0.74       50
+personal        0.90   0.78   0.83       58
+chitchat        0.80   1.00   0.89       12
+out_of_scope    1.00   0.57   0.73       14
+ambiguous       0.04   0.17   0.06        6
+
+Confusion matrix (hàng = nhãn đúng, cột = dự đoán)
+                      rag    personal    chitchat out_of_scop   ambiguous
+rag                    33           1           0           0          16
+personal                5          45           0           0           8
+chitchat                0           0          12           0           0
+out_of_scope            1           2           0           8           3
+ambiguous               0           2           3           0           1

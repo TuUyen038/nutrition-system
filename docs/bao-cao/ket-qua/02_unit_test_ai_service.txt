@@ -1,0 +1,25 @@
+test_citation_numbers_ignored (tests.test_grounding.NumberParsing.test_citation_numbers_ignored) ... ok
+test_formats (tests.test_grounding.NumberParsing.test_formats) ... ok
+test_allowed_context (tests.test_grounding.Verify.test_allowed_context) ... ok
+test_citation_on_next_segment_is_merged (tests.test_grounding.Verify.test_citation_on_next_segment_is_merged) ... ok
+test_fixed_answer_keeps_good_lines_and_markdown (tests.test_grounding.Verify.test_fixed_answer_keeps_good_lines_and_markdown) ... ok
+test_grounded_answer_passes (tests.test_grounding.Verify.test_grounded_answer_passes) ... ok
+test_hallucinated_number (tests.test_grounding.Verify.test_hallucinated_number) ... ok
+test_invalid_citation (tests.test_grounding.Verify.test_invalid_citation) ... ok
+test_no_sources_any_number_fails (tests.test_grounding.Verify.test_no_sources_any_number_fails) ... ok
+test_number_from_other_source_is_warning (tests.test_grounding.Verify.test_number_from_other_source_is_warning) ... ok
+test_refusal_without_numbers_passes (tests.test_grounding.Verify.test_refusal_without_numbers_passes) ... ok
+test_uncited_number_is_auto_cited (tests.test_grounding.Verify.test_uncited_number_is_auto_cited) ... ok
+test_year_from_metadata_allowed (tests.test_grounding.Verify.test_year_from_metadata_allowed) ... ok
+test_query (tests.test_evaluation.Audiences.test_query) ... ok
+test_section (tests.test_evaluation.Audiences.test_section) ... ok
+test_grades (tests.test_evaluation.Metrics.test_grades) ... ok
+test_perfect_ranking (tests.test_evaluation.Metrics.test_perfect_ranking) ... ok
+test_second_rank (tests.test_evaluation.Metrics.test_second_rank) ... ok
+test_threshold_override (tests.test_evaluation.Metrics.test_threshold_override) ... ok
+test_usable_requires_threshold (tests.test_evaluation.Metrics.test_usable_requires_threshold) ... ok
+
+----------------------------------------------------------------------
+Ran 20 tests in 0.001s
+
+OK
