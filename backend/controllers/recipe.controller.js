@@ -191,7 +191,11 @@ const searchByImage = async (req, res, next) => {
     // Bước 1: Detect tên món từ ảnh
     const detectionJsonString = await identifyFoodName(imageFile);
     const parsedDetection = safeParse(detectionJsonString);
-    const foodName = parsedDetection.foodName || null;
+    // The detection prompt returns {"foods": [...]}; older prompts used foodName.
+    const detectedFoods = Array.isArray(parsedDetection.foods)
+      ? parsedDetection.foods.filter(Boolean)
+      : [];
+    const foodName = detectedFoods[0] || parsedDetection.foodName || null;
 
     if (!foodName || foodName === "Không xác định" || parsedDetection.error) {
       return res.status(400).json({
@@ -215,6 +219,7 @@ const searchByImage = async (req, res, next) => {
     res.status(200).json({
       success: true,
       detectedFoodName: foodName,
+      detectedFoods: detectedFoods.length ? detectedFoods : [foodName],
       data: searchResult.recipes,
       pagination: {
         page: searchResult.page,
