@@ -5,12 +5,16 @@ const googleOAuthService = require("./googleOAuth.service");
 // with a token that dies halfway.
 const TOKEN_REFRESH_MARGIN_MS = 60 * 1000;
 
-function getConnectUrl(userId) {
+function getConnectUrl(userId, returnTo = null) {
   if (!userId) {
     throw new Error("userId is required");
   }
 
-  const state = googleOAuthService.createOAuthState(userId);
+  if (returnTo && !googleOAuthService.isAllowedReturnTo(returnTo)) {
+    throw new Error("returnTo is not an allowed app link");
+  }
+
+  const state = googleOAuthService.createOAuthState(userId, returnTo);
 
   return googleOAuthService.generateAuthUrl(state);
 }
