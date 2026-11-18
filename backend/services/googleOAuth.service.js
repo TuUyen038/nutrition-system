@@ -32,12 +32,62 @@ function createOAuthClient() {
  * Google sends it back unchanged on the callback, so we know which user
  * connected and that the request really started from our app.
  */
-function createOAuthState(userId) {
-  return jwt.sign(
-    { userId: userId.toString(), purpose: OAUTH_STATE_PURPOSE },
-    getJwtSecret(),
-    { expiresIn: "10m" }
-  );
+function createOAuthState(userId, returnTo = null) {
+  const payload = { userId: userId.toString(), purpose: OAUTH_STATE_PURPOSE };
+
+  // Mobile clients pass their own deep link so the callback can send the
+  // browser back to the app instead of the web FRONTEND_URL.
+  if (returnTo) {
+    payload.returnTo = returnTo;
+  }
+
+  return jwt.sign(payload, getJwtSecret(), { expiresIn: "10m" });
+}
+
+/**
+ * Deep link schemes the callback may redirect to.
+ * Override with GOOGLE_RETURN_SCHEMES="myapp,exp" if needed.
+ */
+function getAllowedReturnSchemes() {
+  return (process.env.GOOGLE_RETURN_SCHEMES || "nutritionsystem,exp,exps")
+    .split(",")
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function isAllowedReturnTo(returnTo) {
+  if (!returnTo || typeof returnTo !== "string" || returnTo.length > 500) {
+    return false;
+  }
+
+  const match = returnTo.match(/^([a-z][a-z0-9+.-]*):\/\//i);
+
+  if (!match) return false;
+
+  return getAllowedReturnSchemes().includes(match[1].toLowerCase());
+}
+
+/**
+ * Read returnTo from the state without failing the request.
+ * Used on the error path, where the state may be missing or expired.
+ */
+function getReturnToFromState(state) {
+  if (!state) return null;
+
+  try {
+    const decoded = jwt.verify(state, getJwtSecret());
+
+    if (
+      decoded.purpose === OAUTH_STATE_PURPOSE &&
+      isAllowedReturnTo(decoded.returnTo)
+    ) {
+      return decoded.returnTo;
+    }
+  } catch (error) {
+    return null;
+  }
+
+  return null;
 }
 
 function verifyOAuthState(state) {
@@ -93,6 +143,8 @@ module.exports = {
   createOAuthClient,
   createOAuthState,
   verifyOAuthState,
+  isAllowedReturnTo,
+  getReturnToFromState,
   generateAuthUrl,
   exchangeCodeForTokens,
   parseScopes,

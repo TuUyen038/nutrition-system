@@ -1,6 +1,7 @@
 const googleHealthService = require("../services/googleHealth.service");
 const activityGuidelineService = require("../services/activityGuideline.service");
 const googleConnectionService = require("../services/googleConnection.service");
+const googleOAuthService = require("../services/googleOAuth.service");
 
 async function mockSyncHealthData(req, res) {
   try {
@@ -153,7 +154,9 @@ async function syncHealthData(req, res) {
 
 async function connectGoogle(req, res) {
   try {
-    const url = googleConnectionService.getConnectUrl(req.user._id);
+    // Optional: mobile app deep link to return to after consent.
+    const returnTo = req.query.returnTo || null;
+    const url = googleConnectionService.getConnectUrl(req.user._id, returnTo);
 
     return res.status(200).json({
       success: true,
@@ -178,7 +181,11 @@ async function connectGoogle(req, res) {
  */
 async function googleCallback(req, res) {
   const { code, state, error: googleError } = req.query;
-  const frontendUrl = process.env.FRONTEND_URL;
+  // A mobile deep link from the signed state wins over the web FRONTEND_URL.
+  const frontendUrl =
+    googleOAuthService.getReturnToFromState(state) || process.env.FRONTEND_URL;
+  const withStatus = (base, status) =>
+    `${base}${base.includes("?") ? "&" : "?"}googleHealth=${status}`;
 
   try {
     // User clicked "Cancel" on the Google consent screen.
@@ -192,7 +199,7 @@ async function googleCallback(req, res) {
     });
 
     if (frontendUrl) {
-      return res.redirect(`${frontendUrl}?googleHealth=connected`);
+      return res.redirect(withStatus(frontendUrl, "connected"));
     }
 
     return res.status(200).json({
@@ -207,7 +214,7 @@ async function googleCallback(req, res) {
     );
 
     if (frontendUrl) {
-      return res.redirect(`${frontendUrl}?googleHealth=error`);
+      return res.redirect(withStatus(frontendUrl, "error"));
     }
 
     return res.status(400).json({
