@@ -1,0 +1,175 @@
+---
+id: ods_boron_health_professional
+title: "Boron"
+org: "NIH Office of Dietary Supplements (ODS)"
+year: "2022"
+url: "https://ods.od.nih.gov/factsheets/Boron-HealthProfessional"
+lang: eng
+audience_group: professional
+chunk_profile: structured
+---
+
+# Boron
+
+## Introduction
+
+Boron is a trace element that is naturally present in many foods and available as a dietary supplement. It is a structural component of plant cell walls and is required for plant growth, pollination, and seed formation.
+
+Boron is not classified as an essential nutrient for humans because research has not yet identified a clear biological function for boron. However, it might have beneficial effects on such functions as reproduction and development, calcium metabolism, bone formation, brain function, insulin and energy substrate metabolism, immunity, and the function of steroid hormones (including vitamin D and estrogen).
+
+Boron is present in foods and beverages as inorganic borates as well as mono- or di-sugar-borate esters, such as calcium fructoborate. Most ingested boron is hydrolyzed to boric acid within the gastrointestinal tract. The body absorbs about 85%–90% of ingested boron. However, very little is known about how or where in the gastrointestinal tract absorption occurs.
+
+Boron does not accumulate in most body tissues, but bone, nails, and hair have higher boron levels than other body tissues, whereas fat has lower levels. Boric acid is the main form of boron in blood, urine, and other body fluids. The lack of substantial changes in blood boron levels in response to large increases in dietary intakes suggests that the body maintains boron homeostasis, likely by increasing urinary excretion, but the regulatory mechanisms for boron homeostasis have not been identified. Boron is excreted mainly in the urine, and small amounts are excreted in the feces, sweat, breath, and bile.
+
+Boron status is not routinely measured in clinical practice. Most studies suggest that urinary boron levels correlate with boron intakes. Fasting plasma concentrations of boron in postmenopausal women range from 34 to 95 ng/mL (3.14 to 8.79 mcmol/L).
+
+## Recommended Intakes
+
+Intake recommendations for nutrients are provided in the Dietary Reference Intakes (DRIs) developed by an expert committee of the Food and Nutrition Board (FNB) at the National Academies of Sciences, Engineering, and Medicine. DRI is the general term for a set of reference values used for planning and assessing nutrient intakes of healthy people. These values, which vary by age and sex, include the following:
+
+- Recommended Dietary Allowance (RDA): Average daily level of intake sufficient to meet the nutrient requirements of nearly all (97%–98%) healthy individuals; often used to plan nutritionally adequate diets for individuals
+- Adequate Intake (AI): Intake at this level is assumed to ensure nutritional adequacy; established when evidence is insufficient to develop an RDA
+- Estimated Average Requirement (EAR): Average daily level of intake estimated to meet the requirements of 50% of healthy individuals; usually used to assess the nutrient intakes of groups of people and to plan nutritionally adequate diets for them; can also be used to assess the nutrient intakes of individuals
+- Tolerable Upper Intake Level (UL): Maximum daily intake unlikely to cause adverse health effects
+
+The FNB found the existing data insufficient to derive an RDA, AI, or EAR for boron. The World Health Organization estimates that an acceptable safe range of boron intakes for adults is 1–13 mg/day.
+
+## Sources of Boron
+
+### Food
+
+Plant foods—including fruit, tubers, and legumes—contain the largest amounts of boron. Wine, cider, and beer also contain boron.
+
+The main sources of boron in the diets of people in the United States are coffee, milk, apples, dried and cooked beans, and potatoes, primarily because people tend to consume large amounts of these foods. Among toddlers, 38% of boron intakes comes from fruits and fruit juices and 19% from milk and cheese. For adolescents, milk and cheese products account for 18%–20% of boron intakes, whereas beverages, especially instant coffee, represent the largest dietary source of boron for adults.
+
+The amount of boron in plant foods depends somewhat on the boron content of the soil and water where they were grown. Areas of the world with limited boron in the soil include Brazil, Japan, and most of the United States, mainly because of high levels of rainfall, which leaches boron out of the soil. In contrast, arid regions of the world—including California and parts of Turkey, Argentina, Chile, Russia, China, and Peru—have higher boron concentrations.
+
+Boron concentrations are about 0.27 mg/L in breast milk and 0.33 mg/L in cow’s milk. Water contains boron, but the concentration varies considerably by source. The median boron concentration of drinking water in the United States is 0.031 mg/L.
+
+Selected food sources of boron are listed in Table 1. The U.S. Department of Agriculture’s (USDA’s) FoodData Central does not list the boron content of foods or provide lists of foods containing boron. Therefore, information on boron levels in foods is limited.
+
+**Table 1: Boron Content of Selected Foods**
+
+| Food | Milligrams (mg) per serving |
+| --- | --- |
+| Prune juice, 1 cup | 1.43 |
+| Avocado, raw, cubed, ½ cup | 1.07 |
+| Raisins, 1.5 ounces | 0.95 |
+| Peaches, 1 medium | 0.80 |
+| Grape juice, 1 cup | 0.76 |
+| Apples, 1 medium | 0.66 |
+| Pears, 1 medium | 0.50 |
+| Peanuts, roasted, salted, 1 ounce | 0.48 |
+| Beans, refried, ½ cup | 0.48 |
+| Peanut butter, 2 tablespoons | 0.46 |
+| Apple juice, 1 cup | 0.45 |
+| Chili con carne, with beans, 1 cup | 0.41 |
+| Grapes, ½ cup | 0.37 |
+| Oranges, 1 medium | 0.37 |
+| Lima beans, dry, cooked, ½ cup | 0.35 |
+| Applesauce, ½ cup | 0.34 |
+| Fruit cocktail, canned, in heavy syrup, ½ cup | 0.26 |
+| Broccoli, boiled, chopped, ½ cup | 0.20 |
+| Orange juice, 1 cup | 0.18 |
+| Spinach, boiled, ½ cup | 0.16 |
+| Banana, medium | 0.16 |
+| Spaghetti sauce, ½ cup | 0.16 |
+| Cantaloupe, cubed, ½ cup | 0.14 |
+| Carrots, raw, 1 medium | 0.14 |
+| Peas, green, cooked, ½ cup | 0.10 |
+| Potato chips, 1 ounce, about 22 chips | 0.09 |
+| French fries, frozen, deep fried, 10 fries | 0.08 |
+| Coffee, 1 cup | 0.07 |
+| Lettuce, chopped, loosely packed, 1 cup | 0.06 |
+| Tomatoes, raw, chopped, ½ cup | 0.06 |
+| Tuna, canned, water packed, 3 ounces | 0.05 |
+| Milk, whole, 1 cup | 0.04 |
+| Corn, cooked, ½ cup | 0.04 |
+| Rice, white, cooked, ½ cup | 0.03 |
+| Chicken breast, broiled, ½ breast | 0.03 |
+| Tea, brewed, 1 cup | 0.02 |
+| Onions, raw, chopped, 1 tablespoon | 0.02 |
+| Ice cream, ½ cup | 0.02 |
+| Bread, white, 1 slice | 0.01 |
+
+The U.S. Food and Drug Administration developed Daily Values (DVs) to help consumers compare the nutrient contents of products within the context of a total diet. Because the FNB has not established an RDA or AI for boron, boron does not have a DV.
+
+### Dietary supplements
+
+Boron is available in dietary supplements containing only boron and in supplements containing boron in combination with a few other nutrients, often other minerals. Common amounts of elemental boron in dietary supplements range from 0.15 to 6 mg.
+
+In dietary supplements, boron is present in many different forms, including sodium borate, sodium tetraborate, boron amino acid chelate, boron ascorbate, boron aspartate, boron citrate, boron gluconate, boron glycinate, boron picolinate, and calcium fructoborate. In a small human study, boron as sodium tetraborate significantly increased plasma boron levels within 4–6 hours of consumption, but no data are available on the relative bioavailability of different forms of supplemental boron.
+
+The Supplement Facts label on a dietary supplement product declares the amount of *elemental* boron in the product, not the weight of the entire boron-containing compound.
+
+## Boron Intakes and Status
+
+According to data from the Third National Health and Nutrition Examination Survey (NHANES III; 1988–1994) and the Continuing Survey of Food Intakes by Individuals (1994–1996), median dietary boron intakes range from 0.87 to 1.35 mg/day in adults, 1.05 to 1.08 mg/day in pregnant women, and 0.75 to 0.96 mg/day in school-age children. Vegetarians tend to have higher intakes of boron than nonvegetarians because boron is plentiful in plant foods. The median dietary boron intake in lactating women is 1.27 mg/day. Boron intakes are about 0.55 mg/day among infants and about 0.54 mg/day among toddlers.
+
+Total median boron intakes from dietary supplements and foods are about 1.0 to 1.5 mg/day for adults.
+
+## Boron Deficiency
+
+In humans, boron deficiency signs and symptoms have not been firmly established. Limited data suggest that boron deficiency might affect brain function by reducing mental alertness and impairing executive brain function. In addition, a low-boron diet (0.25 mg boron/2,000 kcal) might elevate urinary calcium and magnesium excretion and lower serum concentrations of estrogen in postmenopausal women. Low boron intakes (0.23 mg boron/2,000 kcal) also appear to reduce plasma calcium and serum 25-hydroxyvitamin D levels and raise serum calcitonin and osteocalcin levels in men and women; these changes could affect bone mineral density.
+
+## Boron and Health
+
+This section focuses on three health areas in which boron might be involved: osteoarthritis, bone health, and cancer.
+
+### Osteoarthritis
+
+Observational evidence combined with the findings from a few small clinical studies in humans suggests that boron might be helpful for reducing the symptoms of osteoarthritis, possibly by inhibiting inflammation.
+
+In a small pilot study that compared 6 mg boron per day for 8 weeks with placebo, the supplements reduced symptoms of osteoarthritis in 20 participants younger than 75 years (mean age about 65 years). Another 8-week study in 20 patients with mild to moderate or severe osteoarthritis found that 6 mg/day boron as calcium fructoborate for mild to moderate osteoarthritis or 12 mg/day boron for severe disease reduced joint rigidity and the use of ibuprofen for pain and increased mobility and flexibility. However, this study was very small and not blinded or placebo controlled.
+
+A subsequent double-blind, placebo-controlled trial examined the effects of 1.5, 3, or 6 mg/day boron (as calcium fructoborate) for 2 weeks on inflammatory biomarkers (e.g., C-reactive protein and fibrinogen) in 60 participants with osteoarthritis age 59–68 years. Supplementation significantly reduced inflammatory markers. In another double-blind, placebo-controlled clinical trial, supplementation with 6 mg/day boron (as calcium fructoborate) for 2 weeks significantly reduced knee discomfort in 60 adults (mean age 50 years) with self-reported knee discomfort.
+
+These findings suggest that boron, particularly as calcium fructoborate, might hold promise for reducing osteoarthritis symptoms, but confirmation is needed from additional controlled trials.
+
+### Bone health
+
+Boron might be important for bone growth and formation, possibly by affecting osteoblast and/or osteoclast activity or by influencing serum steroid hormone levels and calcium metabolism. Animal studies indicate that boron deficiency causes abnormal limb development; delayed maturation of growth plates; and decreased bone strength, bone volume fraction, and trabecular thickness.
+
+Comparisons of animals receiving boron supplementation with animals that consume usual or small amounts of boron show that the supplementation improves some measures of bone strength. However, in an observational study in 134 Korean women (average age 41 years), boron intakes (mean of 0.9 mg/day) were not significantly correlated with bone mineral density in the lumbar spine or femoral regions.
+
+In a placebo-controlled clinical trial of 17 female athletes (mean age 19.8 years) and 11 sedentary females (mean age 20.3 years), 3 mg/day boron supplementation for 10 months significantly reduced serum phosphorus levels and increased serum magnesium levels in sedentary females; such changes are often associated with increased bone mineral density. However, supplementation in this study did not directly affect bone mineral density.
+
+Additional research is needed to determine whether boron supplementation affects bone health in humans.
+
+### Cancer
+
+Preliminary evidence suggests that dietary boron intake might affect cancer risk. Several observational studies found that boron intakes are inversely associated with prostate cancer risk in men and with lung and cervical cancer risk in women. For example, in a case control study of 763 women with lung cancer and 838 healthy women, those in the lowest quartile of boron intake (less than 0.78 mg/day) had almost twice the risk of lung cancer of those in the highest quartile (more than 1.25 mg/day). An observational study in Turkey evaluated two criteria for prostate cancer risk, prostate size and prostate specific antigen (PSA) levels. Men with higher boron intakes (about 6 mg/day) had significantly smaller prostate glands than men who consumed less boron (0.64–0.88 mg/day). However, PSA levels did not differ significantly between the two groups.
+
+No clinical trials have evaluated the effects of boron on cancer prevention or treatment. More research is needed to understand the effects, if any, of boron on cancer.
+
+## Health Risks from Excessive Boron
+
+No data are available on adverse effects of high boron intakes from food or water.
+
+Symptoms associated with accidental consumption of boric acid or borax (sodium borate), contained in some household cleaning products and pesticides, include nausea, gastrointestinal discomfort, vomiting, diarrhea, skin flushing, rash, excitation, convulsions, depression, and vascular collapse. The amount of boron consumed in people who accidentally consumed boron ranged from 18 to 9,713 mg, and most were children younger than 6 years. Boron toxicity can also cause headache, hypothermia, restlessness, weariness, renal injury, dermatitis, alopecia, anorexia, and indigestion. In infants, high boron intakes have caused anemia, seizures, erythema, and thin hair. Extremely high doses of boron can be fatal; for example, 15,000 to 20,000 mg can cause death in adults.
+
+The FNB established boron ULs for healthy individuals based on levels associated with reproductive and developmental effects in animals.
+
+**Table 2: Tolerable Upper Intake Levels (ULs) for Boron**
+
+| Age | Male | Female | Pregnancy | Lactation |
+| --- | --- | --- | --- | --- |
+| Birth to 6 months | None established\* | None established\* |  |  |
+| 7–12 months | None established\* | None established\* |  |  |
+| 1–3 years | 3 mg | 3 mg |  |  |
+| 4–8 years | 6 mg | 6 mg |  |  |
+| 9–13 years | 11 mg | 11 mg |  |  |
+| 14–18 years | 17 mg | 17 mg | 17 mg | 17 mg |
+| 19+ years | 20 mg | 20 mg | 20 mg | 20 mg |
+
+\* Breast milk, formula, and food should be the only sources of boron for infants.
+
+## Interactions with Medications
+
+Boron is not known to have any clinically relevant interactions with medications.
+
+## Boron and Healthful Diets
+
+In general, a person’s nutritional needs should be met primarily through the diet, including fortified foods. Dietary supplements may be useful in cases where it is not possible to meet the needs for specific nutrients through food alone, especially during certain life stages. The *Dietary Guidelines for Americans* offers a general description of healthy dietary patterns.
+
+For more information about building a healthy dietary pattern, refer to the *Dietary Guidelines for Americans*.
