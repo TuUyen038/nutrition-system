@@ -4,7 +4,7 @@ title: "Dietary Supplements in the Time of COVID-19"
 org: "NIH Office of Dietary Supplements (ODS)"
 year: "2024"
 url: "https://ods.od.nih.gov/factsheets/COVID19-HealthProfessional"
-lang: eng
+lang: en
 audience_group: professional
 chunk_profile: structured
 ---

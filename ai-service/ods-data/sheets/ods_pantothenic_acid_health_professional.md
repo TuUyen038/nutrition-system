@@ -4,7 +4,7 @@ title: "Pantothenic Acid"
 org: "NIH Office of Dietary Supplements (ODS)"
 year: "2026"
 url: "https://ods.od.nih.gov/factsheets/PantothenicAcid-HealthProfessional"
-lang: eng
+lang: en
 audience_group: professional
 chunk_profile: structured
 ---

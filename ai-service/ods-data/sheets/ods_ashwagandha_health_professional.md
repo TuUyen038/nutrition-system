@@ -4,7 +4,7 @@ title: "Ashwagandha: Is it helpful for stress, anxiety, or sleep?"
 org: "NIH Office of Dietary Supplements (ODS)"
 year: "2025"
 url: "https://ods.od.nih.gov/factsheets/Ashwagandha-HealthProfessional"
-lang: eng
+lang: en
 audience_group: professional
 chunk_profile: structured
 ---

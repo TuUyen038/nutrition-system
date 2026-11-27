@@ -41,8 +41,8 @@ FRONT = {
     "org": "NIH Office of Dietary Supplements (ODS)",
     "chunk_profile": "structured",
     "by_type": {
-        "HealthProfessional": {"lang": "eng", "audience_group": "professional"},
-        "Consumer": {"lang": "eng", "audience_group": "general"},
+        "HealthProfessional": {"lang": "en", "audience_group": "professional"},
+        "Consumer": {"lang": "en", "audience_group": "general"},
         "DatosEnEspanol": {"lang": "spa", "audience_group": "general"},
     },
 }

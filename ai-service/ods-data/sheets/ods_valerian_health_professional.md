@@ -4,7 +4,7 @@ title: "Valerian"
 org: "NIH Office of Dietary Supplements (ODS)"
 year: "2013"
 url: "https://ods.od.nih.gov/factsheets/Valerian-HealthProfessional"
-lang: eng
+lang: en
 audience_group: professional
 chunk_profile: structured
 ---

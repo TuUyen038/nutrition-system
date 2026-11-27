@@ -4,7 +4,7 @@ title: "Thiamin"
 org: "NIH Office of Dietary Supplements (ODS)"
 year: "2023"
 url: "https://ods.od.nih.gov/factsheets/Thiamin-HealthProfessional"
-lang: eng
+lang: en
 audience_group: professional
 chunk_profile: structured
 ---
