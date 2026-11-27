@@ -60,6 +60,16 @@ LANG_SCORE_OFFSETS = _by_lang("LANG_SCORE_OFFSET_", {"en": 0.05})
 # khi câu hỏi không nhắc nhóm đó. 0 = tắt. Chọn theo scripts/eval_ablation.py
 SECTION_AUDIENCE_PENALTY = float(os.getenv("SECTION_AUDIENCE_PENALTY", "0.04"))
 
+# Kết hợp BM25 (trên văn bản bỏ dấu) với vector bằng RRF. Mục đích: câu tiếng Việt gõ không dấu (bge-m3 hiểu kém).
+#   off = tắt | unaccented = chỉ bật khi câu hỏi không dấu (mặc định) | always = luôn bật
+HYBRID_MODE = os.getenv("HYBRID_MODE", "unaccented").lower()
+BM25_CANDIDATES = int(os.getenv("BM25_CANDIDATES", "20"))
+BM25_RRF_K = int(os.getenv("BM25_RRF_K", "60"))
+# Câu không dấu có cosine thấp hơn nhiều dù đúng nghĩa: chunk nằm trong top BM25_RELEVANT_TOPN của BM25 được hạ ngưỡng
+# cosine đi BM25_RELEVANT_DELTA (hai tín hiệu cùng đồng ý thì tin hơn). 0 = tắt. Eval 2026-11-27: 0.15 và 0.20 cùng Usable@5 0.873 (Reject@5 0.833), 0.25 làm Reject@5 rớt 0.750.
+BM25_RELEVANT_TOPN = int(os.getenv("BM25_RELEVANT_TOPN", "5"))
+BM25_RELEVANT_DELTA = float(os.getenv("BM25_RELEVANT_DELTA", "0.15"))
+
 ROUTER_KEYWORD_BOOST = float(os.getenv("ROUTER_KEYWORD_BOOST", "0.05"))
 ROUTER_MARGIN = float(os.getenv("ROUTER_MARGIN", "0.015"))
 ROUTER_SUB_MARGIN = float(os.getenv("ROUTER_SUB_MARGIN", "0.01"))

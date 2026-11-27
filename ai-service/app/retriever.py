@@ -6,13 +6,16 @@ Khi không rerank: xếp hạng theo cosine + độ lệch theo ngôn ngữ, cò
 import re
 from typing import Any, Dict, List, Optional
 
-from . import config, embedding, reranker, vector_store
+import numpy as np
+
+from . import bm25, config, embedding, reranker, vector_store
 from .intent_router import strip_accents
 
 # Từ khóa cho biết câu hỏi nói về trẻ nhỏ (khớp trên văn bản đã bỏ dấu, nên có dấu/không dấu đều khớp)
 INFANT_RE = re.compile(
     r"\b(be|tre|tre em|tre nho|em be|bu me|bu sua|sua me|sua cong thuc|an dam|an bo sung|"
-    r"so sinh|thang tuoi|baby|infant|toddler|breastfe\w*|complementary feeding)\b"
+    r"so sinh|thang tuoi|baby|infant|toddler|breastfe\w*|complementary feeding|"
+    r"thanh thieu nien|thieu nien|adolescen\w*|child|children)\b"
 )
 
 
@@ -61,13 +64,14 @@ def detect_audiences(query: str, audiences: Optional[List[str]] = None) -> Optio
 
     - Truyền `audiences` rõ ràng -> dùng đúng như vậy.
     - Câu hỏi có từ khóa về trẻ nhỏ -> tìm tất cả tài liệu.
-    - Ngược lại -> chỉ tài liệu "general" (không để tài liệu dành cho trẻ nhỏ trả lời câu hỏi người lớn).
+    - Ngược lại -> tài liệu "general" và "professional" (fact sheet NIH ODS: kiến thức chung cho người lớn,
+      không phải nhóm tuổi). Không để tài liệu dành cho trẻ nhỏ trả lời câu hỏi người lớn.
     """
     if audiences:
         return list(audiences)
     if INFANT_RE.search(strip_accents(query)):
         return None
-    return ["general"]
+    return ["general", "professional"]
 
 
 def _where(lang: Optional[str], allowed: Optional[List[str]], doc_ids: Optional[List[str]] = None) -> Optional[Dict[str, Any]]:
@@ -83,6 +87,37 @@ def _where(lang: Optional[str], allowed: Optional[List[str]], doc_ids: Optional[
     return conds[0] if len(conds) == 1 else {"$and": conds}
 
 
+def _fuse_bm25(query, cands, qvec, collection, allowed, doc_ids):
+    """RRF giữa xếp hạng vector (rank_score) và xếp hạng BM25. Chunk chỉ BM25 tìm thấy được tính cosine thật."""
+    hits = bm25.search(query, config.BM25_CANDIDATES, collection, allowed, doc_ids)
+    if not hits:
+        return cands
+    by_id = {c["id"]: c for c in cands}
+    missing = [h["id"] for h in hits if h["id"] not in by_id]
+    if missing:
+        emb = vector_store.get_collection(collection, create=False).get(ids=missing, include=["embeddings"])
+        q = np.asarray(qvec, dtype=float)
+        for cid, vec in zip(emb["ids"], emb["embeddings"]):
+            v = np.asarray(vec, dtype=float)
+            cos = float(q @ v / ((np.linalg.norm(q) * np.linalg.norm(v)) or 1.0))
+            hit = next(h for h in hits if h["id"] == cid)
+            c = {**hit, "score": round(cos, 4), "vector_score": round(cos, 4)}
+            c["rank_score"] = c["vector_score"] + (config.lang_offset(c.get("lang")))
+            by_id[cid] = c
+    k = config.BM25_RRF_K
+    vec_order = sorted(by_id.values(), key=lambda c: c["rank_score"], reverse=True)
+    fused = {c["id"]: 1.0 / (k + r) for r, c in enumerate(vec_order, start=1)}
+    for r, h in enumerate(hits, start=1):
+        fused[h["id"]] += 1.0 / (k + r)
+        by_id[h["id"]]["bm25_rank"] = r
+        by_id[h["id"]]["bm25_score"] = h["bm25_score"]
+    out = list(by_id.values())
+    for c in out:
+        c["rank_score"] = round(fused[c["id"]], 5)
+    out.sort(key=lambda c: c["rank_score"], reverse=True)
+    return out
+
+
 def retrieve(
     query: str,
     top_k: Optional[int] = None,
@@ -94,6 +129,7 @@ def retrieve(
     lang_offset: bool = True,
     audience_penalty: Optional[float] = None,
     doc_ids: Optional[List[str]] = None,
+    hybrid: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Trả {"chunks": [...], "reranked": bool, "threshold": float, "thresholds": dict, "audiences": list|None}.
 
@@ -102,6 +138,7 @@ def retrieve(
     cùng metadata (doc_id, title, org, year, url, lang, section, heading, h1..h5, audience_group...).
     `lang_offset=False` bỏ độ lệch theo ngôn ngữ khi xếp hạng (để so sánh trong eval).
     `audience_penalty` ghi đè SECTION_AUDIENCE_PENALTY (0 = tắt).
+    `hybrid`: off | unaccented | always (mặc định config.HYBRID_MODE) - trộn BM25 bỏ dấu với vector bằng RRF.
     `doc_ids` chỉ tìm trong các tài liệu này (VD trích dẫn khuyến nghị WHO cho một chỉ số cụ thể).
     """
     top_k = top_k or config.TOP_K
@@ -136,6 +173,11 @@ def retrieve(
         c["rank_score"] = round(c["vector_score"] + bonus, 4)
     cands.sort(key=lambda c: c["rank_score"], reverse=True)
 
+    mode = (hybrid or config.HYBRID_MODE).lower()
+    use_bm25 = mode == "always" or (mode == "unaccented" and bm25.is_unaccented_vietnamese(query))
+    if use_bm25:
+        cands = _fuse_bm25(query, cands, qvec, collection, allowed, doc_ids)
+
     scores = reranker.rerank(query, [c["text"] for c in cands]) if (rerank and cands) else None
     reranked = scores is not None
     if reranked:
@@ -152,6 +194,9 @@ def retrieve(
         else:
             threshold = config.vector_threshold(c.get("lang"))
             c["relevant"] = c["vector_score"] >= threshold
+            bm = c.get("bm25_rank")
+            if use_bm25 and not c["relevant"] and bm is not None and bm <= config.BM25_RELEVANT_TOPN:
+                c["relevant"] = c["vector_score"] >= threshold - config.BM25_RELEVANT_DELTA
         c["threshold"] = threshold
 
     if reranked:
@@ -159,4 +204,4 @@ def retrieve(
     else:
         base = config.VECTOR_RELEVANCE_THRESHOLD
         per = {str(l): config.vector_threshold(l) for l in langs if l is not None}
-    return {"chunks": chunks, "reranked": reranked, "threshold": base, "thresholds": per, "audiences": allowed}
+    return {"chunks": chunks, "reranked": reranked, "threshold": base, "thresholds": per, "audiences": allowed, "hybrid": use_bm25}

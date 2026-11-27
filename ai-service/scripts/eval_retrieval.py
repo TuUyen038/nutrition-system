@@ -22,9 +22,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app import config, embedding, evaluation, reranker, retriever  # noqa: E402
+from app import bm25, config, embedding, evaluation, reranker, retriever  # noqa: E402
 
-DEFAULT_FILES = [config.EVAL_DIR / "retrieval_exercise.jsonl", config.EVAL_DIR / "retrieval_qa.jsonl"]
+DEFAULT_FILES = [config.EVAL_DIR / "retrieval_exercise.jsonl", config.EVAL_DIR / "retrieval_qa.jsonl",
+                 config.EVAL_DIR / "retrieval_ods.jsonl"]
 RESULTS_DIR = config.EVAL_DIR / "results"
 
 
@@ -41,6 +42,8 @@ def add_args(ap: argparse.ArgumentParser):
     ap.add_argument("--file", type=Path, nargs="+", default=DEFAULT_FILES)
     ap.add_argument("--collection", default=config.CHROMA_COLLECTION)
     ap.add_argument("--ks", type=int, nargs="+", default=[1, 3, 5, 10])
+    ap.add_argument("--hybrid", choices=["off", "unaccented", "always"], default=None,
+                    help="BM25 bỏ dấu + vector (RRF); mặc định theo HYBRID_MODE trong .env")
     ap.add_argument("--rerank", action="store_true", help="bật rerank (mặc định tắt)")
     ap.add_argument("--no-lang-offset", action="store_true", help="bỏ độ lệch điểm theo ngôn ngữ khi xếp hạng")
     ap.add_argument("--no-audience-filter", action="store_true", help="không lọc tài liệu theo đối tượng")
@@ -60,6 +63,7 @@ def make_retrieve(args, max_k):
             lang_offset=not args.no_lang_offset,
             audience_penalty=getattr(args, "audience_penalty", None),
             per_lang=max(args.per_lang or config.RERANK_CANDIDATES_PER_LANG, max_k),
+            hybrid=getattr(args, "hybrid", None),
         )
     return run
 
@@ -81,6 +85,8 @@ def evaluate(args, rows=None):
     if args.rerank:
         reranker.preload()
     retrieve = make_retrieve(args, max_k)
+    if getattr(args, "hybrid", None) != "off":
+        bm25.get_index(args.collection)  # dựng chỉ mục BM25 trước khi đo độ trễ
     retrieve("warmup")  # không tính thời gian nạp model vào độ trễ
     corpus = evaluation.CorpusIndex(args.collection)
     dangling = [(r["question"], d) for r in rows for d in [corpus.dangling_labels(r)] if d]
