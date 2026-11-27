@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 
-from . import config, embedding, grounding, reranker, retriever, vector_store
+from . import bm25, config, embedding, grounding, reranker, retriever, vector_store
 from .intent_router import IntentRouter
 
 state = {}
@@ -16,6 +16,8 @@ async def lifespan(_: FastAPI):
     embedding.get_model()  # tải model embedding 1 lần lúc khởi động
     state["router"] = IntentRouter()
     state["reranker_ready"] = reranker.preload()
+    if config.HYBRID_MODE != "off":
+        bm25.get_index()  # dựng chỉ mục BM25 sẵn để câu không dấu đầu tiên không bị chậm
     yield
 
 

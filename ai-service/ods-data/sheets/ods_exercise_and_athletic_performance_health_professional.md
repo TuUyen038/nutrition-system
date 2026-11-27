@@ -4,7 +4,7 @@ title: "Dietary Supplements for Exercise and Athletic Performance"
 org: "NIH Office of Dietary Supplements (ODS)"
 year: "2024"
 url: "https://ods.od.nih.gov/factsheets/ExerciseAndAthleticPerformance-HealthProfessional"
-lang: eng
+lang: en
 audience_group: professional
 chunk_profile: structured
 ---

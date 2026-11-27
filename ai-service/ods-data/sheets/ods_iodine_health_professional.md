@@ -4,7 +4,7 @@ title: "Iodine"
 org: "NIH Office of Dietary Supplements (ODS)"
 year: "2024"
 url: "https://ods.od.nih.gov/factsheets/Iodine-HealthProfessional"
-lang: eng
+lang: en
 audience_group: professional
 chunk_profile: structured
 ---

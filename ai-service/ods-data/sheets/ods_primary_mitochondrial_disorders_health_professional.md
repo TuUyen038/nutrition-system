@@ -4,7 +4,7 @@ title: "Dietary Supplements for Primary Mitochondrial Disorders"
 org: "NIH Office of Dietary Supplements (ODS)"
 year: "2020"
 url: "https://ods.od.nih.gov/factsheets/PrimaryMitochondrialDisorders-HealthProfessional"
-lang: eng
+lang: en
 audience_group: professional
 chunk_profile: structured
 ---

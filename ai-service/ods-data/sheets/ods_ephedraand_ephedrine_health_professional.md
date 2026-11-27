@@ -4,7 +4,7 @@ title: "Ephedra and Ephedrine Alkaloids for Weight Loss and Athletic Performance
 org: "NIH Office of Dietary Supplements (ODS)"
 year: "2004"
 url: "https://ods.od.nih.gov/factsheets/EphedraandEphedrine-HealthProfessional"
-lang: eng
+lang: en
 audience_group: professional
 chunk_profile: structured
 ---

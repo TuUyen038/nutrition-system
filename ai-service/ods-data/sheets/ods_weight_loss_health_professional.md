@@ -4,7 +4,7 @@ title: "Dietary Supplements for Weight Loss"
 org: "NIH Office of Dietary Supplements (ODS)"
 year: "2022"
 url: "https://ods.od.nih.gov/factsheets/WeightLoss-HealthProfessional"
-lang: eng
+lang: en
 audience_group: professional
 chunk_profile: structured
 ---

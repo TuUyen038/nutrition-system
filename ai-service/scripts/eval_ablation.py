@@ -42,7 +42,7 @@ def load_generic(path: Path):
 
 def ns(**kw):
     base = dict(collection=config.CHROMA_COLLECTION, ks=[1, 3, 5, 10], rerank=False, no_lang_offset=False,
-                no_audience_filter=False, per_lang=None, thresholds=None, file=[], audience_penalty=0.0)
+                no_audience_filter=False, per_lang=None, thresholds=None, file=[], audience_penalty=0.0, hybrid="off")
     base.update(kw)
     return argparse.Namespace(**base)
 
@@ -84,7 +84,8 @@ def table(rows, cols):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--file", type=Path, nargs="+",
-                    default=[config.EVAL_DIR / "retrieval_exercise.jsonl", config.EVAL_DIR / "retrieval_qa.jsonl"])
+                    default=[config.EVAL_DIR / "retrieval_exercise.jsonl", config.EVAL_DIR / "retrieval_qa.jsonl",
+                              config.EVAL_DIR / "retrieval_ods.jsonl"])
     ap.add_argument("--generic", type=Path, default=config.EVAL_DIR / "retrieval_generic.jsonl",
                     help="lấy thêm câu ngoài kho cho quét ngưỡng (bỏ trống để không dùng)")
     ap.add_argument("--with-rerank", action="store_true")
@@ -99,6 +100,7 @@ def main():
         ("5 ứng viên / ngôn ngữ", {"per_lang": 5}),
         ("20 ứng viên / ngôn ngữ", {"per_lang": 20}),
     ]
+    configs += [("BM25 không dấu (chỉ câu không dấu)", {"hybrid": "unaccented"}), ("BM25 luôn bật", {"hybrid": "always"})]
     for x in (0.02, 0.04, 0.06):
         configs.append((f"Trừ điểm mục sai đối tượng {x}", {"audience_penalty": x}))
     if args.with_rerank:

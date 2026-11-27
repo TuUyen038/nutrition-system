@@ -4,7 +4,7 @@ title: "Dietary Supplements for Immune Function and Infectious Diseases"
 org: "NIH Office of Dietary Supplements (ODS)"
 year: "2025"
 url: "https://ods.od.nih.gov/factsheets/ImmuneFunction-HealthProfessional"
-lang: eng
+lang: en
 audience_group: professional
 chunk_profile: structured
 ---
